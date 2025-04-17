@@ -62,6 +62,12 @@ func EnviarProceso(w http.ResponseWriter, r *http.Request) {
 	if resp != nil {
 		log.Printf("respuesta del servidor: %s", resp.Status)
 	}
+
+	// Agrego el status Code 200 a la respuesta
+	w.WriteHeader(http.StatusOK)
+
+	// Envío la respuesta al cliente con un mensaje de éxito
+	_, _ = w.Write([]byte("ok"))
 }
 
 // Get preferred outbound ip of this machine
