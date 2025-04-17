@@ -12,9 +12,13 @@ func main() {
 
 	handler := http.NewServeMux()
 
-	handler.HandleFunc("/instrucciones", internal.RecibirInstrucciones)
-	handler.HandleFunc("/procesos", internal.RecibirProcesos)
-	handler.HandleFunc("/interrupciones", internal.RecibirInterrupciones)
+	// Recepción de valores
+	handler.HandleFunc("/instrucciones", internal.RecibirInstrucciones)   // Memoria --> CPU
+	handler.HandleFunc("/procesos", internal.RecibirProcesos)             // Kernel --> CPU
+	handler.HandleFunc("/interrupciones", internal.RecibirInterrupciones) // Kernel --> CPU
+
+	// Envío de valores
+	handler.HandleFunc("/proceso", internal.EnviarProceso) // CPU --> Kernel
 
 	if err := http.ListenAndServe(":8080", handler); err != nil {
 		logger.Error("Error starting server", "err", err)
