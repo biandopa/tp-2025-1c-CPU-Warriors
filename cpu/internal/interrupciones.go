@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func RecibirInterrupciones(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) RecibirInterrupciones(w http.ResponseWriter, r *http.Request) {
 	// Leer el cuerpo de la solicitud
 	decoder := json.NewDecoder(r.Body)
 	paquete := map[string]interface{}{}

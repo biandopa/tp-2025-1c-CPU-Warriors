@@ -13,7 +13,7 @@ type Proceso struct {
 	ID int `json:"id"`
 }
 
-func RecibirProcesos(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	// Leer el cuerpo de la solicitud
 	decoder := json.NewDecoder(r.Body)
 	paquete := map[string]interface{}{}
@@ -21,7 +21,7 @@ func RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	// Guarda el valor del body en la variable paquete
 	err := decoder.Decode(&paquete)
 	if err != nil {
-		log.Printf("error al decodificar mensaje: %s\n", err.Error())
+		h.Log.Error("error al decodificar mensaje: %s\n", err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("error al decodificar mensaje"))
 		return
@@ -35,13 +35,13 @@ func RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 }
 
 // EnviarProceso envia un proceso al kernel
-func EnviarProceso(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) EnviarProceso(w http.ResponseWriter, r *http.Request) {
 	// Creo un proceso
 	proceso := Proceso{
 		ID: 1,
 	}
 
-	// Conviero la estructura del proceso a un []bytes
+	// Conviero la estructura del proceso a un []bytes (formato en el que se envían las peticiones)
 	body, err := json.Marshal(proceso)
 	if err != nil {
 		log.Printf("error codificando mensaje: %s", err.Error())
@@ -56,7 +56,7 @@ func EnviarProceso(w http.ResponseWriter, r *http.Request) {
 	url := fmt.Sprintf("http://%s:%d/{{endpoint-kernel}}", ip, puerto)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", ip, puerto)
+		h.Log.Printf("error enviando mensaje a ip:%s puerto:%d", ip, puerto)
 	}
 
 	if resp != nil {
