@@ -22,7 +22,7 @@ func (h *Handler) EnviarIdentificacion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: Agregar endpoint del Kernel
-	url := fmt.Sprintf("http://%s:%d/{{endpoint-kernel}}", h.Config.IpKernel, h.Config.PortKernel)
+	url := fmt.Sprintf("http://%s:%d/cpuConeccionInicial", h.Config.IpKernel, h.Config.PortKernel)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		log.Printf("error enviando mensaje a ip:%s puerto:%d", h.Config.IpKernel, h.Config.PortKernel)

@@ -15,26 +15,25 @@ func main() {
 		log.Fatal("Faltan argumentos.%d", len(os.Args))
 	}
 
-	archivoNombre := os.Args[1]
-	tamanioProceso := os.Args[2]
-
+	internal.ArchivoNombre = os.Args[1]
+	internal.TamanioProceso = os.Args[2]
 	internal.ClientConfig = internal.IniciarConfiguracion("config.json")
 
-	//IO --> Kernel  (le enviará su nombre, ip y puerto)  HANDSHAKE
-	internal.ConeccionInicial(archivoNombre, tamanioProceso, internal.ClientConfig)
+	//IO --> Kernel  (le enviará su nombre, ip y puerto) HANDSHAKE
+	internal.ConeccionInicial()
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/ioConeccionInicial", internal.ConeccionInicialIO)
-	mux.HandleFunc("/cpuConeccionInicial", internal.ConeccionInicialCPU)
+	mux.HandleFunc("/ioConeccionInicial", internal.ConeccionInicialIO)   //IO LISTA --> Kernel
+	mux.HandleFunc("/cpuConeccionInicial", internal.ConeccionInicialCPU) // CPU  --> Kernel (Envia IP, puerto e ID)  HANDSHAKE
+	mux.HandleFunc("/ioTerminoPeticion", internal.TerminoPeticionIO)     // IO --> KERNEL (usleep)
+
+	mux.HandleFunc("/recibo-proceso-cpu", internal.RespuestaProcesoCPU) //CPU --> Kernel (Recibe respuesta del proceso de la CPU) PROCESO
+
+	//mux.HandleFunc("/interrupciones", .RecibirInterrupciones) // Kernel --> CPU Procesos a ejecutar
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", internal.ClientConfig.Port_kernel), mux)
 	if err != nil {
 		panic(err)
 	}
-
-	// Kernel --> Cpu notificaciones de interrupciones LISTO INTERRUPCION
-	// Kernel --> Cpu Procesos a ejecutar  LISTO  PROCESO
-	// Kernel --> Memoria
-	// Kernel --> IO (usleep)?
 }
