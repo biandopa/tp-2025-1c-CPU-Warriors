@@ -23,7 +23,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	err := http.ListenAndServe(fmt.Sprintf(":%d", internal.ClientConfig.Port_io), mux)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", internal.ClientConfig.PortIo), mux)
 	if err != nil {
 		panic(err)
 	}

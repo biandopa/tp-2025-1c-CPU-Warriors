@@ -16,11 +16,11 @@ type IOIdentificacion struct {
 }
 
 type Config struct {
-	Ip_kernel   string `json:"ip_kernel"`
-	Port_kernel int    `json:"port_kernel"`
-	Port_io     int    `json:"port_io"`
-	Ip_io       string `json:"ip_io"`
-	Log_level   string `json:"log_level"`
+	IpKernel   string `json:"ip_kernel"`
+	PortKernel int    `json:"port_kernel"`
+	PortIo     int    `json:"port_io"`
+	IpIo       string `json:"ip_io"`
+	LogLevel   string `json:"log_level"`
 }
 
 var ClientConfig *Config
@@ -31,20 +31,23 @@ func IniciarConfiguracion(filePath string) *Config {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	defer configFile.Close()
+	defer func() {
+		_ = configFile.Close()
+	}()
 
 	jsonParser := json.NewDecoder(configFile)
-	jsonParser.Decode(&config)
+	if err = jsonParser.Decode(&config); err != nil {
+		log.Fatal(err.Error())
+	}
 
 	return config
 }
 
 func ConeccionInicial(nombre string, ClientConfig1 *Config) {
-
 	data := IOIdentificacion{
 		Nombre: nombre,
-		IP:     ClientConfig1.Ip_io,
-		Puerto: ClientConfig1.Port_io,
+		IP:     ClientConfig1.IpIo,
+		Puerto: ClientConfig1.PortIo,
 	}
 
 	body, err := json.Marshal(data)
@@ -53,11 +56,15 @@ func ConeccionInicial(nombre string, ClientConfig1 *Config) {
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/ioConeccionInicial", ClientConfig1.Ip_kernel, ClientConfig1.Port_kernel)
+	url := fmt.Sprintf("http://%s:%d/ioConeccionInicial", ClientConfig1.IpKernel, ClientConfig1.PortKernel)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig1.Ip_kernel, ClientConfig1.Port_kernel)
+		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig1.IpKernel, ClientConfig1.PortKernel)
 	}
 
-	log.Printf("respuesta del servidor: %s", resp.Status)
+	if resp != nil {
+		log.Printf("respuesta del servidor: %s", resp.Status)
+	} else {
+		log.Printf("No se recibió respuesta del servidor")
+	}
 }
