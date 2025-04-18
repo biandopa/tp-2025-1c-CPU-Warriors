@@ -1,18 +1,40 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"net/http"
+	"os"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
 )
 
 func main() {
+
+	if len(os.Args) < 2 {
+		log.Fatal("Faltan argumentos.%d", len(os.Args))
+	}
+
+	archivoNombre := os.Args[1]
+	tamanioProceso := os.Args[2]
+
+	internal.ClientConfig = internal.IniciarConfiguracion("config.json")
+
+	//IO --> Kernel  (le enviará su nombre, ip y puerto)  HANDSHAKE
+	internal.ConeccionInicial(archivoNombre, tamanioProceso, internal.ClientConfig)
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/ioConeccionInicial", internal.ConeccionInicialIO)
+	mux.HandleFunc("/cpuConeccionInicial", internal.ConeccionInicialCPU)
 
-	err := http.ListenAndServe(":8001", mux)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", internal.ClientConfig.Port_kernel), mux)
 	if err != nil {
 		panic(err)
 	}
+
+	// Kernel --> Cpu notificaciones de interrupciones LISTO INTERRUPCION
+	// Kernel --> Cpu Procesos a ejecutar  LISTO  PROCESO
+	// Kernel --> Memoria
+	// Kernel --> IO (usleep)?
 }
