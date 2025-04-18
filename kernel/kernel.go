@@ -25,6 +25,8 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	// TODO: Los endpoints deben escribirse en minúscula y con guiones (o separar palabras con /)
+	// TODO: Si envía body en la petición, se debe usar el método POST
 	mux.HandleFunc("/ioConeccionInicial", internal.ConeccionInicialIO)
 	mux.HandleFunc("/cpuConeccionInicial", internal.ConeccionInicialCPU)
 
