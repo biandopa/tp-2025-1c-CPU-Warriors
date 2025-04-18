@@ -41,7 +41,7 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 		log.Printf("error codificando mensaje: %s", err.Error())
 	}
 
-	url := fmt.Sprintf("http://%s:%d/recibir-puerto", h.Config.IpMemory, h.Config.PortMemory)
+	url := fmt.Sprintf("http://%s:%d/enviar-instruccion", h.Config.IpMemory, h.Config.PortMemory)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		log.Printf("error enviando mensaje a ip:%s puerto:%d", h.Config.IpMemory, h.Config.PortMemory)
