@@ -1,18 +1,43 @@
 package internal
 
+import (
+	"encoding/json"
+	"log"
+	"os"
+)
+
 type Config struct {
-	Port_cpu          int    `json:"port_cpu"`
-	Ip_cpu            string `json:"ip_cpu"`
-	Ip_memory         string `json:"ip_memory"`
-	Port_memory       int    `json:"port_memory"`
-	Ip_kernel         string `json:"ip_kernel"`
-	Port_kernel       int    `json:"port_kernel"`
-	Tlb_entries       int    `json:"tlb_entries"`
-	Tlb_replacement   string `json:"tlb_replacement"`
-	Cache_entries     int    `json:"cache_entries"`
-	Cache_replacement string `json:"cache_replacement"`
-	Cache_delay       int    `json:"cache_delay"`
-	Log_level         string `json:"log_level"`
+	PortCpu          int    `json:"port_cpu"`
+	IpCpu            string `json:"ip_cpu"`
+	IpMemory         string `json:"ip_memory"`
+	PortMemory       int    `json:"port_memory"`
+	IpKernel         string `json:"ip_kernel"`
+	PortKernel       int    `json:"port_kernel"`
+	TlbEntries       int    `json:"tlb_entries"`
+	TlbReplacement   string `json:"tlb_replacement"`
+	CacheEntries     int    `json:"cache_entries"`
+	CacheReplacement string `json:"cache_replacement"`
+	CacheDelay       int    `json:"cache_delay"`
+	LogLevel         string `json:"log_level"`
 }
 
 var ClientConfig *Config
+
+func IniciarConfiguracion(filePath string) *Config {
+	var config *Config
+	configFile, err := os.Open(filePath)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer func() {
+		_ = configFile.Close()
+	}()
+
+	jsonParser := json.NewDecoder(configFile)
+	err = jsonParser.Decode(&config)
+	if err != nil {
+		return nil
+	}
+
+	return config
+}

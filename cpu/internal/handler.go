@@ -7,11 +7,13 @@ import (
 )
 
 type Handler struct {
-	Log *slog.Logger
+	Log    *slog.Logger
+	Config *Config
 }
 
 func NewHandler() *Handler {
 	return &Handler{
-		Log: log.BuildLogger(),
+		Log:    log.BuildLogger(),
+		Config: IniciarConfiguracion("config.json"),
 	}
 }
