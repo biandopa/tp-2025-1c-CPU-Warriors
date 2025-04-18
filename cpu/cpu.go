@@ -8,9 +8,13 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
+const (
+	configFilePath = "./configs/config.json"
+)
+
 func main() {
 	mux := http.NewServeMux()
-	h := internal.NewHandler()
+	h := internal.NewHandler(configFilePath)
 
 	// Recepción de valores
 	mux.HandleFunc("POST /instrucciones", h.RecibirInstrucciones)   // Memoria --> CPU
