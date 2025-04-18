@@ -14,6 +14,6 @@ type Handler struct {
 func NewHandler() *Handler {
 	return &Handler{
 		Log:    log.BuildLogger(),
-		Config: IniciarConfiguracion("config.json"),
+		Config: IniciarConfiguracion("internal/config.json"),
 	}
 }
