@@ -1,4 +1,4 @@
-package internal
+package config
 
 import (
 	"encoding/json"
@@ -25,9 +25,9 @@ func IniciarConfiguracion(filePath string) *Config {
 	var config *Config
 	configFile, err := os.Open(filePath)
 	if err != nil {
-		slog.Error("error opening config file",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		slog.Error("Error al abrir el archivo de configuración",
 			slog.Attr{Key: "filePath", Value: slog.StringValue(filePath)},
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
 		)
 		panic(err)
 	}
@@ -38,9 +38,9 @@ func IniciarConfiguracion(filePath string) *Config {
 	jsonParser := json.NewDecoder(configFile)
 	err = jsonParser.Decode(&config)
 	if err != nil {
-		slog.Error("error decoding config file",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		slog.Error("Error al decodificar el archivo de configuración",
 			slog.Attr{Key: "filePath", Value: slog.StringValue(filePath)},
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
 		)
 		panic(err)
 	}
