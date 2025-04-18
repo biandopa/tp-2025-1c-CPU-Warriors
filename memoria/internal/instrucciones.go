@@ -8,25 +8,7 @@ import (
 	"net/http"
 )
 
-func (h *Handler) RecibirInstrucciones(w http.ResponseWriter, r *http.Request) {
-	// Leer el cuerpo de la solicitud
-	decoder := json.NewDecoder(r.Body)
-	paquete := map[string]interface{}{}
-
-	// Guarda el valor del body en la variable paquete
-	err := decoder.Decode(&paquete)
-	if err != nil {
-		log.Printf("error al decodificar mensaje: %s\n", err.Error())
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("error al decodificar mensaje"))
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("ok"))
-}
-
-func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) EnviarInstrucciones(w http.ResponseWriter, r *http.Request) {
 	// Creo instruccion
 	instruccion := map[string]interface{}{
 		"tipo": "instruccion",
@@ -41,10 +23,10 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 		log.Printf("error codificando mensaje: %s", err.Error())
 	}
 
-	url := fmt.Sprintf("http://%s:%d/recibir-puerto", h.Config.IpMemory, h.Config.PortMemory)
+	url := fmt.Sprintf("http://%s:%d/instrucciones", h.Config.IpCpu, h.Config.PortCpu)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", h.Config.IpMemory, h.Config.PortMemory)
+		log.Printf("error enviando mensaje a ip:%s puerto:%d", h.Config.IpCpu, h.Config.PortCpu)
 	}
 
 	if resp != nil {
@@ -56,4 +38,21 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 
 	// Envío la respuesta al cliente con un mensaje de éxito
 	_, _ = w.Write([]byte("ok"))
+}
+
+func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
+	// Decode the request body
+	var instruccion map[string]interface{}
+	err := json.NewDecoder(r.Body).Decode(&instruccion)
+	if err != nil {
+		h.Log.Error("Error decoding request body", "error", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	h.Log.Info("RecibirInstruccion", "instruccion", instruccion)
+
+	// Respond with success
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("Request processed successfully"))
 }
