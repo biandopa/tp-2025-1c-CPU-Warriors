@@ -56,7 +56,7 @@ func (h *Handler) EnviarProceso(w http.ResponseWriter, r *http.Request) {
 	url := fmt.Sprintf("http://%s:%d/{{endpoint-kernel}}", ip, puerto)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		h.Log.Printf("error enviando mensaje a ip:%s puerto:%d", ip, puerto)
+		log.Printf("error enviando mensaje a ip:%s puerto:%d", ip, puerto)
 	}
 
 	if resp != nil {
