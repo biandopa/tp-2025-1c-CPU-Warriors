@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+
+	"github.com/sisoputnfrba/tp-golang/cpu/internal"
 )
 
 type Proceso struct {
@@ -53,7 +55,7 @@ func (h *Handler) EnviarProceso(w http.ResponseWriter, r *http.Request) {
 	puerto := 8085
 
 	// TODO: Agregar endpoint del Kernel y poner IP + puerto en config
-	url := fmt.Sprintf("http://%s:%d/{{endpoint-kernel}}", ip, puerto)
+	url := fmt.Sprintf("http://%s:%d/{{endpoint-kernel}}", internal.ClientConfig.Ip_cpu, internal.ClientConfig.port_cpu)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		log.Printf("error enviando mensaje a ip:%s puerto:%d", ip, puerto)
