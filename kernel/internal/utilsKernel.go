@@ -42,16 +42,19 @@ func IniciarConfiguracion(filePath string) *Config {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	defer configFile.Close()
+	defer func() {
+		_ = configFile.Close()
+	}()
 
 	jsonParser := json.NewDecoder(configFile)
-	jsonParser.Decode(&config)
+	if err = jsonParser.Decode(&config); err != nil {
+		log.Fatal(err.Error())
+	}
 
 	return config
 }
 
 func ConeccionInicial(archivoNombre string, tamanioProceso string, ClientConfig1 *Config) {
-
 	log.Printf("Connecion Inicial - archivo: %s, tamaño: %s, config: %+v", archivoNombre, tamanioProceso, ClientConfig1)
 
 	body, err := json.Marshal(tamanioProceso)
@@ -66,7 +69,11 @@ func ConeccionInicial(archivoNombre string, tamanioProceso string, ClientConfig1
 		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig1.IpMemory, ClientConfig1.PortMemory)
 	}
 
-	log.Printf("respuesta del servidor: %s", resp.Status)
+	if resp != nil {
+		log.Printf("respuesta del servidor: %s", resp.Status)
+	} else {
+		log.Printf("respuesta del servidor: nil")
+	}
 }
 
 func ConeccionInicialIO(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +83,7 @@ func ConeccionInicialIO(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error al decodificar ioIdentificacion: %s\n", err.Error())
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Error al decodificar ioIdentificacion"))
+		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
 		return
 	}
 
@@ -84,7 +91,7 @@ func ConeccionInicialIO(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%+v\n", ioIdentificacion)
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	_, _ = w.Write([]byte("ok"))
 }
 
 func ConeccionInicialCPU(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +101,7 @@ func ConeccionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error al decodificar ioIdentificacion: %s\n", err.Error())
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Error al decodificar ioIdentificacion"))
+		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
 		return
 	}
 
@@ -102,5 +109,5 @@ func ConeccionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%+v\n", cpuIdentificacion)
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	_, _ = w.Write([]byte("ok"))
 }
