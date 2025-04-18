@@ -11,15 +11,15 @@ import (
 func main() {
 
 	//para que tome el argumento debe ingresarse asi "go run io.go NOMBRE"
-	interfazIo := os.Args[1]
+	internal.NombreIO = os.Args[1]
 
 	internal.ClientConfig = internal.IniciarConfiguracion("config.json")
 
 	//BORRAR
-	fmt.Println("Inicializando interfaz IO con nombre:", interfazIo)
+	fmt.Println("Inicializando interfaz IO con nombre:", internal.NombreIO)
 
 	//IO --> Kernel  (le enviará su nombre, ip y puerto)  HANDSHAKE
-	internal.ConeccionInicial(interfazIo, internal.ClientConfig)
+	internal.ConeccionInicial()
 
 	mux := http.NewServeMux()
 
@@ -28,7 +28,7 @@ func main() {
 		panic(err)
 	}
 
-	//Kernel --> IO (usleep)
-	//mux.HandleFunc("/petiocionKernel", internal.EjecutarPeticion)
-	//IO --> Kernel  (respuesta de solicitud finalizada) posiblemnte va dentro del EjecutarPeticion
+	//Kernel --> IO (usleep) LISTO
+	mux.HandleFunc("/petiocionKernel", internal.EjecutarPeticion)
+	//IO --> Kernel  (respuesta de solicitud finalizada) LISTO
 }
