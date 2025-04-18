@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+
+	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 func (h *Handler) RecibirInstrucciones(w http.ResponseWriter, r *http.Request) {
@@ -16,14 +18,14 @@ func (h *Handler) RecibirInstrucciones(w http.ResponseWriter, r *http.Request) {
 	// Guarda el valor del body en la variable paquete
 	err := decoder.Decode(&paquete)
 	if err != nil {
-		log.Printf("error al decodificar mensaje: %s\n", err.Error())
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("error al decodificar mensaje"))
+		h.Log.Error("Error al decodificar mensaje", log.ErrAttr(err))
+		http.Error(w, "error al decodificar mensaje", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
+	return
 }
 
 func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
@@ -38,17 +40,30 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 	// Conviero la estructura del proceso a un []bytes (formato en el que se envían las peticiones)
 	body, err := json.Marshal(instruccion)
 	if err != nil {
-		log.Printf("error codificando mensaje: %s", err.Error())
+		h.Log.Error("Error codificando mensaje", log.ErrAttr(err))
+		http.Error(w, "Error codificando mensaje", http.StatusBadRequest)
+		return
 	}
 
 	url := fmt.Sprintf("http://%s:%d/enviar-instruccion", h.Config.IpMemory, h.Config.PortMemory)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", h.Config.IpMemory, h.Config.PortMemory)
+		h.Log.Error("Error enviando mensaje",
+			slog.Attr{Key: "ip", Value: slog.StringValue(h.Config.IpMemory)},
+			slog.Attr{Key: "puerto", Value: slog.IntValue(h.Config.PortMemory)},
+			log.ErrAttr(err),
+		)
+		http.Error(w, "Error enviando mensaje", http.StatusBadRequest)
+		return
 	}
 
 	if resp != nil {
-		log.Printf("respuesta del servidor: %s", resp.Status)
+		h.Log.Info("Respuesta del servidor",
+			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
+			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
+		)
+	} else {
+		h.Log.Info("Respuesta del servidor: nil")
 	}
 
 	// Agrego el status Code 200 a la respuesta
@@ -56,4 +71,5 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 
 	// Envío la respuesta al cliente con un mensaje de éxito
 	_, _ = w.Write([]byte("ok"))
+	return
 }

@@ -2,8 +2,9 @@ package internal
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
+
+	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 func (h *Handler) RecibirInterrupciones(w http.ResponseWriter, r *http.Request) {
@@ -14,12 +15,12 @@ func (h *Handler) RecibirInterrupciones(w http.ResponseWriter, r *http.Request) 
 	// Guarda el valor del body en la variable paquete
 	err := decoder.Decode(&paquete)
 	if err != nil {
-		log.Printf("error al decodificar mensaje: %s\n", err.Error())
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("error al decodificar mensaje"))
+		h.Log.Error("Error al decodificar mensaje", log.ErrAttr(err))
+		http.Error(w, "error al decodificar mensaje", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
+	return
 }

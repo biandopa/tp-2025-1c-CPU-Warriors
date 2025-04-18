@@ -2,7 +2,7 @@ package internal
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 )
 
@@ -21,13 +21,15 @@ type Config struct {
 	LogLevel         string `json:"log_level"`
 }
 
-var ClientConfig *Config
-
 func IniciarConfiguracion(filePath string) *Config {
 	var config *Config
 	configFile, err := os.Open(filePath)
 	if err != nil {
-		log.Fatal(err.Error())
+		slog.Error("Error opening config file",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+			slog.Attr{Key: "filePath", Value: slog.StringValue(filePath)},
+		)
+		panic(err)
 	}
 	defer func() {
 		_ = configFile.Close()
@@ -36,7 +38,11 @@ func IniciarConfiguracion(filePath string) *Config {
 	jsonParser := json.NewDecoder(configFile)
 	err = jsonParser.Decode(&config)
 	if err != nil {
-		return nil
+		slog.Error("Error decoding config file",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+			slog.Attr{Key: "filePath", Value: slog.StringValue(filePath)},
+		)
+		panic(err)
 	}
 
 	return config
