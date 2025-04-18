@@ -12,7 +12,7 @@ import (
 func main() {
 
 	if len(os.Args) < 2 {
-		log.Fatal("Faltan argumentos.%d", len(os.Args))
+		log.Fatalf("Faltan %d argumentos.", len(os.Args))
 	}
 
 	archivoNombre := os.Args[1]
@@ -28,7 +28,7 @@ func main() {
 	mux.HandleFunc("/ioConeccionInicial", internal.ConeccionInicialIO)
 	mux.HandleFunc("/cpuConeccionInicial", internal.ConeccionInicialCPU)
 
-	err := http.ListenAndServe(fmt.Sprintf(":%d", internal.ClientConfig.Port_kernel), mux)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", internal.ClientConfig.PortKernel), mux)
 	if err != nil {
 		panic(err)
 	}
