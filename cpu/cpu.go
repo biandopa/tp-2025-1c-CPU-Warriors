@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/cpu/internal"
@@ -16,9 +17,12 @@ func main() {
 	mux.HandleFunc("/interrupciones", h.RecibirInterrupciones) // Kernel --> CPU
 
 	// Envío de valores
-	mux.HandleFunc("/proceso", h.EnviarProceso) // CPU --> Kernel
+	mux.HandleFunc("/enviar-proceso", h.EnviarProceso)         // CPU --> Kernel
+	mux.HandleFunc("/envio-ip", h.EnviarIdentificacion)        // CPU --> Kernel
+	mux.HandleFunc("/enviar-instruccion", h.EnviarInstruccion) // CPU --> Memoria
 
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	cpuAddress := fmt.Sprintf("%s:%d", h.Config.IpCpu, h.Config.PortCpu)
+	if err := http.ListenAndServe(cpuAddress, mux); err != nil {
 		h.Log.Error("Error starting server", "err", err)
 		panic(err)
 	}
