@@ -67,7 +67,6 @@ func (h *Handler) EnviarInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 	// Envío la respuesta al cliente con un mensaje de éxito
 	_, _ = w.Write([]byte("ok"))
-	return
 }
 
 func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
