@@ -25,5 +25,4 @@ func (h *Handler) RecibirPeticionAcceso(w http.ResponseWriter, r *http.Request) 
 	// Respond with success
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("Request processed successfully"))
-	return
 }

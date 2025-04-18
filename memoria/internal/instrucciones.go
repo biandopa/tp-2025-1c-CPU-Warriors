@@ -87,5 +87,4 @@ func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 	// Respond with success
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("request processed successfully"))
-	return
 }
