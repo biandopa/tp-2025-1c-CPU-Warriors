@@ -23,15 +23,15 @@ type CPUIdentificacion struct {
 }
 
 type Config struct {
-	Ip_memory               string `json:"ip_memory"`
-	Port_memory             int    `json:"port_memory"`
-	Ip_kernel               string `json:"ip_kernel"`
-	Port_kernel             int    `json:"port_kernel"`
-	Scheduler_algorithm     string `json:"scheduler_algorithm"`
-	Ready_ingress_algorithm int    `json:"ready_ingress_algorithm"`
-	Alpha                   int    `json:"alpha"`
-	Suspension_Time         int    `json:"suspension_time"`
-	Log_level               string `json:"log_level"`
+	IpMemory              string `json:"ip_memory"`
+	PortMemory            int    `json:"port_memory"`
+	IpKernel              string `json:"ip_kernel"`
+	PortKernel            int    `json:"port_kernel"`
+	SchedulerAlgorithm    string `json:"scheduler_algorithm"`
+	ReadyIngressAlgorithm int    `json:"ready_ingress_algorithm"`
+	Alpha                 int    `json:"alpha"`
+	SuspensionTime        int    `json:"suspension_time"`
+	LogLevel              string `json:"log_level"`
 }
 
 var ClientConfig *Config
@@ -60,10 +60,10 @@ func ConeccionInicial(archivoNombre string, tamanioProceso string, ClientConfig1
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/memoriaConeccionInicial", ClientConfig1.Ip_memory, ClientConfig1.Port_memory)
+	url := fmt.Sprintf("http://%s:%d/memoriaConeccionInicial", ClientConfig1.IpMemory, ClientConfig1.PortMemory)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig1.Ip_memory, ClientConfig1.Port_memory)
+		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig1.IpMemory, ClientConfig1.PortMemory)
 	}
 
 	log.Printf("respuesta del servidor: %s", resp.Status)
