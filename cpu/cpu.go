@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/cpu/internal"
+	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 func main() {
@@ -24,9 +24,7 @@ func main() {
 
 	cpuAddress := fmt.Sprintf("%s:%d", h.Config.IpCpu, h.Config.PortCpu)
 	if err := http.ListenAndServe(cpuAddress, mux); err != nil {
-		h.Log.Error("Error starting server",
-			slog.Attr{Key: "err", Value: slog.StringValue(err.Error())},
-		)
+		h.Log.Error("Error starting server", log.ErrAttr(err))
 		panic(err)
 	}
 }

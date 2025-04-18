@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/memoria/internal"
+	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 func main() {
@@ -21,9 +21,7 @@ func main() {
 
 	memoriaAddress := fmt.Sprintf("%s:%d", h.Config.IpMemory, h.Config.PortMemory)
 	if err := http.ListenAndServe(memoriaAddress, mux); err != nil {
-		h.Log.Error("Error starting server",
-			slog.Attr{Key: "err", Value: slog.StringValue(err.Error())},
-		)
+		h.Log.Error("Error starting server", log.ErrAttr(err))
 		panic(err)
 	}
 }

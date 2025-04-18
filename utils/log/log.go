@@ -12,3 +12,7 @@ func BuildLogger() *slog.Logger {
 	}
 	return slog.New(slog.NewJSONHandler(os.Stderr, ops))
 }
+
+func ErrAttr(err error) slog.Attr {
+	return slog.Any("error", err)
+}
