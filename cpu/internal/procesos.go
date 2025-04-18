@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 )
 
@@ -47,16 +46,11 @@ func (h *Handler) EnviarProceso(w http.ResponseWriter, r *http.Request) {
 		log.Printf("error codificando mensaje: %s", err.Error())
 	}
 
-	// Solo para pruebas!!! --> Borar después
-	// Obtengo mi IP y asigno un puerto random
-	ip := GetOutboundIP().String()
-	puerto := 8085
-
-	// TODO: Agregar endpoint del Kernel y poner IP + puerto en config
-	url := fmt.Sprintf("http://%s:%d/{{endpoint-kernel}}", ip, puerto)
+	// TODO: Agregar endpoint del Kernel
+	url := fmt.Sprintf("http://%s:%d/{{endpoint-kernel}}", h.Config.IpKernel, h.Config.PortKernel)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", ip, puerto)
+		log.Printf("error enviando mensaje a ip:%s puerto:%d", h.Config.IpKernel, h.Config.PortKernel)
 	}
 
 	if resp != nil {
@@ -68,19 +62,4 @@ func (h *Handler) EnviarProceso(w http.ResponseWriter, r *http.Request) {
 
 	// Envío la respuesta al cliente con un mensaje de éxito
 	_, _ = w.Write([]byte("ok"))
-}
-
-// Get preferred outbound ip of this machine
-func GetOutboundIP() net.IP {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
-	return localAddr.IP
 }
