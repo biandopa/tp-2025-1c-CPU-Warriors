@@ -1,0 +1,17 @@
+{
+  "port_memory": 8002,
+  "ip_memory": "127.0.0.1",
+  "port_cpu": 8004,
+  "ip_cpu": "127.0.0.1",
+  "ip_kernel": "127.0.0.1",
+  "port_kernel": 8002,
+  "memory_size": 4096,
+  "page_size": 64,
+  "entries_per_page": 4,
+  "number_of_levels": 5,
+  "memory_delay": 1500,
+  "swapfile_path": "/home/utnso/swapfile.bin",
+  "swap_delay": 15000,
+  "log_level": "DEBUG",
+  "dump_path": "/home/utnso/dump_files/"
+}
