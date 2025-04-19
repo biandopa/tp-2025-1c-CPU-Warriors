@@ -58,8 +58,8 @@ func IniciarConfiguracion(filePath string) *Config {
 	return config
 }
 
-func (h *Handler) ConeccionInicial() {
-	h.Log.Debug("Connecion Inicial config: %+v",
+func (h *Handler) ConexionInicial() {
+	h.Log.Debug("Conexión Inicial",
 		slog.Attr{Key: "archivo", Value: slog.StringValue(ArchivoNombre)},
 		slog.Attr{Key: "tamaño", Value: slog.StringValue(TamanioProceso)},
 		slog.Attr{Key: "config", Value: slog.AnyValue(ClientConfig)},
@@ -93,7 +93,7 @@ func (h *Handler) ConeccionInicial() {
 	}
 }
 
-func (h *Handler) ConeccionInicialIO(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&ioIdentificacion)
 	if err != nil {
@@ -114,7 +114,7 @@ func (h *Handler) ConeccionInicialIO(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
-func (h *Handler) ConeccionInicialCPU(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&identificacionCPU)
 	if err != nil {
