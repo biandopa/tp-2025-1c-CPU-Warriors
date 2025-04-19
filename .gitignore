@@ -1,3 +1,8 @@
 # Log files
 *.log
 
+# IDE specific files
+.idea/
+*.xml
+*.iml
+
