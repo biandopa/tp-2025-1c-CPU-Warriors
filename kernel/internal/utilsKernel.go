@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
+	"log/slog"
 	"net/http"
 	"os"
 )
@@ -56,95 +58,129 @@ func IniciarConfiguracion(filePath string) *Config {
 	return config
 }
 
-func ConeccionInicial() {
-	log.Printf("Connecion Inicial - archivo: %s, tamaño: %s, config: %+v", ArchivoNombre, TamanioProceso, ClientConfig)
+func (h *Handler) ConeccionInicial() {
+	h.Log.Debug("Connecion Inicial config: %+v",
+		slog.Attr{Key: "archivo", Value: slog.StringValue(ArchivoNombre)},
+		slog.Attr{Key: "tamaño", Value: slog.StringValue(TamanioProceso)},
+		slog.Attr{Key: "config", Value: slog.AnyValue(ClientConfig)},
+	)
 
 	body, err := json.Marshal(TamanioProceso)
 	if err != nil {
-		log.Printf("error codificando nombre: %s", err.Error())
+		h.Log.Error("Error al serializar tamanioProceso",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/pedir-acceso", ClientConfig.Ip_memory, ClientConfig.Port_memory)
+	url := fmt.Sprintf("http://%s:%d/pedir-acceso", ClientConfig.IpMemory, ClientConfig.PortMemory)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig.Ip_memory, ClientConfig.Port_memory)
+		h.Log.Error("Error enviando mensaje a memoria",
+			slog.Attr{Key: "ip", Value: slog.StringValue(ClientConfig.IpMemory)},
+			slog.Attr{Key: "puerto", Value: slog.IntValue(ClientConfig.PortMemory)},
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
 	}
 
 	if resp != nil {
-		log.Printf("respuesta del servidor: %s", resp.Status)
+		h.Log.Info("Respuesta del servidor",
+			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
+			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
+		)
 	} else {
-		log.Printf("respuesta del servidor: nil")
+		h.Log.Info("Respuesta del servidor: nil")
 	}
 }
 
-func ConeccionInicialIO(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ConeccionInicialIO(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&ioIdentificacion)
 	if err != nil {
-		log.Printf("Error al decodificar ioIdentificacion: %s\n", err.Error())
+		h.Log.Error("Error al decodificar ioIdentificacion",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
+
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
 		return
 	}
 
-	log.Println("Me llego la conexion de un IO")
-	log.Printf("%+v\n", ioIdentificacion)
+	h.Log.Debug("Me llego la conexion de un IO",
+		slog.Attr{Key: "ioIdentificacion", Value: slog.AnyValue(ioIdentificacion)},
+	)
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }
 
-func ConeccionInicialCPU(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ConeccionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&identificacionCPU)
 	if err != nil {
-		log.Printf("Error al decodificar ioIdentificacion: %s\n", err.Error())
+		h.Log.Error("Error al decodificar ioIdentificacion",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
-		return
 	}
 
-	log.Println("Me llego la conexion de una CPU")
-	log.Printf("%+v\n", identificacionCPU)
+	h.Log.Debug("Me llego la conexion de CPU",
+		slog.Attr{Key: "identificacionCPU", Value: slog.AnyValue(identificacionCPU)},
+	)
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	_, _ = w.Write([]byte("ok"))
 }
 
 // TODO: usarla donde sea necesario
-func EnviarPeticionAIO(tiempoSleep int) {
-
+func (h *Handler) EnviarPeticionAIO(w http.ResponseWriter, tiempoSleep int) {
 	body, err := json.Marshal(tiempoSleep)
 	if err != nil {
-		log.Printf("error codificando nombre: %s", err.Error())
+		h.Log.Error("Error codificando tiempoSleep",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
+		http.Error(w, "error codificando mensaje", http.StatusInternalServerError)
 		return
 	}
 
 	url := fmt.Sprintf("http://%s:%d/petiocionKernel", ioIdentificacion.IP, ioIdentificacion.Puerto)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig.Ip_kernel, ClientConfig.Port_kernel)
+		h.Log.Error("Error enviando mensaje a peticion",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
+		http.Error(w, "error enviando mensaje", http.StatusBadRequest)
+		return
 	}
 
-	log.Printf("respuesta del servidor: %s", resp.Status)
+	if resp != nil {
+		h.Log.Debug("Respuesta del servidor",
+			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
+			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
+		)
+	} else {
+		h.Log.Debug("Respuesta del servidor: nil")
+	}
 }
 
-func TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
-
+func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var ioIdentificacionPeticion IOIdentificacion
 	err := decoder.Decode(&ioIdentificacionPeticion)
 	if err != nil {
-		log.Printf("Error al decodificar ioIdentificacion: %s\n", err.Error())
+		h.Log.Error("Error al decodificar ioIdentificacion",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Error al decodificar ioIdentificacion"))
+		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
 		return
 	}
 
 	//TODO: Buscar en la lista de ioIdentificacion y cambiarle es status
-	log.Println("Me llego la peticion Finalizada de IO")
-	log.Printf("%+v\n", ioIdentificacion)
+	h.Log.Debug("Me llego la peticion Finalizada de IO",
+		slog.Attr{Key: "ioIdentificacion", Value: slog.AnyValue(ioIdentificacionPeticion)},
+	)
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))

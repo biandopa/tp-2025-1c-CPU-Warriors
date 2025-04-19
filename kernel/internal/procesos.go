@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -13,7 +13,7 @@ type Proceso struct {
 }
 
 // EnviarProceso envia un proceso al Cpu
-func EnviarProceso(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) EnviarProceso(w http.ResponseWriter, r *http.Request) {
 	// Creo un proceso
 	proceso := Proceso{
 		ID: 1,
@@ -22,36 +22,54 @@ func EnviarProceso(w http.ResponseWriter, r *http.Request) {
 	// Convierto la estructura del proceso a un []bytes (formato en el que se envían las peticiones)
 	body, err := json.Marshal(proceso)
 	if err != nil {
-		log.Printf("error codificando mensaje: %s", err.Error())
+		h.Log.Error("error codificando mensaje",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
+		http.Error(w, "error codificando mensaje", http.StatusInternalServerError)
 	}
 
 	url := fmt.Sprintf("http://%s:%d/procesos", identificacionCPU["ip"].(string), identificacionCPU["puerto"].(int))
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", identificacionCPU["ip"].(string), identificacionCPU["puerto"].(int))
+		h.Log.Error("error enviando mensaje",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+			slog.Attr{Key: "ip", Value: slog.StringValue(identificacionCPU["ip"].(string))},
+			slog.Attr{Key: "puerto", Value: slog.IntValue(identificacionCPU["puerto"].(int))},
+		)
+		http.Error(w, "error enviando mensaje", http.StatusBadRequest)
+		return
 	}
 
-	log.Printf("respuesta del CPU: %s", resp.Status)
+	if resp != nil {
+		h.Log.Debug("Respuesta del servidor",
+			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
+			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
+		)
+	} else {
+		h.Log.Debug("Respuesta del servidor: nil")
+	}
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }
 
-func RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var proceso Proceso
 
 	err := decoder.Decode(&proceso)
 	if err != nil {
-		log.Printf("Error al decodificar la RTA del Proceso: %s\n", err.Error())
+		h.Log.Error("Error al decodificar la RTA del Proceso",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Error al decodificar la RTA del Proceso"))
-		return
+		_, _ = w.Write([]byte("Error al decodificar la RTA del Proceso"))
 	}
 
-	log.Println("Me llego la RTA del Proceso")
-	log.Printf("%+v\n", proceso)
+	h.Log.Debug("Me llego la RTA del Proceso",
+		slog.Attr{Key: "proceso", Value: slog.AnyValue(proceso)},
+	)
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	_, _ = w.Write([]byte("ok"))
 }

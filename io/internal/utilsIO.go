@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -44,8 +46,7 @@ func IniciarConfiguracion(filePath string) *Config {
 	return config
 }
 
-func ConeccionInicial() {
-
+func (h *Handler) ConeccionInicial() {
 	data := IOIdentificacion{
 		Nombre: NombreIO,
 		IP:     ClientConfig.IpIo,
@@ -54,52 +55,69 @@ func ConeccionInicial() {
 
 	body, err := json.Marshal(data)
 	if err != nil {
-		log.Printf("error codificando nombre: %s", err.Error())
+		h.Log.Error("Error al serializar ioIdentificacion",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/ioConeccionInicial", ClientConfig.Ip_kernel, ClientConfig.Port_kernel)
+	url := fmt.Sprintf("http://%s:%d/ioConeccionInicial", ClientConfig.IpKernel, ClientConfig.PortKernel)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig.Ip_kernel, ClientConfig.Port_kernel)
+		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig.IpKernel, ClientConfig.PortKernel)
 	}
 
-	log.Printf("respuesta del servidor: %s", resp.Status)
+	if resp != nil {
+		h.Log.Info("Respuesta del servidor",
+			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
+			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
+		)
+	} else {
+		h.Log.Info("Respuesta del servidor: nil")
+	}
 }
 
-func EjecutarPeticion(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) EjecutarPeticion(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var tiempoSleep int
 	err := decoder.Decode(&tiempoSleep)
 	if err != nil {
-		log.Printf("Error al decodificar ioIdentificacion: %s\n", err.Error())
+		h.Log.Error("Error al decodificar ioIdentificacion",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Error al decodificar ioIdentificacion"))
+		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
 		return
 	}
 
-	log.Println("Me llego la peticion del Kernel")
-	log.Printf("%+d\n", tiempoSleep)
+	h.Log.Debug("Me llego la peticion del Kernel",
+		slog.Attr{Key: "tiempoSleep", Value: slog.IntValue(tiempoSleep)},
+	)
 
 	time.Sleep(time.Duration(tiempoSleep) * time.Microsecond)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	_, _ = w.Write([]byte("ok"))
 
 	//Avisa que termino
-	AvisarAKernelFinalizacionPeticion()
+	h.AvisarAKernelFinalizacionPeticion()
 }
 
-func AvisarAKernelFinalizacionPeticion() {
-
-	url := fmt.Sprintf("http://%s:%d/ioTerminoPeticion", ClientConfig.Ip_kernel, ClientConfig.Port_kernel)
+func (h *Handler) AvisarAKernelFinalizacionPeticion() {
+	url := fmt.Sprintf("http://%s:%d/ioTerminoPeticion", ClientConfig.IpKernel, ClientConfig.PortKernel)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer([]byte("{}")))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig.Ip_kernel, ClientConfig.Port_kernel)
+		h.Log.Error("error enviando mensaje",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+			slog.Attr{Key: "ip", Value: slog.StringValue(ClientConfig.IpKernel)},
+			slog.Attr{Key: "puerto", Value: slog.IntValue(ClientConfig.PortKernel)},
+		)
 	}
 
 	if resp != nil {
-		log.Printf("respuesta del servidor: %s", resp.Status)
+		h.Log.Info("Respuesta del servidor",
+			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
+		)
 	} else {
-		log.Printf("No se recibió respuesta del servidor")
+		h.Log.Info("No se recibió respuesta del servidor")
 	}
 }

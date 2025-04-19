@@ -2,24 +2,29 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/sisoputnfrba/tp-golang/io/internal"
 )
 
+const (
+	configFilePath = "./configs/config.json"
+)
+
 func main() {
+	h := internal.NewHandler(configFilePath)
 
 	//para que tome el argumento debe ingresarse asi "go run io.go NOMBRE"
 	internal.NombreIO = os.Args[1]
 
-	internal.ClientConfig = internal.IniciarConfiguracion("config.json")
-
-	//BORRAR
-	fmt.Println("Inicializando interfaz IO con nombre:", internal.NombreIO)
+	h.Log.Debug("Inicializando interfaz IO",
+		slog.Attr{Key: "nombre", Value: slog.StringValue(internal.NombreIO)},
+	)
 
 	//IO --> Kernel  (le enviará su nombre, ip y puerto)  HANDSHAKE
-	internal.ConeccionInicial()
+	h.ConeccionInicial()
 
 	mux := http.NewServeMux()
 
@@ -29,6 +34,6 @@ func main() {
 	}
 
 	//Kernel --> IO (usleep) LISTO
-	mux.HandleFunc("/petiocionKernel", internal.EjecutarPeticion)
+	mux.HandleFunc("/petiocionKernel", h.EjecutarPeticion)
 	//IO --> Kernel  (respuesta de solicitud finalizada) LISTO
 }
