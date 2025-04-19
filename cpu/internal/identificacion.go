@@ -11,6 +11,7 @@ import (
 )
 
 func (h *Handler) EnviarIdentificacion(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	identificacion := map[string]interface{}{
 		"ip":     h.Config.IpCpu,
 		"puerto": h.Config.PortCpu,
@@ -20,16 +21,15 @@ func (h *Handler) EnviarIdentificacion(w http.ResponseWriter, r *http.Request) {
 	// Convierto la estructura del proceso a un []bytes (formato en el que se envían las peticiones)
 	body, err := json.Marshal(identificacion)
 	if err != nil {
-		h.Log.Error("Error codificando mensaje", log.ErrAttr(err))
+		h.Log.ErrorContext(ctx, "Error codificando mensaje", log.ErrAttr(err))
 		http.Error(w, "error codificando mensaje", http.StatusInternalServerError)
 		return
 	}
 
-	// TODO: Agregar endpoint del Kernel
-	url := fmt.Sprintf("http://%s:%d/cpuConeccionInicial", h.Config.IpKernel, h.Config.PortKernel)
+	url := fmt.Sprintf("http://%s:%d/cpu/conexion-inicial", h.Config.IpKernel, h.Config.PortKernel)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		h.Log.Error("Error enviando identificacion a Kernel",
+		h.Log.ErrorContext(ctx, "Error enviando identificacion a Kernel",
 			slog.Attr{Key: "ip", Value: slog.StringValue(h.Config.IpKernel)},
 			slog.Attr{Key: "puerto", Value: slog.IntValue(h.Config.PortKernel)},
 			log.ErrAttr(err),

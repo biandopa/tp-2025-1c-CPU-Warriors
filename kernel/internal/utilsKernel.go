@@ -73,7 +73,7 @@ func (h *Handler) ConexionInicial() {
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/pedir-acceso", ClientConfig.IpMemory, ClientConfig.PortMemory)
+	url := fmt.Sprintf("http://%s:%d/kernel/acceso", ClientConfig.IpMemory, ClientConfig.PortMemory)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.Error("Error enviando mensaje a memoria",
@@ -144,7 +144,7 @@ func (h *Handler) EnviarPeticionAIO(w http.ResponseWriter, tiempoSleep int) {
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/petiocionKernel", ioIdentificacion.IP, ioIdentificacion.Puerto)
+	url := fmt.Sprintf("http://%s:%d/io/peticion", ioIdentificacion.IP, ioIdentificacion.Puerto)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.Error("Error enviando mensaje a peticion",

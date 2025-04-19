@@ -11,6 +11,7 @@ import (
 )
 
 func (h *Handler) EnviarInstrucciones(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	// Creo instruccion
 	instruccion := map[string]interface{}{
 		"tipo": "instruccion",
@@ -22,12 +23,12 @@ func (h *Handler) EnviarInstrucciones(w http.ResponseWriter, r *http.Request) {
 	// Conviero la estructura del proceso a un []bytes (formato en el que se envían las peticiones)
 	body, err := json.Marshal(instruccion)
 	if err != nil {
-		h.Log.Error("Error codificando mensaje", log.ErrAttr(err))
+		h.Log.ErrorContext(ctx, "Error codificando mensaje", log.ErrAttr(err))
 		http.Error(w, "Error codificando mensaje", http.StatusBadRequest)
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/instrucciones", h.Config.IpCpu, h.Config.PortCpu)
+	url := fmt.Sprintf("http://%s:%d/memoria/instrucciones", h.Config.IpCpu, h.Config.PortCpu)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.Error("Error enviando mensaje",

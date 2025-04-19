@@ -34,6 +34,6 @@ func main() {
 	}
 
 	//Kernel --> IO (usleep) LISTO
-	mux.HandleFunc("/petiocionKernel", h.EjecutarPeticion)
+	mux.HandleFunc("/kernel/usleep", h.EjecutarPeticion)
 	//IO --> Kernel  (respuesta de solicitud finalizada) LISTO
 }

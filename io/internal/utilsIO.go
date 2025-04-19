@@ -49,8 +49,8 @@ func IniciarConfiguracion(filePath string) *Config {
 func (h *Handler) ConeccionInicial() {
 	data := IOIdentificacion{
 		Nombre: NombreIO,
-		IP:     ClientConfig.IpIo,
-		Puerto: ClientConfig.PortIo,
+		IP:     h.Config.IpIo,
+		Puerto: h.Config.PortIo,
 	}
 
 	body, err := json.Marshal(data)
@@ -61,10 +61,14 @@ func (h *Handler) ConeccionInicial() {
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/ioConeccionInicial", ClientConfig.IpKernel, ClientConfig.PortKernel)
+	url := fmt.Sprintf("http://%s:%d/io/conexion-inicial", h.Config.IpKernel, h.Config.PortKernel)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig.IpKernel, ClientConfig.PortKernel)
+		h.Log.Error("error enviando mensaje",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+			slog.Attr{Key: "ip", Value: slog.StringValue(h.Config.IpKernel)},
+			slog.Attr{Key: "puerto", Value: slog.IntValue(h.Config.PortKernel)},
+		)
 	}
 
 	if resp != nil {
@@ -103,7 +107,7 @@ func (h *Handler) EjecutarPeticion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) AvisarAKernelFinalizacionPeticion() {
-	url := fmt.Sprintf("http://%s:%d/ioTerminoPeticion", ClientConfig.IpKernel, ClientConfig.PortKernel)
+	url := fmt.Sprintf("http://%s:%d/io/peticion-finalizada", ClientConfig.IpKernel, ClientConfig.PortKernel)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer([]byte("{}")))
 	if err != nil {
 		h.Log.Error("error enviando mensaje",

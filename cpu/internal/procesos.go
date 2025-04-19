@@ -15,6 +15,7 @@ type Proceso struct {
 }
 
 func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	// Leer el cuerpo de la solicitud
 	decoder := json.NewDecoder(r.Body)
 	paquete := map[string]interface{}{}
@@ -22,10 +23,14 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	// Guarda el valor del body en la variable paquete
 	err := decoder.Decode(&paquete)
 	if err != nil {
-		h.Log.Error("Error al decodificar mensaje.", log.ErrAttr(err))
+		h.Log.ErrorContext(ctx, "Error al decodificar mensaje.", log.ErrAttr(err))
 		http.Error(w, "error al decodificar mensaje", http.StatusInternalServerError)
 		return
 	}
+
+	h.Log.DebugContext(ctx, "Me llego la peticion del Kernel",
+		slog.Attr{Key: "paquete", Value: slog.AnyValue(paquete)},
+	)
 
 	// Agrego el status Code 200 a la respuesta
 	w.WriteHeader(http.StatusOK)
@@ -36,6 +41,7 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 
 // EnviarProceso envia un proceso al kernel
 func (h *Handler) EnviarProceso(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	// Creo un proceso
 	proceso := Proceso{
 		ID: 1,
@@ -44,20 +50,20 @@ func (h *Handler) EnviarProceso(w http.ResponseWriter, r *http.Request) {
 	// Conviero la estructura del proceso a un []bytes (formato en el que se envían las peticiones)
 	body, err := json.Marshal(proceso)
 	if err != nil {
-		h.Log.Error("error codificando mensaje.", log.ErrAttr(err))
+		h.Log.ErrorContext(ctx, "error codificando mensaje.", log.ErrAttr(err))
 		http.Error(w, "error codificando mensaje", http.StatusBadRequest)
 	}
 
-	// TODO: Agregar endpoint del Kernel
-	url := fmt.Sprintf("http://%s:%d/recibo-proceso-cpu", h.Config.IpKernel, h.Config.PortKernel)
+	url := fmt.Sprintf("http://%s:%d/cpu/proceso", h.Config.IpKernel, h.Config.PortKernel)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		h.Log.Error("Error enviando proceso al Kernel",
+		h.Log.ErrorContext(ctx, "Error enviando proceso al Kernel",
 			slog.Attr{Key: "ip", Value: slog.StringValue(h.Config.IpKernel)},
 			slog.Attr{Key: "puerto", Value: slog.IntValue(h.Config.PortKernel)},
 			log.ErrAttr(err),
 		)
 		http.Error(w, "error enviando mensaje", http.StatusBadRequest)
+		return
 	}
 
 	if resp != nil {

@@ -17,14 +17,14 @@ func main() {
 	h := internal.NewHandler(configFilePath)
 
 	// Recepción de valores
-	mux.HandleFunc("POST /instrucciones", h.RecibirInstrucciones)   // Memoria --> CPU
-	mux.HandleFunc("POST /procesos", h.RecibirProcesos)             // Kernel --> CPU
-	mux.HandleFunc("POST /interrupciones", h.RecibirInterrupciones) // Kernel --> CPU
+	mux.HandleFunc("POST /memoria/instrucciones", h.RecibirInstrucciones)  // Memoria --> CPU
+	mux.HandleFunc("POST /kernel/procesos", h.RecibirProcesos)             // Kernel --> CPU
+	mux.HandleFunc("POST /kernel/interrupciones", h.RecibirInterrupciones) // Kernel --> CPU
 
 	// Envío de valores
-	mux.HandleFunc("POST /enviar-proceso", h.EnviarProceso)         // CPU --> Kernel
-	mux.HandleFunc("POST /envio-ip", h.EnviarIdentificacion)        // CPU --> Kernel
-	mux.HandleFunc("POST /enviar-instruccion", h.EnviarInstruccion) // CPU --> Memoria
+	mux.HandleFunc("POST /kernel/proceso", h.EnviarProceso)               // CPU --> Kernel
+	mux.HandleFunc("POST /kernel/identificacion", h.EnviarIdentificacion) // CPU --> Kernel
+	mux.HandleFunc("POST /memoria/instruccion", h.EnviarInstruccion)      // CPU --> Memoria
 
 	cpuAddress := fmt.Sprintf("%s:%d", h.Config.IpCpu, h.Config.PortCpu)
 	if err := http.ListenAndServe(cpuAddress, mux); err != nil {
