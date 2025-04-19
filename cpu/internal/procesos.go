@@ -29,7 +29,7 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Log.DebugContext(ctx, "Me llego la peticion del Kernel",
-		slog.Attr{Key: "paquete", Value: slog.AnyValue(paquete)},
+		log.AnyAttr("paquete", paquete),
 	)
 
 	// Agrego el status Code 200 a la respuesta
@@ -58,8 +58,8 @@ func (h *Handler) EnviarProceso(w http.ResponseWriter, r *http.Request) {
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.ErrorContext(ctx, "Error enviando proceso al Kernel",
-			slog.Attr{Key: "ip", Value: slog.StringValue(h.Config.IpKernel)},
-			slog.Attr{Key: "puerto", Value: slog.IntValue(h.Config.PortKernel)},
+			log.StringAttr("ip", h.Config.IpKernel),
+			log.IntAttr("puerto", h.Config.PortKernel),
 			log.ErrAttr(err),
 		)
 		http.Error(w, "error enviando mensaje", http.StatusBadRequest)

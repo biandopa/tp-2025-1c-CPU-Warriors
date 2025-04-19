@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -30,8 +29,8 @@ func (h *Handler) EnviarIdentificacion(w http.ResponseWriter, r *http.Request) {
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.ErrorContext(ctx, "Error enviando identificacion a Kernel",
-			slog.Attr{Key: "ip", Value: slog.StringValue(h.Config.IpKernel)},
-			slog.Attr{Key: "puerto", Value: slog.IntValue(h.Config.PortKernel)},
+			log.StringAttr("ip", h.Config.IpKernel),
+			log.IntAttr("port", h.Config.PortKernel),
 			log.ErrAttr(err),
 		)
 		http.Error(w, "Error enviando identificacion", http.StatusBadRequest)
@@ -40,8 +39,7 @@ func (h *Handler) EnviarIdentificacion(w http.ResponseWriter, r *http.Request) {
 
 	if resp != nil {
 		h.Log.Info("Respuesta del servidor",
-			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
-			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
+			log.StringAttr("status", resp.Status),
 		)
 	} else {
 		h.Log.Info("Respuesta del servidor: nil")

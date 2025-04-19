@@ -35,7 +35,7 @@ func main() {
 
 	//mux.HandleFunc("/interrupciones", .RecibirInterrupciones) // Kernel --> CPU Procesos a ejecutar
 
-	err := http.ListenAndServe(fmt.Sprintf(":%d", internal.ClientConfig.PortKernel), mux)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", h.Config.PortKernel), mux)
 	if err != nil {
 		panic(err)
 	}

@@ -18,6 +18,18 @@ func ErrAttr(err error) slog.Attr {
 	return slog.Any("error", err)
 }
 
+func StringAttr(key, value string) slog.Attr {
+	return slog.String(key, value)
+}
+
+func IntAttr(key string, value int) slog.Attr {
+	return slog.Int(key, value)
+}
+
+func AnyAttr(key string, value any) slog.Attr {
+	return slog.Any(key, value)
+}
+
 func getLevelByName(level string) slog.Level {
 	switch strings.ToLower(level) {
 	case "debug":

@@ -73,12 +73,12 @@ func (h *Handler) ConexionInicial() {
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/kernel/acceso", ClientConfig.IpMemory, ClientConfig.PortMemory)
+	url := fmt.Sprintf("http://%s:%d/kernel/acceso", h.Config.IpMemory, h.Config.PortMemory)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.Error("Error enviando mensaje a memoria",
-			slog.Attr{Key: "ip", Value: slog.StringValue(ClientConfig.IpMemory)},
-			slog.Attr{Key: "puerto", Value: slog.IntValue(ClientConfig.PortMemory)},
+			slog.Attr{Key: "ip", Value: slog.StringValue(h.Config.IpMemory)},
+			slog.Attr{Key: "puerto", Value: slog.IntValue(h.Config.PortMemory)},
 			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
 		)
 	}

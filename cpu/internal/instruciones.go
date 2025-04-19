@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -50,8 +49,8 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.ErrorContext(ctx, "Error enviando mensaje",
-			slog.Attr{Key: "ip", Value: slog.StringValue(h.Config.IpMemory)},
-			slog.Attr{Key: "puerto", Value: slog.IntValue(h.Config.PortMemory)},
+			log.StringAttr("ip", h.Config.IpMemory),
+			log.IntAttr("puerto", h.Config.PortMemory),
 			log.ErrAttr(err),
 		)
 		http.Error(w, "Error enviando mensaje", http.StatusBadRequest)
@@ -60,8 +59,7 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 
 	if resp != nil {
 		h.Log.Debug("Respuesta del servidor",
-			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
-			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
+			log.StringAttr("status", resp.Status),
 		)
 	} else {
 		h.Log.Debug("Respuesta del servidor: nil")

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -23,7 +22,7 @@ func (h *Handler) RecibirInterrupciones(w http.ResponseWriter, r *http.Request) 
 	}
 
 	h.Log.DebugContext(ctx, "Recibí interrupciones del Kernel",
-		slog.Attr{Key: "paquete", Value: slog.AnyValue(paquete)},
+		log.AnyAttr("paquete", paquete),
 	)
 
 	w.WriteHeader(http.StatusOK)
