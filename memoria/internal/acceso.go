@@ -18,7 +18,7 @@ func (h *Handler) RecibirPeticionAcceso(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	h.Log.Info("Petición recibida con éxito",
+	h.Log.Info("Petición de acceso recibida con éxito",
 		slog.Attr{Key: "peticion", Value: slog.AnyValue(peticion)},
 	)
 

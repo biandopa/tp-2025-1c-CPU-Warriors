@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
 type IOIdentificacion struct {
@@ -24,6 +24,7 @@ type Config struct {
 }
 
 var ClientConfig *Config
+var NombreIO string
 
 func IniciarConfiguracion(filePath string) *Config {
 	var config *Config
@@ -43,11 +44,12 @@ func IniciarConfiguracion(filePath string) *Config {
 	return config
 }
 
-func ConeccionInicial(nombre string, ClientConfig1 *Config) {
+func ConeccionInicial() {
+
 	data := IOIdentificacion{
-		Nombre: nombre,
-		IP:     ClientConfig1.IpIo,
-		Puerto: ClientConfig1.PortIo,
+		Nombre: NombreIO,
+		IP:     ClientConfig.IpIo,
+		Puerto: ClientConfig.PortIo,
 	}
 
 	body, err := json.Marshal(data)
@@ -56,10 +58,43 @@ func ConeccionInicial(nombre string, ClientConfig1 *Config) {
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/ioConeccionInicial", ClientConfig1.IpKernel, ClientConfig1.PortKernel)
+	url := fmt.Sprintf("http://%s:%d/ioConeccionInicial", ClientConfig.Ip_kernel, ClientConfig.Port_kernel)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig1.IpKernel, ClientConfig1.PortKernel)
+		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig.Ip_kernel, ClientConfig.Port_kernel)
+	}
+
+	log.Printf("respuesta del servidor: %s", resp.Status)
+}
+
+func EjecutarPeticion(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	var tiempoSleep int
+	err := decoder.Decode(&tiempoSleep)
+	if err != nil {
+		log.Printf("Error al decodificar ioIdentificacion: %s\n", err.Error())
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Error al decodificar ioIdentificacion"))
+		return
+	}
+
+	log.Println("Me llego la peticion del Kernel")
+	log.Printf("%+d\n", tiempoSleep)
+
+	time.Sleep(time.Duration(tiempoSleep) * time.Microsecond)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("ok"))
+
+	//Avisa que termino
+	AvisarAKernelFinalizacionPeticion()
+}
+
+func AvisarAKernelFinalizacionPeticion() {
+
+	url := fmt.Sprintf("http://%s:%d/ioTerminoPeticion", ClientConfig.Ip_kernel, ClientConfig.Port_kernel)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer([]byte("{}")))
+	if err != nil {
+		log.Printf("error enviando mensaje a ip:%s puerto:%d", ClientConfig.Ip_kernel, ClientConfig.Port_kernel)
 	}
 
 	if resp != nil {
