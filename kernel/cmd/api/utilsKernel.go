@@ -8,14 +8,14 @@ import (
 	"net/http"
 )
 
-func (h *Handler) ConexionInicial() {
+func (h *Handler) ConexionInicial(archivoNombre, tamanioProceso string) {
 	h.Log.Debug("Conexión Inicial",
-		slog.Attr{Key: "archivo", Value: slog.StringValue(ArchivoNombre)},
-		slog.Attr{Key: "tamaño", Value: slog.StringValue(TamanioProceso)},
-		slog.Attr{Key: "config", Value: slog.AnyValue(ClientConfig)},
+		slog.Attr{Key: "archivo", Value: slog.StringValue(archivoNombre)},
+		slog.Attr{Key: "tamaño", Value: slog.StringValue(tamanioProceso)},
+		slog.Attr{Key: "config", Value: slog.AnyValue(h.Config)},
 	)
 
-	body, err := json.Marshal(TamanioProceso)
+	body, err := json.Marshal(tamanioProceso)
 	if err != nil {
 		h.Log.Error("Error al serializar tamanioProceso",
 			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},

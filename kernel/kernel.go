@@ -20,11 +20,11 @@ func main() {
 		panic("Faltan argumentos para inicializar el módulo Kernel.")
 	}
 
-	api.ArchivoNombre = os.Args[1]
-	api.TamanioProceso = os.Args[2]
+	archivoNombre := os.Args[1]
+	tamanioProceso := os.Args[2]
 
 	//IO --> Kernel  (le enviará su nombre, ip y puerto) HANDSHAKE
-	h.ConexionInicial()
+	h.ConexionInicial(archivoNombre, tamanioProceso)
 
 	mux := http.NewServeMux()
 
