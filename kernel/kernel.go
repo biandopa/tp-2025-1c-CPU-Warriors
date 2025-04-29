@@ -17,6 +17,7 @@ func main() {
 
 	if len(os.Args) < 2 {
 		h.Log.Error(fmt.Sprintf("Faltan %d argumentos.", len(os.Args)))
+		panic("Faltan argumentos para inicializar el módulo Kernel.")
 	}
 
 	internal.ArchivoNombre = os.Args[1]
