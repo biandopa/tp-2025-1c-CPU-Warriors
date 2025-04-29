@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/sisoputnfrba/tp-golang/cpu/internal"
+	"github.com/sisoputnfrba/tp-golang/cpu/cmd/api"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
@@ -14,7 +14,7 @@ const (
 
 func main() {
 	mux := http.NewServeMux()
-	h := internal.NewHandler(configFilePath)
+	h := api.NewHandler(configFilePath)
 
 	// Recepción de valores
 	mux.HandleFunc("POST /memoria/instrucciones", h.RecibirInstrucciones)  // Memoria --> CPU

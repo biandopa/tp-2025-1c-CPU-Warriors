@@ -1,62 +1,12 @@
-package internal
+package api
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
-	"os"
 )
-
-type IOIdentificacion struct {
-	Nombre string `json:"nombre"`
-	IP     string `json:"ip"`
-	Puerto int    `json:"puerto"`
-}
-type Config struct {
-	IpMemory              string `json:"ip_memory"`
-	PortMemory            int    `json:"port_memory"`
-	IpKernel              string `json:"ip_kernel"`
-	PortKernel            int    `json:"port_kernel"`
-	SchedulerAlgorithm    string `json:"scheduler_algorithm"`
-	ReadyIngressAlgorithm int    `json:"ready_ingress_algorithm"`
-	Alpha                 int    `json:"alpha"`
-	SuspensionTime        int    `json:"suspension_time"`
-	LogLevel              string `json:"log_level"`
-}
-
-var ClientConfig *Config
-var ArchivoNombre string
-var TamanioProceso string
-
-// TODO: HACER UNA LISTA DE IO
-var ioIdentificacion IOIdentificacion
-
-var identificacionCPU = map[string]interface{}{
-	"ip":     "",
-	"puerto": "",
-	"id":     "",
-}
-
-func IniciarConfiguracion(filePath string) *Config {
-	var config *Config
-	configFile, err := os.Open(filePath)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	defer func() {
-		_ = configFile.Close()
-	}()
-
-	jsonParser := json.NewDecoder(configFile)
-	if err = jsonParser.Decode(&config); err != nil {
-		log.Fatal(err.Error())
-	}
-
-	return config
-}
 
 func (h *Handler) ConexionInicial() {
 	h.Log.Debug("Conexión Inicial",

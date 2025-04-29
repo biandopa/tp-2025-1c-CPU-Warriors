@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sisoputnfrba/tp-golang/io/internal"
+	"github.com/sisoputnfrba/tp-golang/io/cmd/api"
 )
 
 const (
@@ -14,13 +14,13 @@ const (
 )
 
 func main() {
-	h := internal.NewHandler(configFilePath)
+	h := api.NewHandler(configFilePath)
 
 	//para que tome el argumento debe ingresarse asi "go run io.go NOMBRE"
-	internal.NombreIO = os.Args[1]
+	api.NombreIO = os.Args[1]
 
 	h.Log.Debug("Inicializando interfaz IO",
-		slog.Attr{Key: "nombre", Value: slog.StringValue(internal.NombreIO)},
+		slog.Attr{Key: "nombre", Value: slog.StringValue(api.NombreIO)},
 	)
 
 	//IO --> Kernel  (le enviará su nombre, ip y puerto)  HANDSHAKE

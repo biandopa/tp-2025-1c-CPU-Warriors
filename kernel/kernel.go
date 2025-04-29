@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sisoputnfrba/tp-golang/kernel/internal"
+	"github.com/sisoputnfrba/tp-golang/kernel/cmd/api"
 )
 
 const (
@@ -13,15 +13,15 @@ const (
 )
 
 func main() {
-	h := internal.NewHandler(configFilePath)
+	h := api.NewHandler(configFilePath)
 
 	if len(os.Args) < 2 {
 		h.Log.Error(fmt.Sprintf("Faltan %d argumentos.", len(os.Args)))
 		panic("Faltan argumentos para inicializar el módulo Kernel.")
 	}
 
-	internal.ArchivoNombre = os.Args[1]
-	internal.TamanioProceso = os.Args[2]
+	api.ArchivoNombre = os.Args[1]
+	api.TamanioProceso = os.Args[2]
 
 	//IO --> Kernel  (le enviará su nombre, ip y puerto) HANDSHAKE
 	h.ConexionInicial()

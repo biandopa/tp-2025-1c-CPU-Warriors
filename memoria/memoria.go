@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/sisoputnfrba/tp-golang/memoria/internal"
+	"github.com/sisoputnfrba/tp-golang/memoria/cmd/api"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
@@ -14,7 +14,7 @@ const (
 
 func main() {
 	mux := http.NewServeMux()
-	h := internal.NewHandler(configFilePath)
+	h := api.NewHandler(configFilePath)
 
 	// Recepción de valores
 	mux.HandleFunc("POST /kernel/acceso", h.RecibirPeticionAcceso) // Kernel --> Memoria
