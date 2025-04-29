@@ -1,5 +1,9 @@
 package api
 
+import (
+	"time"
+)
+
 var (
 	ClientConfig   *Config
 	ArchivoNombre  string
@@ -22,6 +26,13 @@ type Config struct {
 	Alpha                 int    `json:"alpha"`
 	SuspensionTime        int    `json:"suspension_time"`
 	LogLevel              string `json:"log_level"`
+}
+
+type PCB struct {
+	Pid            int             `json:"pid"`
+	ProgramCounter int             `json:"pc"`
+	MetricasEstado []string        `json:"metricas_estado"`
+	MetricasTiempo []time.Duration `json:"metricas_tiempo"`
 }
 
 // TODO: HACER UNA LISTA DE IO
