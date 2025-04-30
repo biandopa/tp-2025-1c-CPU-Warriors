@@ -46,7 +46,7 @@ func IniciarConfiguracion(filePath string) *Config {
 	return config
 }
 
-func (h *Handler) ConeccionInicial() {
+func (h *Handler) ConexionInicial() {
 	data := IOIdentificacion{
 		Nombre: NombreIO,
 		IP:     h.Config.IpIo,
