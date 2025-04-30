@@ -2,10 +2,11 @@ package api
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
+	"github.com/sisoputnfrba/tp-golang/kernel/internal/planificadores"
+	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 // EnviarProceso envia un proceso a la Memoria
@@ -13,12 +14,9 @@ func (h *Handler) EnviarProceso(archivoNombre, tamanioProceso, args string) {
 	// Creo un proceso
 	proceso := internal.Proceso{}
 
+	// TODO: Hacer un switch para elegir un planificador y que ejecute interfaces
 	if h.Config.SchedulerAlgorithm == "FIFO" {
-		planificador := internal.Planificador{
-			NewQueue: []*internal.Proceso{
-				&proceso,
-			},
-		}
+		planificador := planificadores.NewPlanificador(h.Log)
 
 		planificador.PlanificadorLargoPlazoFIFO(args)
 
@@ -31,19 +29,19 @@ func (h *Handler) EnviarProceso(archivoNombre, tamanioProceso, args string) {
 
 func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	var proceso Proceso
+	var proceso internal.Proceso
 
 	err := decoder.Decode(&proceso)
 	if err != nil {
 		h.Log.Error("Error al decodificar la RTA del Proceso",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+			log.ErrAttr(err),
 		)
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("Error al decodificar la RTA del Proceso"))
 	}
 
 	h.Log.Debug("Me llego la RTA del Proceso",
-		slog.Attr{Key: "proceso", Value: slog.AnyValue(proceso)},
+		log.AnyAttr("proceso", proceso),
 	)
 
 	w.WriteHeader(http.StatusOK)
