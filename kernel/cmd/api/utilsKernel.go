@@ -4,99 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
+
+	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
-func (h *Handler) ConexionInicial(archivoNombre, tamanioProceso string) {
-	h.Log.Debug("Conexión Inicial",
-		slog.Attr{Key: "archivo", Value: slog.StringValue(archivoNombre)},
-		slog.Attr{Key: "tamaño", Value: slog.StringValue(tamanioProceso)},
-		slog.Attr{Key: "config", Value: slog.AnyValue(h.Config)},
-	)
-
-	body, err := json.Marshal(tamanioProceso)
-	if err != nil {
-		h.Log.Error("Error al serializar tamanioProceso",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
-		)
-		return
-	}
-
-	url := fmt.Sprintf("http://%s:%d/kernel/acceso", h.Config.IpMemory, h.Config.PortMemory)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
-	if err != nil {
-		h.Log.Error("Error enviando mensaje a memoria",
-			slog.Attr{Key: "ip", Value: slog.StringValue(h.Config.IpMemory)},
-			slog.Attr{Key: "puerto", Value: slog.IntValue(h.Config.PortMemory)},
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
-		)
-	}
-
-	if resp != nil {
-		h.Log.Info("Respuesta del servidor",
-			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
-			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
-		)
-	} else {
-		h.Log.Info("Respuesta del servidor: nil")
-	}
-}
-
-func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	ioInfo := IOIdentificacion{}
-
-	// Leer el cuerpo de la solicitud
-	decoder := json.NewDecoder(r.Body)
-	err := decoder.Decode(&ioInfo)
-	if err != nil {
-		h.Log.ErrorContext(ctx, "Error al decodificar ioIdentificacion",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
-		)
-
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
-		return
-	}
-
-	h.Config.IpIo = ioInfo.IP
-	h.Config.PortIo = ioInfo.Puerto
-	// Agregar nombre si es necesario
-
-	h.Log.DebugContext(ctx, "Me llego la conexion de un IO",
-		slog.Attr{Key: "ioIdentificacion", Value: slog.AnyValue(ioIdentificacion)},
-	)
-
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("ok"))
-}
-
-func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-	err := decoder.Decode(&identificacionCPU)
-	if err != nil {
-		h.Log.Error("Error al decodificar ioIdentificacion",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
-		)
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
-	}
-
-	h.Log.Debug("Me llego la conexion de CPU",
-		slog.Attr{Key: "identificacionCPU", Value: slog.AnyValue(identificacionCPU)},
-	)
-
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("ok"))
-}
-
-// TODO: usarla donde sea necesario
+// TODO: usarla donde sea necesario  -> Borrar porque no es una llamada en el handler, sino en internal.
 func (h *Handler) EnviarPeticionAIO(w http.ResponseWriter, tiempoSleep int) {
 	body, err := json.Marshal(tiempoSleep)
 	if err != nil {
 		h.Log.Error("Error codificando tiempoSleep",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+			log.ErrAttr(err),
 		)
 		http.Error(w, "error codificando mensaje", http.StatusInternalServerError)
 		return
@@ -106,7 +24,7 @@ func (h *Handler) EnviarPeticionAIO(w http.ResponseWriter, tiempoSleep int) {
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.Error("Error enviando mensaje a peticion",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+			log.ErrAttr(err),
 		)
 		http.Error(w, "error enviando mensaje", http.StatusBadRequest)
 		return
@@ -114,8 +32,8 @@ func (h *Handler) EnviarPeticionAIO(w http.ResponseWriter, tiempoSleep int) {
 
 	if resp != nil {
 		h.Log.Debug("Respuesta del servidor",
-			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
-			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
+			log.StringAttr("status", resp.Status),
+			log.StringAttr("body", string(body)),
 		)
 	} else {
 		h.Log.Debug("Respuesta del servidor: nil")
@@ -128,7 +46,7 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&ioIdentificacionPeticion)
 	if err != nil {
 		h.Log.Error("Error al decodificar ioIdentificacion",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+			log.ErrAttr(err),
 		)
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
@@ -137,7 +55,7 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 
 	//TODO: Buscar en la lista de ioIdentificacion y cambiarle es status
 	h.Log.Debug("Me llego la peticion Finalizada de IO",
-		slog.Attr{Key: "ioIdentificacion", Value: slog.AnyValue(ioIdentificacionPeticion)},
+		log.AnyAttr("ioIdentificacionPeticion", ioIdentificacionPeticion),
 	)
 
 	w.WriteHeader(http.StatusOK)

@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+const (
+	PlanificadorEstadoStop  = "STOP"
+	PlanificadorEstadoStart = "START"
+)
+
 type Planificador struct {
 	NewQueue       []*Proceso
 	ReadyQueue     []*Proceso
@@ -21,14 +26,14 @@ type Planificador struct {
 
 // Planificador de largo plazo FIFO
 func (p *Planificador) PlanificadorLargoPlazoFIFO(enter string) {
-	estado := "STOP"
+	estado := PlanificadorEstadoStop
 
 	// Revisa si el argumento es "Enter" para iniciar el planificador
 	if enter == "\n" {
-		estado = "START"
+		estado = PlanificadorEstadoStart
 	}
 
-	if estado == "START" {
+	if estado == PlanificadorEstadoStart {
 		for _, proceso := range p.SuspReadyQueue {
 			// TODO: Implementar funcion de verificación de memoria
 			if h.IntentarCargarEnMemoria(proceso) {

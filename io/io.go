@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/sisoputnfrba/tp-golang/io/cmd/api"
+	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 const (
@@ -20,17 +20,15 @@ func main() {
 	nombreIO := os.Args[1]
 
 	h.Log.Debug("Inicializando interfaz IO",
-		slog.Attr{Key: "nombre", Value: slog.StringValue(api.NombreIO)},
+		log.StringAttr("nombreIO", nombreIO),
 	)
 
 	//IO --> Kernel  (le enviará su nombre, ip y puerto)  HANDSHAKE
-	h.ConexionInicial(nombreIO)
+	h.ConexionInicialKernel(nombreIO)
 
 	mux := http.NewServeMux()
 
-	//Kernel --> IO (usleep) LISTO
 	mux.HandleFunc("/kernel/usleep", h.EjecutarPeticion)
-	//IO --> Kernel  (respuesta de solicitud finalizada) LISTO
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", h.Config.PortIo), mux)
 	if err != nil {

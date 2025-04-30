@@ -49,13 +49,13 @@ func (h *Handler) EnviarInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 		if resp.StatusCode != http.StatusOK {
 			h.Log.Error("Error en la respuesta del CPU",
-				slog.Attr{Key: "status_code", Value: slog.IntValue(resp.StatusCode)},
+				log.IntAttr("status_code", resp.StatusCode),
 			)
 			http.Error(w, "error en la respuesta del CPU", http.StatusInternalServerError)
 			return
 		}
 		h.Log.Info("Mensaje enviado al CPU con éxito",
-			slog.Attr{Key: "status_code", Value: slog.IntValue(resp.StatusCode)},
+			log.IntAttr("status_code", resp.StatusCode),
 		)
 	} else {
 		h.Log.Error("Error al enviar mensaje al CPU")
@@ -75,13 +75,13 @@ func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 	var instruccion map[string]interface{}
 	err := json.NewDecoder(r.Body).Decode(&instruccion)
 	if err != nil {
-		h.Log.Error("Error decoding request body", "error", err)
+		h.Log.Error("Error decoding request body", log.ErrAttr(err))
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	h.Log.Info("Instrucción recibida con éxito",
-		slog.Attr{Key: "instruccion", Value: slog.AnyValue(instruccion)},
+		log.AnyAttr("instruccion", instruccion),
 	)
 
 	// Respond with success

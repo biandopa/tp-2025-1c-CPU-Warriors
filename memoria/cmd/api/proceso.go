@@ -2,8 +2,9 @@ package api
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
+
+	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 func (h *Handler) RecibirProceso(w http.ResponseWriter, r *http.Request) {
@@ -11,6 +12,12 @@ func (h *Handler) RecibirProceso(w http.ResponseWriter, r *http.Request) {
 		// Leer tamanioProceso del queryparameter
 		tamanioProceso = r.URL.Query().Get("tamanioProceso")
 	)
+
+	if tamanioProceso == "" {
+		h.Log.Error("Tamaño del Proceso no proporcionado")
+		http.Error(w, "tamaño del oroceso no proporcionado", http.StatusBadRequest)
+		return
+	}
 
 	// Decode the request body
 	var peticion map[string]interface{}
@@ -22,7 +29,7 @@ func (h *Handler) RecibirProceso(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Log.Info("Petición recibida con éxito",
-		slog.Attr{Key: "petición", Value: slog.AnyValue(peticion)},
+		log.AnyAttr("peticion", peticion),
 	)
 
 	// Verifica si hay suficiente espacio

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -68,8 +67,8 @@ func (h *Handler) EnviarProceso(w http.ResponseWriter, r *http.Request) {
 
 	if resp != nil {
 		h.Log.Debug("Respuesta del servidor recibida.",
-			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
-			slog.Attr{Key: "body", Value: slog.AnyValue(resp.Body)},
+			log.StringAttr("status", resp.Status),
+			log.AnyAttr("body", string(body)),
 		)
 	}
 

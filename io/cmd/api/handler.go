@@ -9,20 +9,26 @@ import (
 
 type Handler struct {
 	Log    *slog.Logger
-	Config *config.Config
+	Config *Config
 }
 
 func NewHandler(configFile string) *Handler {
-	c := config.IniciarConfiguracion(configFile)
+	c := config.IniciarConfiguracion(configFile, &Config{})
 	if c == nil {
 		panic("Error loading configuration")
 	}
 
+	// Cast the configuration to the specific type
+	configStruct, ok := c.(*Config)
+	if !ok {
+		panic("Error casting configuration")
+	}
+
 	// Initialize the logger with the log level from the configuration
-	logLevel := c.LogLevel
+	logLevel := configStruct.LogLevel
 
 	return &Handler{
-		Config: c,
+		Config: configStruct,
 		Log:    log.BuildLogger(logLevel),
 	}
 }
