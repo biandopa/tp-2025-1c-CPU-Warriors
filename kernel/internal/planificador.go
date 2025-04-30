@@ -30,6 +30,7 @@ func (p *Planificador) PlanificadorLargoPlazoFIFO(enter string) {
 
 	if estado == "START" {
 		for _, proceso := range p.SuspReadyQueue {
+			// TODO: Implementar funcion de verificación de memoria
 			if h.IntentarCargarEnMemoria(proceso) {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de suspendidos ready

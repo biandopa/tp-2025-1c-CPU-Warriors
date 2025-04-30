@@ -21,7 +21,7 @@ func main() {
 	}
 
 	archivoNombre := os.Args[1]
-	tamanioProceso := os.Args[2]
+	tamanioProceso := os.Args[2] // Tamaño en bytes
 
 	//IO --> Kernel  (le enviará su nombre, ip y puerto) HANDSHAKE
 	// h.ConexionInicial(archivoNombre, tamanioProceso)
