@@ -44,10 +44,14 @@ func (h *Handler) ConexionInicial(archivoNombre, tamanioProceso string) {
 }
 
 func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ioInfo := IOIdentificacion{}
+
+	// Leer el cuerpo de la solicitud
 	decoder := json.NewDecoder(r.Body)
-	err := decoder.Decode(&ioIdentificacion)
+	err := decoder.Decode(&ioInfo)
 	if err != nil {
-		h.Log.Error("Error al decodificar ioIdentificacion",
+		h.Log.ErrorContext(ctx, "Error al decodificar ioIdentificacion",
 			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
 		)
 
@@ -56,7 +60,11 @@ func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Log.Debug("Me llego la conexion de un IO",
+	h.Config.IpIo = ioInfo.IP
+	h.Config.PortIo = ioInfo.Puerto
+	// Agregar nombre si es necesario
+
+	h.Log.DebugContext(ctx, "Me llego la conexion de un IO",
 		slog.Attr{Key: "ioIdentificacion", Value: slog.AnyValue(ioIdentificacion)},
 	)
 

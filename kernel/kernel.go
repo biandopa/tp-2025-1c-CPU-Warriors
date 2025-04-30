@@ -24,10 +24,10 @@ func main() {
 	tamanioProceso := os.Args[2]
 
 	//IO --> Kernel  (le enviará su nombre, ip y puerto) HANDSHAKE
-	h.ConexionInicial(archivoNombre, tamanioProceso)
+	// h.ConexionInicial(archivoNombre, tamanioProceso)
 
 	// Kernel --> Memoria
-	h.EnviarProceso(archivoNombre, tamanioProceso)
+	h.EnviarProceso(archivoNombre, tamanioProceso, os.Args[3])
 
 	mux := http.NewServeMux()
 
