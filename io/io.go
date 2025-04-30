@@ -17,23 +17,23 @@ func main() {
 	h := api.NewHandler(configFilePath)
 
 	//para que tome el argumento debe ingresarse asi "go run io.go NOMBRE"
-	api.NombreIO = os.Args[1]
+	nombreIO := os.Args[1]
 
 	h.Log.Debug("Inicializando interfaz IO",
 		slog.Attr{Key: "nombre", Value: slog.StringValue(api.NombreIO)},
 	)
 
 	//IO --> Kernel  (le enviará su nombre, ip y puerto)  HANDSHAKE
-	h.ConeccionInicial()
+	h.ConexionInicial(nombreIO)
 
 	mux := http.NewServeMux()
+
+	//Kernel --> IO (usleep) LISTO
+	mux.HandleFunc("/kernel/usleep", h.EjecutarPeticion)
+	//IO --> Kernel  (respuesta de solicitud finalizada) LISTO
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", h.Config.PortIo), mux)
 	if err != nil {
 		panic(err)
 	}
-
-	//Kernel --> IO (usleep) LISTO
-	mux.HandleFunc("/kernel/usleep", h.EjecutarPeticion)
-	//IO --> Kernel  (respuesta de solicitud finalizada) LISTO
 }
