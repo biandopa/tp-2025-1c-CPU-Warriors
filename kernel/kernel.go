@@ -26,6 +26,9 @@ func main() {
 	//IO --> Kernel  (le enviará su nombre, ip y puerto) HANDSHAKE
 	h.ConexionInicial(archivoNombre, tamanioProceso)
 
+	// Kernel --> Memoria
+	h.EnviarProceso(archivoNombre, tamanioProceso)
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/io/conexion-inicial", h.ConexionInicialIO)    //IO LISTA --> Kernel
