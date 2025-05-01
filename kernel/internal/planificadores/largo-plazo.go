@@ -42,11 +42,11 @@ func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int) *Ser
 			ExitQueue:      make([]*internal.Proceso, 0),
 		},
 		Log:     log,
-		Memoria: memoria.NewMemoria(ipMemoria, puertoMemoria),
+		Memoria: memoria.NewMemoria(ipMemoria, puertoMemoria, log),
 	}
 }
 
-// Planificador de largo plazo FIFO
+// PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
 func (p *Service) PlanificadorLargoPlazoFIFO(enter string) {
 	estado := PlanificadorEstadoStop
 
@@ -58,7 +58,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO(enter string) {
 	if estado == PlanificadorEstadoStart {
 		for _, proceso := range p.Planificador.SuspReadyQueue {
 			// TODO: Implementar funcion de verificación de memoria
-			if memoria.IntentarCargarEnMemoria(proceso) {
+			if p.Memoria.ConsultarEspacio() {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de suspendidos ready
 
@@ -86,7 +86,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO(enter string) {
 		}
 
 		for _, proceso := range p.Planificador.NewQueue {
-			if memoria.IntentarCargarEnMemoria(proceso) {
+			if p.Memoria.ConsultarEspacio() {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de new
 
