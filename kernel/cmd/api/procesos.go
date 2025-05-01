@@ -5,24 +5,21 @@ import (
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
-	"github.com/sisoputnfrba/tp-golang/kernel/internal/planificadores"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 // EnviarProceso envia un proceso a la Memoria
 func (h *Handler) EnviarProceso(archivoNombre, tamanioProceso, args string) {
 	// Creo un proceso
-	proceso := internal.Proceso{}
+	//proceso := internal.Proceso{}
 
 	// TODO: Hacer un switch para elegir un planificador y que ejecute interfaces
 	if h.Config.SchedulerAlgorithm == "FIFO" {
-		planificador := planificadores.NewPlanificador(h.Log)
-
-		planificador.PlanificadorLargoPlazoFIFO(args)
+		h.Planificador.PlanificadorLargoPlazoFIFO(args)
 
 		// Se ejecuta algun otro planificador
 
-		planificador.FinalizarProceso(proceso)
+		//h.Planificador.FinalizarProceso(proceso)
 	}
 
 }

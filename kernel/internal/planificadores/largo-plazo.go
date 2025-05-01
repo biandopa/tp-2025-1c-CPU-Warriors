@@ -17,6 +17,7 @@ const (
 type Service struct {
 	Planificador *Planificador
 	Log          *slog.Logger
+	Memoria      *memoria.Memoria
 }
 
 type Planificador struct {
@@ -29,7 +30,7 @@ type Planificador struct {
 	ExitQueue      []*internal.Proceso
 }
 
-func NewPlanificador(log *slog.Logger) *Service {
+func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int) *Service {
 	return &Service{
 		Planificador: &Planificador{
 			NewQueue:       make([]*internal.Proceso, 0),
@@ -40,7 +41,8 @@ func NewPlanificador(log *slog.Logger) *Service {
 			ExecQueue:      make([]*internal.Proceso, 0),
 			ExitQueue:      make([]*internal.Proceso, 0),
 		},
-		Log: log,
+		Log:     log,
+		Memoria: memoria.NewMemoria(ipMemoria, puertoMemoria),
 	}
 }
 
