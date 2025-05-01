@@ -1,11 +1,7 @@
 package planificadores
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
 	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
@@ -118,7 +114,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO(enter string) {
 	}
 }
 
-func (p *Service) FinalizarProceso(proceso internal.Proceso) {
+/*func (p *Service) FinalizarProceso(proceso internal.Proceso) {
 	// 1. Notificar a Memoria
 	url := fmt.Sprintf("http://%s:%d/memoria/finalizar-proceso", h.Config.IpMemory, h.Config.PortMemory) // TODO: Hacer la llamada en el pkg memoria
 
@@ -146,4 +142,4 @@ func (p *Service) FinalizarProceso(proceso internal.Proceso) {
 
 	// 4. Intentar inicializar procesos esperando
 	//p.planilargoplazofifo()
-}
+}*/
