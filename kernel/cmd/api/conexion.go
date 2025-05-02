@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/sisoputnfrba/tp-golang/kernel/internal/planificadores"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
@@ -76,7 +77,7 @@ func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 // TRANSFORMAR ESTO A UNA LISTA DE CPUS
 func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	identificacionCPU := CPUIdentificacion{}
+	identificacionCPU := &planificadores.CpuIdentificacion{}
 
 	h.Log.DebugContext(ctx, "Me llego la conexion de un CPU??")
 
@@ -99,10 +100,10 @@ func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 
 	identificacionCPU.ESTADO = true
 
-	h.CPUConectadas = append(h.CPUConectadas, identificacionCPU)
+	h.Planificador.AddCpuConectada(identificacionCPU)
 
 	h.Log.DebugContext(ctx, "Lista actual de CPUs conectadas",
-		log.AnyAttr("CPUConectadas", h.CPUConectadas),
+		log.AnyAttr("CPUConectadas", h.Planificador.CPUConectadas),
 	)
 
 	w.WriteHeader(http.StatusOK)

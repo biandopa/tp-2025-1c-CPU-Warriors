@@ -13,7 +13,7 @@ type Usleep struct {
 }
 
 // EnviarUsleep envia un usleep al IO
-func SendUsleep(puertoIO, iPIO, nombre string, timeSleep int) error {
+func EnviarUsleep(puertoIO, iPIO, nombre string, timeSleep int) error {
 	// Crear el JSON con los datos necesarios
 	usleep := &Usleep{
 		PID:         0, // Cambiar por el PID correspondiente

@@ -41,7 +41,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 						p.Log.Info("Proceso movido de READY a EXEC",
 							log.IntAttr("PID", proceso.PCB.PID),
 						)
-						cpuSeleccionada = &p.CPUConectadas[i]
+						cpuSeleccionada = p.CPUConectadas[i]
 						p.CPUConectadas[i].ESTADO = false
 						fmt.Println("CPU seleccionada:", cpuSeleccionada)
 

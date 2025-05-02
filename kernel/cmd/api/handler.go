@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"log/slog"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal/planificadores"
@@ -10,10 +9,9 @@ import (
 )
 
 type Handler struct {
-	Log           *slog.Logger
-	Config        *Config
-	CPUConectadas []CPUIdentificacion
-	Planificador  *planificadores.Service
+	Log          *slog.Logger
+	Config       *Config
+	Planificador *planificadores.Service
 }
 
 func NewHandler(configFile string) *Handler {
@@ -32,16 +30,12 @@ func NewHandler(configFile string) *Handler {
 	logLevel := configStruct.LogLevel
 	logger := log.BuildLogger(logLevel)
 
-	var cpus []interface{}
-	value, _ := json.Marshal([]CPUIdentificacion{})
-	_ = json.Unmarshal(value, &cpus)
-
 	return &Handler{
 		Config: configStruct,
 		Log:    logger,
 		Planificador: planificadores.NewPlanificador(
 			logger, configStruct.IpMemory, configStruct.PortMemory,
-			cpus,
+			[]*planificadores.CpuIdentificacion{},
 		),
 	}
 }

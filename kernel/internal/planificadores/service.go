@@ -11,7 +11,7 @@ type Service struct {
 	Planificador  *Planificador
 	Log           *slog.Logger
 	Memoria       *memoria.Memoria
-	CPUConectadas []CpuIdentificacion
+	CPUConectadas []*CpuIdentificacion // TODO: Ver si hace falta exponerlo o se puede hacer privado
 }
 
 type Planificador struct {
@@ -33,18 +33,7 @@ type CpuIdentificacion struct {
 
 // NewPlanificador función que sirve para crear una nueva instancia del planificador de procesos. El planificador posee
 // varias colas para gestionar los procesos en diferentes estados: New, Ready, Block, Suspended Ready, Suspended Block, Exec y Exit.
-func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int, cpus []interface{}) *Service {
-	// Convertir la lista de CPUs a una lista de CPUIdentificacion
-	cpuIdentificaciones := make([]CpuIdentificacion, len(cpus))
-	for i, cpu := range cpus {
-		cpuIdentificacion, ok := cpu.(CpuIdentificacion)
-		if !ok {
-			log.Error("Error al convertir CPU a CPUIdentificacion")
-			continue
-		}
-		cpuIdentificaciones[i] = cpuIdentificacion
-	}
-
+func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int, cpus []*CpuIdentificacion) *Service {
 	return &Service{
 		Planificador: &Planificador{
 			NewQueue:       make([]*internal.Proceso, 0),
@@ -57,6 +46,6 @@ func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int, cpus
 		},
 		Log:           log,
 		Memoria:       memoria.NewMemoria(ipMemoria, puertoMemoria, log),
-		CPUConectadas: cpuIdentificaciones,
+		CPUConectadas: cpus,
 	}
 }
