@@ -1,11 +1,9 @@
 package planificadores
 
 import (
-	"log/slog"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
-	"github.com/sisoputnfrba/tp-golang/kernel/pkg/memoria"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
@@ -14,38 +12,7 @@ const (
 	PlanificadorEstadoStart = "START"
 )
 
-type Service struct {
-	Planificador *Planificador
-	Log          *slog.Logger
-	Memoria      *memoria.Memoria
-}
-
-type Planificador struct {
-	NewQueue       []*internal.Proceso
-	ReadyQueue     []*internal.Proceso
-	BlockQueue     []*internal.Proceso
-	SuspReadyQueue []*internal.Proceso
-	SuspBlockQueue []*internal.Proceso
-	ExecQueue      []*internal.Proceso
-	ExitQueue      []*internal.Proceso
-}
-
-func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int) *Service {
-	return &Service{
-		Planificador: &Planificador{
-			NewQueue:       make([]*internal.Proceso, 0),
-			ReadyQueue:     make([]*internal.Proceso, 0),
-			BlockQueue:     make([]*internal.Proceso, 0),
-			SuspReadyQueue: make([]*internal.Proceso, 0),
-			SuspBlockQueue: make([]*internal.Proceso, 0),
-			ExecQueue:      make([]*internal.Proceso, 0),
-			ExitQueue:      make([]*internal.Proceso, 0),
-		},
-		Log:     log,
-		Memoria: memoria.NewMemoria(ipMemoria, puertoMemoria, log),
-	}
-}
-
+// TODO: Agregar escucha ante un nuevo proceso en la cola de New y ante un enter.
 // PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
 func (p *Service) PlanificadorLargoPlazoFIFO(enter string) {
 	estado := PlanificadorEstadoStop

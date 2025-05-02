@@ -23,9 +23,6 @@ func main() {
 	archivoNombre := os.Args[1]
 	tamanioProceso := os.Args[2] // Tamaño en bytes
 
-	// Kernel --> Memoria
-	h.EnviarProceso(archivoNombre, tamanioProceso, os.Args[3])
-
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/io/conexion-inicial", h.ConexionInicialIO)    //IO LISTA --> Kernel
@@ -35,6 +32,9 @@ func main() {
 	mux.HandleFunc("/cpu/proceso", h.RespuestaProcesoCPU) //CPU --> Kernel (Recibe respuesta del proceso de la CPU) PROCESO
 
 	//mux.HandleFunc("/interrupciones", .RecibirInterrupciones) // Kernel --> CPU Procesos a ejecutar
+
+	// Kernel --> Memoria
+	h.EjecutarPlanificadores(archivoNombre, tamanioProceso, os.Args[3])
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", h.Config.PortKernel), mux)
 	if err != nil {

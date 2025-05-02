@@ -97,6 +97,8 @@ func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 		log.AnyAttr("identificacionCPU", identificacionCPU),
 	)
 
+	identificacionCPU.ESTADO = true
+
 	h.CPUConectadas = append(h.CPUConectadas, identificacionCPU)
 
 	h.Log.DebugContext(ctx, "Lista actual de CPUs conectadas",

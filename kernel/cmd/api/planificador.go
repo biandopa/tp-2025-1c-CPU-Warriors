@@ -1,43 +1,53 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
-	"log/slog"
 	"net/http"
 
-	"github.com/sisoputnfrba/tp-golang/kernel/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
-// EnviarProceso envia un proceso a la Memoria
-func (h *Handler) EnviarProceso(archivoNombre, tamanioProceso, args string) {
+// EjecutarPlanificadores envia un proceso a la Memoria
+func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso, args string) {
 	// Creo un proceso
 	//proceso := internal.Proceso{}
 
 	// TODO: Hacer un switch para elegir un planificador y que ejecute interfaces
-	if h.Config.SchedulerAlgorithm == "FIFO" {
+	// TODO: Hacer que los planificadores se ejecuten en async
+
+	switch h.Config.ReadyIngressAlgorithm {
+	case "FIFO":
 		h.Planificador.PlanificadorLargoPlazoFIFO(args)
+	case "PMCP":
 
-		// Se ejecuta algun otro planificador
-		//lista de procesos en ready, y necesita la lista de cpus
-		h.SeleccionarPlanificadorCortoPlazo()
+	default:
+		h.Log.Warn("Algoritmo de largo plazo no reconocido")
+	}
 
-		//planificador.FinalizarProceso(proceso)
+	switch h.Config.SchedulerAlgorithm {
+	case "FIFO":
+		h.Planificador.PlanificadorCortoPlazoFIFO()
+	case "SJFSD":
+
+	case "SJFD":
+
+	default:
+		h.Log.Warn("Algoritmo de corto plazo no reconocido")
 	}
 }
 
 //LA IDEA ES QUE LA CONSUMA EL PLANIFICADOR CORTO
 
-func (h *Handler) SeleccionarPlanificadorCortoPlazo() {
+// SeleccionarPlanificador selecciona el planificador de corto plazo a utilizar.
+func (h *Handler) SeleccionarPlanificador() {
 
 	switch h.Config.ReadyIngressAlgorithm {
 	case "FIFO":
-		h.PlanificadorCortoPlazoFIFO()
+		h.Planificador.PlanificadorCortoPlazoFIFO()
 	case "SJFSD":
 
 	case "SJFD":
+	case "PMCP":
 
 	default:
 		h.Log.Warn("Algoritmo no reconocido")
@@ -45,7 +55,7 @@ func (h *Handler) SeleccionarPlanificadorCortoPlazo() {
 
 }
 
-func (h *Handler) PlanificadorCortoPlazoFIFO() {
+/*func (h *Handler) PlanificadorCortoPlazoFIFO() {
 
 	h.Log.Debug("Entre Al PLannificador")
 
@@ -59,44 +69,7 @@ func (h *Handler) PlanificadorCortoPlazoFIFO() {
 	}
 	//TODO: RECIBIR EL PROCESO A ENVIAR A CPU
 	h.enviarProcesoACPU(cpu)
-}
-
-func (h *Handler) enviarProcesoACPU(cpuID CPUIdentificacion, proceso *internal.Proceso) {
-
-	h.Log.Debug("Entre al EnviarProceso")
-	data := map[string]interface{}{
-		"cpuID": cpuID,
-		"pc":    proceso.PCB.PID,
-		"pid":   proceso.PCB.ProgramCounter, // Cambiar por el ID real
-	}
-
-	body, err := json.Marshal(data)
-	if err != nil {
-		h.Log.Error("Error al serializar ioIdentificacion",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
-		)
-		return
-	}
-
-	url := fmt.Sprintf("http://%s:%d/kernel/procesos", cpuID.IP, cpuID.Puerto)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
-	if err != nil {
-		h.Log.Error("error enviando mensaje",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
-			slog.Attr{Key: "ip", Value: slog.StringValue(cpuID.IP)},
-			slog.Attr{Key: "puerto", Value: slog.IntValue(cpuID.Puerto)},
-		)
-	}
-
-	if resp != nil {
-		h.Log.Info("Respuesta del servidor",
-			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
-			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
-		)
-	} else {
-		h.Log.Info("Respuesta del servidor: nil")
-	}
-}
+}*/
 
 //ESto devuelve el PID + PC + alguno de estos
 //IO 25000
