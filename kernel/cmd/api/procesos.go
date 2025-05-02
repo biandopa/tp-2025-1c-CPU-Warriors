@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
-	"github.com/sisoputnfrba/tp-golang/kernel/internal/planificadores"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
@@ -19,9 +18,7 @@ func (h *Handler) EnviarProceso(archivoNombre, tamanioProceso, args string) {
 
 	// TODO: Hacer un switch para elegir un planificador y que ejecute interfaces
 	if h.Config.SchedulerAlgorithm == "FIFO" {
-		planificador := planificadores.NewPlanificador(h.Log)
-
-		planificador.PlanificadorLargoPlazoFIFO(args)
+		h.Planificador.PlanificadorLargoPlazoFIFO(args)
 
 		// Se ejecuta algun otro planificador
 		//lista de procesos en ready, y necesita la lista de cpus

@@ -29,11 +29,14 @@ func NewHandler(configFile string) *Handler {
 
 	// Initialize the logger with the log level from the configuration
 	logLevel := configStruct.LogLevel
+	logger := log.BuildLogger(logLevel)
 
 	return &Handler{
-		Config:        configStruct,
-		Log:           log.BuildLogger(logLevel),
+		Config: configStruct,
+		Log:    logger,
+		Planificador: planificadores.NewPlanificador(
+			logger, configStruct.IpMemory, configStruct.PortMemory,
+		),
 		CPUConectadas: []CPUIdentificacion{},
-		Planificador:  planificadores.NewPlanificador,
 	}
 }

@@ -1,11 +1,7 @@
 package planificadores
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
 	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
@@ -21,6 +17,7 @@ const (
 type Service struct {
 	Planificador *Planificador
 	Log          *slog.Logger
+	Memoria      *memoria.Memoria
 }
 
 type Planificador struct {
@@ -33,7 +30,7 @@ type Planificador struct {
 	ExitQueue      []*internal.Proceso
 }
 
-func NewPlanificador(log *slog.Logger) *Service {
+func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int) *Service {
 	return &Service{
 		Planificador: &Planificador{
 			NewQueue:       make([]*internal.Proceso, 0),
@@ -44,11 +41,12 @@ func NewPlanificador(log *slog.Logger) *Service {
 			ExecQueue:      make([]*internal.Proceso, 0),
 			ExitQueue:      make([]*internal.Proceso, 0),
 		},
-		Log: log,
+		Log:     log,
+		Memoria: memoria.NewMemoria(ipMemoria, puertoMemoria, log),
 	}
 }
 
-// Planificador de largo plazo FIFO
+// PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
 func (p *Service) PlanificadorLargoPlazoFIFO(enter string) {
 	estado := PlanificadorEstadoStop
 
@@ -60,7 +58,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO(enter string) {
 	if estado == PlanificadorEstadoStart {
 		for _, proceso := range p.Planificador.SuspReadyQueue {
 			// TODO: Implementar funcion de verificación de memoria
-			if memoria.IntentarCargarEnMemoria(proceso) {
+			if p.Memoria.ConsultarEspacio() {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de suspendidos ready
 
@@ -88,7 +86,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO(enter string) {
 		}
 
 		for _, proceso := range p.Planificador.NewQueue {
-			if memoria.IntentarCargarEnMemoria(proceso) {
+			if p.Memoria.ConsultarEspacio() {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de new
 
@@ -118,7 +116,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO(enter string) {
 	}
 }
 
-func (p *Service) FinalizarProceso(proceso internal.Proceso) {
+/*func (p *Service) FinalizarProceso(proceso internal.Proceso) {
 	// 1. Notificar a Memoria
 	url := fmt.Sprintf("http://%s:%d/memoria/finalizar-proceso", h.Config.IpMemory, h.Config.PortMemory) // TODO: Hacer la llamada en el pkg memoria
 
@@ -146,4 +144,4 @@ func (p *Service) FinalizarProceso(proceso internal.Proceso) {
 
 	// 4. Intentar inicializar procesos esperando
 	//p.planilargoplazofifo()
-}
+}*/
