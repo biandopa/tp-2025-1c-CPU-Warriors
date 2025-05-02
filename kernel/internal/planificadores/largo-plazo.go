@@ -1,6 +1,8 @@
 package planificadores
 
 import (
+	"bufio"
+	"os"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
@@ -14,13 +16,21 @@ const (
 
 // TODO: Agregar escucha ante un nuevo proceso en la cola de New y ante un enter.
 // PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
-func (p *Service) PlanificadorLargoPlazoFIFO(enter string) {
+func (p *Service) PlanificadorLargoPlazoFIFO() {
 	estado := PlanificadorEstadoStop
 
-	// Revisa si el argumento es "Enter" para iniciar el planificador
-	if enter == "\n" {
+	// Lanzamos una goroutine que espera el Enter
+	go func() {
+		reader := bufio.NewReader(os.Stdin)
+		_, _ = reader.ReadString('\n') // Espera hasta que se presione Enter
+		p.CanalEnter <- struct{}{}     // Envía una señal al canal
 		estado = PlanificadorEstadoStart
-	}
+	}()
+
+	// Se queda escuchando hasta que el usuario presione la tecla ENTER por consola para iniciar el planificador
+	<-p.CanalEnter
+	//estado = PlanificadorEstadoStart
+	p.Log.Info("Planificador de largo plazo iniciado")
 
 	if estado == PlanificadorEstadoStart {
 		for _, proceso := range p.Planificador.SuspReadyQueue {
@@ -79,7 +89,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO(enter string) {
 				// TODO: Implementar la función de escucha
 			}
 		}
-		time.Sleep(time.Second) // espera mínima para no sobrecargar CPU
+		//time.Sleep(time.Second) // espera mínima para no sobrecargar CPU
 	}
 }
 

@@ -8,7 +8,7 @@ import (
 )
 
 // EjecutarPlanificadores envia un proceso a la Memoria
-func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso, args string) {
+func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	// Creo un proceso
 	//proceso := internal.Proceso{}
 
@@ -17,7 +17,7 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso, args str
 
 	switch h.Config.ReadyIngressAlgorithm {
 	case "FIFO":
-		h.Planificador.PlanificadorLargoPlazoFIFO(args)
+		h.Planificador.PlanificadorLargoPlazoFIFO()
 	case "PMCP":
 
 	default:

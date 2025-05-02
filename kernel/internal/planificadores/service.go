@@ -12,6 +12,7 @@ type Service struct {
 	Log           *slog.Logger
 	Memoria       *memoria.Memoria
 	CPUConectadas []*CpuIdentificacion // TODO: Ver si hace falta exponerlo o se puede hacer privado
+	CanalEnter    chan struct{}
 }
 
 type Planificador struct {
@@ -47,5 +48,6 @@ func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int, cpus
 		Log:           log,
 		Memoria:       memoria.NewMemoria(ipMemoria, puertoMemoria, log),
 		CPUConectadas: cpus,
+		CanalEnter:    make(chan struct{}),
 	}
 }

@@ -31,10 +31,8 @@ func main() {
 
 	mux.HandleFunc("/cpu/proceso", h.RespuestaProcesoCPU) //CPU --> Kernel (Recibe respuesta del proceso de la CPU) PROCESO
 
-	//mux.HandleFunc("/interrupciones", .RecibirInterrupciones) // Kernel --> CPU Procesos a ejecutar
-
 	// Kernel --> Memoria
-	h.EjecutarPlanificadores(archivoNombre, tamanioProceso, os.Args[3])
+	h.EjecutarPlanificadores(archivoNombre, tamanioProceso)
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", h.Config.PortKernel), mux)
 	if err != nil {
