@@ -3,13 +3,16 @@ package api
 import (
 	"log/slog"
 
+	"github.com/sisoputnfrba/tp-golang/kernel/internal/planificadores"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 type Handler struct {
-	Log    *slog.Logger
-	Config *Config
+	Log           *slog.Logger
+	Config        *Config
+	CPUConectadas []CPUIdentificacion
+	Planificador  *planificadores.Service
 }
 
 func NewHandler(configFile string) *Handler {
@@ -28,7 +31,9 @@ func NewHandler(configFile string) *Handler {
 	logLevel := configStruct.LogLevel
 
 	return &Handler{
-		Config: configStruct,
-		Log:    log.BuildLogger(logLevel),
+		Config:        configStruct,
+		Log:           log.BuildLogger(logLevel),
+		CPUConectadas: []CPUIdentificacion{},
+		Planificador:  planificadores.NewPlanificador,
 	}
 }

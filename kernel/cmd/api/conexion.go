@@ -73,9 +73,12 @@ func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
+// TRANSFORMAR ESTO A UNA LISTA DE CPUS
 func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	identificacionCPU := CPUIdentificacion{}
+
+	h.Log.DebugContext(ctx, "Me llego la conexion de un CPU??")
 
 	// Leer el cuerpo de la solicitud
 	decoder := json.NewDecoder(r.Body)
@@ -92,6 +95,12 @@ func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 
 	h.Log.DebugContext(ctx, "Me llego la conexion de CPU",
 		log.AnyAttr("identificacionCPU", identificacionCPU),
+	)
+
+	h.CPUConectadas = append(h.CPUConectadas, identificacionCPU)
+
+	h.Log.DebugContext(ctx, "Lista actual de CPUs conectadas",
+		log.AnyAttr("CPUConectadas", h.CPUConectadas),
 	)
 
 	w.WriteHeader(http.StatusOK)

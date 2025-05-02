@@ -19,6 +19,8 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	paquete := map[string]interface{}{}
 
+	h.Log.Debug("Recibi el proceso")
+
 	// Guarda el valor del body en la variable paquete
 	err := decoder.Decode(&paquete)
 	if err != nil {
