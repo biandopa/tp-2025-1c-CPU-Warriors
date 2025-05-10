@@ -35,6 +35,12 @@ func (h *Handler) EjecutarPeticion(w http.ResponseWriter, r *http.Request) {
 		log.IntAttr("PID", usleep.PID),
 	)
 
+	ioFinOk := finIO{
+		PID:         usleep.PID,
+		Dispositivo: h.Nombre,
+	}
+	body, _ := json.Marshal(ioFinOk)
+
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("ok"))
+	_, _ = w.Write(body)
 }

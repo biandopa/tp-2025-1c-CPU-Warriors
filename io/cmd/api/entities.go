@@ -18,3 +18,8 @@ type Usleep struct {
 	PID         int `json:"pid"`
 	TiempoSleep int `json:"tiempo_sleep"`
 }
+
+type finIO struct {
+	PID         int    `json:"pid"`
+	Dispositivo string `json:"dispositivo"`
+}

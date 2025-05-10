@@ -8,11 +8,12 @@ import (
 )
 
 type Handler struct {
+	Nombre string
 	Log    *slog.Logger
 	Config *Config
 }
 
-func NewHandler(configFile string) *Handler {
+func NewHandler(configFile, nombre string) *Handler {
 	c := config.IniciarConfiguracion(configFile, &Config{})
 	if c == nil {
 		panic("Error loading configuration")
@@ -28,6 +29,7 @@ func NewHandler(configFile string) *Handler {
 	logLevel := configStruct.LogLevel
 
 	return &Handler{
+		Nombre: nombre,
 		Config: configStruct,
 		Log:    log.BuildLogger(logLevel),
 	}
