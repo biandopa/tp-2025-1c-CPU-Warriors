@@ -17,7 +17,7 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 
 	switch h.Config.ReadyIngressAlgorithm {
 	case "FIFO":
-		h.Planificador.PlanificadorLargoPlazoFIFO()
+		go h.Planificador.PlanificadorLargoPlazoFIFO()
 	case "PMCP":
 
 	default:
