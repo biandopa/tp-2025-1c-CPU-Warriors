@@ -101,21 +101,33 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		log.AnyAttr("proceso", proceso),
 	)
 
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("ok"))
-
+	// TODO: Implementar lógica para manejar la respuesta del proceso
 	switch proceso.Instruccion {
 	case "INIT_PROC":
 		// TODO: Implementar lógica INIT_PROC (Aca creo un nuevo proceso y los paso a new)
+		/* Crea otro nuevo proceso y lo agrega a la cola de New.
+		Vuelve a ejecutar en el planificador de Largo Plazo creando su PCB en este nuevo proceso
+		y el padre sigue en su estado*/
 	case "IO":
 		// TODO: Implementar lógica IO
+		/* Primero verifica que existe el IO. Si no existe, se manda a EXIT.
+		Si existe y está ocupado, se manda a Blocked. Veremos...*/
 	case "DUMP_MEMORY":
 		// TODO: Implementar lógica DUMP_MEMORY
+		// Nota: Este todavía no!!!!!
+		/* Esta bloquea el proceso. En caso de error se envía a exit y sino se pasa a Ready*/
 	case "EXIT":
 		// TODO: Implementar lógica EXIT (aca busco el PID en Exec y lo paso a Exit)
+		/* Como le devuelve el PID, tiene que buscar al proceso en la cola de exec y terminarlo.
+		Hay que cambiar el estado de la CPU tmb!!!!!*/
+		go h.Planificador.FinalizarProceso(proceso.PID)
 	default:
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("Instrucción no reconocida"))
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
+
 }

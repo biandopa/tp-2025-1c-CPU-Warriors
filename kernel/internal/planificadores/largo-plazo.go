@@ -92,8 +92,29 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 	}
 }
 
-func (p *Service) FinalizarProceso(proceso internal.Proceso) {
-	// 1. Notificar a Memoria
+func (p *Service) FinalizarProceso(pid int) {
+	// 1. Buscar el proceso en la cola de exec
+	var (
+		proceso       *internal.Proceso
+		lugarColaExec int
+	)
+
+	for i, proc := range p.Planificador.ExecQueue {
+		if proc.PCB.PID == pid {
+			proceso = proc
+			lugarColaExec = i
+			break
+		}
+	}
+
+	if proceso == nil {
+		p.Log.Error("No se encontró el proceso en la cola de exec",
+			log.IntAttr("PID", pid),
+		)
+		return
+	}
+
+	// 2. Notificar a Memoria
 	status, err := p.Memoria.FinalizarProceso(proceso.PCB.PID)
 	if err != nil || status != http.StatusOK {
 		p.Log.Error("Error al finalizar proceso en memoria",
@@ -103,14 +124,30 @@ func (p *Service) FinalizarProceso(proceso internal.Proceso) {
 		return
 	}
 
-	// 2. Loguear métricas (acá deberías tenerlas guardadas en el PCB)
+	// 3. Lo saco de la cola de exec
+	p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:lugarColaExec], p.Planificador.ExecQueue[lugarColaExec+1:]...)
+
+	// 4. Cambiar el estado de la CPU
+	// TODO: Preguntar el sabado :)
+
+	// 5. Cambiar el estado del proceso a EXIT
+	proceso.PCB.MetricasEstado[internal.EstadoExit]++
+	if proceso.PCB.MetricasTiempo[internal.EstadoExit] == nil {
+		proceso.PCB.MetricasTiempo[internal.EstadoExit] = &internal.EstadoTiempo{}
+	}
+	proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoInicio = time.Now()
+	proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoAcumulado = time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
+	proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado += time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
+	proceso.PCB.MetricasEstado[internal.EstadoExec]++
+	proceso.PCB.MetricasEstado[internal.EstadoExit]++
+
+	// 6. Loguear métricas (acá deberías tenerlas guardadas en el PCB)
 	p.Log.Info("Finaliza el proceso", log.IntAttr("PID", proceso.PCB.PID))
 	p.Log.Info("Métricas de estado",
 		log.AnyAttr("metricas_estado", proceso.PCB.MetricasEstado),
 		log.AnyAttr("metricas_tiempo", proceso.PCB.MetricasTiempo),
 	)
 
-	// 3. Liberar PCB
-	// Asumiendo que mantenés un map[PID]PCB
-	//delete(pcbTable, proceso.ID)
+	// 7. Liberar PCB
+	proceso.PCB = nil // Libero el PCB asociado al proceso
 }
