@@ -14,3 +14,8 @@ type Config struct {
 	CacheDelay       int    `json:"cache_delay"`
 	LogLevel         string `json:"log_level"`
 }
+
+type Proceso struct {
+	PID int `json:"pid"`
+	PC  int `json:"pc"`
+}

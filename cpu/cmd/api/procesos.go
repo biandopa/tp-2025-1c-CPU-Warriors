@@ -1,28 +1,23 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
+	"github.com/sisoputnfrba/tp-golang/cpu/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
-
-type Proceso struct {
-	ID int `json:"id"`
-}
 
 func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	// Leer el cuerpo de la solicitud
 	decoder := json.NewDecoder(r.Body)
-	paquete := map[string]interface{}{}
+	proceso := &Proceso{}
 
 	h.Log.Debug("Recibi el proceso")
 
 	// Guarda el valor del body en la variable paquete
-	err := decoder.Decode(&paquete)
+	err := decoder.Decode(&proceso)
 	if err != nil {
 		h.Log.ErrorContext(ctx, "Error al decodificar mensaje.", log.ErrAttr(err))
 		http.Error(w, "error al decodificar mensaje", http.StatusInternalServerError)
@@ -30,49 +25,20 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Log.DebugContext(ctx, "Me llego la peticion del Kernel",
-		log.AnyAttr("paquete", paquete),
+		log.AnyAttr("paquete", proceso),
 	)
 
-	// Agrego el status Code 200 a la respuesta
-	w.WriteHeader(http.StatusOK)
-
-	// Envío la respuesta al cliente con un mensaje de éxito
-	_, _ = w.Write([]byte("ok"))
-}
-
-// EnviarProceso envia un proceso al kernel
-func (h *Handler) EnviarProceso(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	// Creo un proceso
-	proceso := Proceso{
-		ID: 1,
+	// TODO: Agregar ejecución de instrucción
+	// Añadir la syscall
+	syscall := &internal.ProcesoSyscall{
+		PID:         proceso.PID,
+		PC:          proceso.PC,
+		Instruccion: "EXIT",     // Ejemplo de instrucción mockeado
+		Args:        []string{}, // Ejemplo de argumentos mockeados
 	}
-
-	// Conviero la estructura del proceso a un []bytes (formato en el que se envían las peticiones)
-	body, err := json.Marshal(proceso)
-	if err != nil {
-		h.Log.ErrorContext(ctx, "error codificando mensaje.", log.ErrAttr(err))
-		http.Error(w, "error codificando mensaje", http.StatusBadRequest)
-	}
-
-	url := fmt.Sprintf("http://%s:%d/cpu/proceso", h.Config.IpKernel, h.Config.PortKernel)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
-	if err != nil {
-		h.Log.ErrorContext(ctx, "Error enviando proceso al Kernel",
-			log.StringAttr("ip", h.Config.IpKernel),
-			log.IntAttr("puerto", h.Config.PortKernel),
-			log.ErrAttr(err),
-		)
-		http.Error(w, "error enviando mensaje", http.StatusBadRequest)
-		return
-	}
-
-	if resp != nil {
-		h.Log.Debug("Respuesta del servidor recibida.",
-			log.StringAttr("status", resp.Status),
-			log.AnyAttr("body", string(body)),
-		)
-	}
+	go func() {
+		err = h.Service.EnviarProcesoSyscall(ctx, syscall)
+	}()
 
 	// Agrego el status Code 200 a la respuesta
 	w.WriteHeader(http.StatusOK)
