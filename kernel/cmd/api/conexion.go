@@ -74,7 +74,6 @@ func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
-// TRANSFORMAR ESTO A UNA LISTA DE CPUS
 func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	identificacionCPU := &planificadores.CpuIdentificacion{}
@@ -98,7 +97,7 @@ func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 		log.AnyAttr("identificacionCPU", identificacionCPU),
 	)
 
-	identificacionCPU.ESTADO = true
+	identificacionCPU.Estado = true
 
 	h.Planificador.AddCpuConectada(identificacionCPU)
 

@@ -24,14 +24,3 @@ type IOIdentificacion struct {
 	IP     string `json:"ip"`
 	Puerto int    `json:"puerto"`
 }
-
-type CPUIdentificacion struct {
-	IP     string `json:"ip"`
-	Puerto int    `json:"puerto"`
-	ID     string `json:"id"`
-	ESTADO bool   `json:"estado"`
-}
-
-type ListaCPU struct {
-	CPUs []CPUIdentificacion `json:"cpus"`
-}

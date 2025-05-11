@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
+	"github.com/sisoputnfrba/tp-golang/kernel/pkg/cpu"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
@@ -17,11 +18,11 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 
 	for _, proceso := range p.Planificador.ReadyQueue {
 
-		var cpuSeleccionada *CpuIdentificacion
+		var cpuSeleccionada *cpu.Cpu
 		for {
 			if len(p.CPUConectadas) > 0 {
 				for i := range p.CPUConectadas {
-					if p.CPUConectadas[i].ESTADO {
+					if p.CPUConectadas[i].Estado {
 
 						// Si el proceso ouede ejecutarse en una cpu, lo muevo a la cola de EXEC
 						// y lo elimino de la cola de Ready
@@ -42,7 +43,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 							log.IntAttr("PID", proceso.PCB.PID),
 						)
 						cpuSeleccionada = p.CPUConectadas[i]
-						p.CPUConectadas[i].ESTADO = false
+						p.CPUConectadas[i].Estado = false
 						fmt.Println("CPU seleccionada:", cpuSeleccionada)
 
 						p.enviarProcesoACPU(*cpuSeleccionada, proceso) // Envio el proceso a la CPU seleccionada
@@ -54,7 +55,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 	}
 }
 
-func (p *Service) enviarProcesoACPU(cpuID CpuIdentificacion, proceso *internal.Proceso) {
+func (p *Service) enviarProcesoACPU(cpuID cpu.Cpu, proceso *internal.Proceso) {
 
 	p.Log.Debug("Entre al EjecutarPlanificadores")
 	data := map[string]interface{}{
