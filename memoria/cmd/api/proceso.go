@@ -11,6 +11,7 @@ import (
 
 func (h *Handler) RecibirProceso(w http.ResponseWriter, r *http.Request) {
 	var (
+		ctx = r.Context()
 		// Leer tamanioProceso del queryparameter
 		tamanioProceso = r.URL.Query().Get("tamanioProceso")
 	)
@@ -30,7 +31,7 @@ func (h *Handler) RecibirProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Log.Info("Petición recibida con éxito",
+	h.Log.DebugContext(ctx, "Petición recibida con éxito",
 		log.AnyAttr("peticion", peticion),
 	)
 

@@ -22,6 +22,7 @@ func main() {
 	mux.HandleFunc("POST /kernel/proceso", h.RecibirProceso)                       // Kernel --> Memoria
 	mux.HandleFunc("GET /kernel/espacio-disponible", h.ConsultarEspacioDisponible) // Kernel --> Memoria
 	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso)           // Kernel --> Memoria
+	mux.HandleFunc("GET /kernel/archivo-instrucciones", h.RecibirInstrucciones)    // Kernel --> Memoria
 
 	// Envío de valores
 	mux.HandleFunc("POST /cpu/instrucciones", h.EnviarInstrucciones) // Memoria --> CPU

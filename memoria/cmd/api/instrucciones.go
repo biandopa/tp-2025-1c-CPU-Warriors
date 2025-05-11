@@ -1,11 +1,14 @@
 package api
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
@@ -83,6 +86,84 @@ func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 	h.Log.Info("Instrucción recibida con éxito",
 		log.AnyAttr("instruccion", instruccion),
 	)
+
+	// Respond with success
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("request processed successfully"))
+}
+
+func (h *Handler) RecibirInstrucciones(w http.ResponseWriter, r *http.Request) {
+	var (
+		ctx = r.Context()
+		// Leer tamanioProceso del queryparameter
+		tamanioProceso = r.URL.Query().Get("tamanio-proceso")
+		// Leer archivoNombre del queryparameter
+		pathArchivo = r.URL.Query().Get("path-archivo")
+	)
+
+	if tamanioProceso == "" {
+		h.Log.Error("Tamaño del Proceso no proporcionado")
+		http.Error(w, "tamaño del oroceso no proporcionado", http.StatusBadRequest)
+		return
+	}
+
+	if pathArchivo == "" {
+		h.Log.Error("Nombre del archivo no proporcionado")
+		http.Error(w, "nombre del archivo no proporcionado", http.StatusBadRequest)
+		return
+	}
+
+	h.Log.DebugContext(ctx, "Archivo de pseudocodigo recibido",
+		log.AnyAttr("path-archivo", pathArchivo),
+	)
+
+	// Verifica si hay suficiente espacio
+	// Inserte función para verificar el espacio disponible
+
+	// Si no hay suficiente espacio, responde con un error
+	// Caso contrario, continúa con el procesamiento
+
+	// Busca el archivo en el sistema
+	file, err := os.OpenFile(h.Config.ScriptsPath+pathArchivo, os.O_RDONLY, os.ModePerm)
+	if err != nil {
+		h.Log.Error("Error al abrir el archivo de pseudocodigo",
+			log.ErrAttr(err),
+			log.StringAttr("path-archivo", h.Config.ScriptsPath+pathArchivo),
+		)
+		http.Error(w, "error al abrir el archivo de pseudocodigo", http.StatusInternalServerError)
+		return
+	}
+
+	// Nos aseguramos de cerrar el archivo después de usarlo
+	defer func() {
+		if err = file.Close(); err != nil {
+			h.Log.Error("Error al cerrar el archivo de pseudocodigo",
+				log.ErrAttr(err),
+				log.StringAttr("path-archivo", h.Config.ScriptsPath+pathArchivo),
+			)
+		}
+	}()
+
+	// Almacenamos el valor del archivo en el array de instrucciones
+
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		linea := scanner.Text()
+		h.Log.DebugContext(ctx, "Leyendo línea del archivo",
+			log.StringAttr("linea", linea),
+		)
+
+		valores := strings.Split(linea, " ")
+		instruccion := Instruccion{
+			Instruccion: valores[0],
+		}
+
+		if len(valores[1:]) > 0 {
+			instruccion.Parametros = valores[1:]
+		}
+		h.Instrucciones = append(h.Instrucciones, instruccion)
+	}
 
 	// Respond with success
 	w.WriteHeader(http.StatusOK)
