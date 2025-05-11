@@ -55,5 +55,9 @@ func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
 	// Si no se puede finalizar, responde con un error
 
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(fmt.Sprintf("Proceso %s finalizado con éxito", pid)))
+	response := map[string]string{
+		"message": fmt.Sprintf("Proceso %s finalizado con éxito", pid),
+	}
+	jsonResponse, _ := json.Marshal(response)
+	_, _ = w.Write(jsonResponse)
 }

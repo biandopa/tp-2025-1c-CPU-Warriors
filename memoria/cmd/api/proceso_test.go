@@ -26,7 +26,7 @@ func TestHandler_FinalizarProceso(t *testing.T) {
 			name:         "Finalizar proceso exitoso",
 			args:         args{pid: "1234"},
 			wantedStatus: http.StatusOK,
-			wantedBody:   `Proceso 1234 finalizado con éxito`,
+			wantedBody:   `{"message":"Proceso 1234 finalizado con éxito"}`,
 		},
 	}
 	for _, tt := range tests {
@@ -49,7 +49,7 @@ func TestHandler_FinalizarProceso(t *testing.T) {
 			// Check the status code
 			ass.Equal(tt.wantedStatus, rr.Code)
 			// Check the response body
-			ass.Equal(tt.wantedBody, rr.Body.String())
+			ass.JSONEq(tt.wantedBody, rr.Body.String())
 		})
 	}
 }
