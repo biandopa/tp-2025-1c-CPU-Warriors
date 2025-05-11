@@ -2,6 +2,8 @@ package planificadores
 
 import (
 	"bufio"
+	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -15,6 +17,7 @@ const (
 )
 
 // TODO: Agregar escucha ante un nuevo proceso en la cola de New y ante un enter.
+
 // PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
 func (p *Service) PlanificadorLargoPlazoFIFO() {
 	estado := PlanificadorEstadoStop
@@ -34,7 +37,6 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 
 	if estado == PlanificadorEstadoStart {
 		for _, proceso := range p.Planificador.SuspReadyQueue {
-			// TODO: Implementar funcion de verificación de memoria
 			if p.Memoria.ConsultarEspacio() {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de suspendidos ready
@@ -52,14 +54,13 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 
 				proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
-				p.Log.Info("Proceso movido de SUSP.READY a READY",
-					log.IntAttr("PID", proceso.PCB.PID),
-				)
+				p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
 			} else {
-				// Me quedo escuchando la respuesta de la memoria ante la finalización de un proceso
-				// TODO: Implementar la función de escucha
+				/* Si la respuesta es negativa (ya que la Memoria no tiene espacio suficiente para inicializarlo)
+				se deberá esperar la finalización de otro proceso para volver a intentar inicializarlo.
+				Vuelvo a agregar al proceso a la cola de suspendidos ready en el lugar que estaba (al principio por ser FIFO) */
+				p.Planificador.SuspReadyQueue = append([]*internal.Proceso{proceso}, p.Planificador.SuspReadyQueue...)
 			}
-
 		}
 
 		for _, proceso := range p.Planificador.NewQueue {
@@ -77,31 +78,25 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 					proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
 				}
 				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
-
 				proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
-				p.Log.Info("Proceso movido de NEW a READY",
-					log.IntAttr("PID", proceso.PCB.PID),
-				)
+				p.Log.Info(fmt.Sprintf("%d Pasa del estado NEW al estado READY", proceso.PCB.PID))
 				// proceso.PCB = nil // Libero el PCB asociado al proceso
 			} else {
-				// Me quedo escuchando la respuesta de la memoria ante la finalización de un proceso
-				// TODO: Implementar la función de escucha
+				/* Si la respuesta es negativa (ya que la Memoria no tiene espacio suficiente para inicializarlo)
+				se deberá esperar la finalización de otro proceso para volver a intentar inicializarlo.
+				Vuelvo a agregar al proceso a la cola de new en el lugar que estaba (al principio por ser FIFO) */
+				p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
 			}
 		}
-		//time.Sleep(time.Second) // espera mínima para no sobrecargar CPU
 	}
 }
 
-/*func (p *Service) FinalizarProceso(proceso internal.Proceso) {
+func (p *Service) FinalizarProceso(proceso internal.Proceso) {
 	// 1. Notificar a Memoria
-	url := fmt.Sprintf("http://%s:%d/memoria/finalizar-proceso", h.Config.IpMemory, h.Config.PortMemory) // TODO: Hacer la llamada en el pkg memoria
-
-	body, _ := json.Marshal(map[string]int{"pid": proceso.PCB.PID})
-
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
-	if err != nil || resp.StatusCode != http.StatusOK {
-		p.Log.Error("Fallo al finalizar proceso en Memoria",
+	status, err := p.Memoria.FinalizarProceso(proceso.PCB.PID)
+	if err != nil || status != http.StatusOK {
+		p.Log.Error("Error al finalizar proceso en memoria",
 			log.ErrAttr(err),
 			log.IntAttr("PID", proceso.PCB.PID),
 		)
@@ -118,7 +113,4 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 	// 3. Liberar PCB
 	// Asumiendo que mantenés un map[PID]PCB
 	//delete(pcbTable, proceso.ID)
-
-	// 4. Intentar inicializar procesos esperando
-	//p.planilargoplazofifo()
-}*/
+}

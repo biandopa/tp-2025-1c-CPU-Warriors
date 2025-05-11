@@ -12,11 +12,11 @@ type Config struct {
 	SchedulerAlgorithm    string  `json:"scheduler_algorithm"`
 	ReadyIngressAlgorithm string  `json:"ready_ingress_algorithm"`
 	Alpha                 float64 `json:"alpha"`
+	InitialEstimate       int     `json:"initial_estimate"`
 	SuspensionTime        int     `json:"suspension_time"`
 	LogLevel              string  `json:"log_level"`
 }
 
-// TODO: HACER UNA LISTA DE IO
 var ioIdentificacion IOIdentificacion
 
 type IOIdentificacion struct {

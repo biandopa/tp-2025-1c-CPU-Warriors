@@ -1,6 +1,8 @@
 package memoria
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -53,4 +55,22 @@ func (m *Memoria) ConsultarEspacio() bool {
 	)
 
 	return true
+}
+
+func (m *Memoria) FinalizarProceso(pid int) (int, error) {
+	var (
+		status int
+		err    error
+		resp   *http.Response
+	)
+	url := fmt.Sprintf("http://%s:%d/kernel/fin-proceso", m.IP, m.Puerto)
+
+	body, _ := json.Marshal(map[string]int{"pid": pid})
+	resp, err = http.Post(url, "application/json", bytes.NewBuffer(body))
+
+	if resp != nil {
+		status = resp.StatusCode
+	}
+
+	return status, err
 }

@@ -24,7 +24,6 @@ func (h *Handler) ConsultarEspacioDisponible(w http.ResponseWriter, r *http.Requ
 
 	// Enviamos la respuesta al kernel
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
 	response := EspacioDisponible{
 		Mensaje: "Espacio disponible en memoria",
 		Tamaño:  espacioDisponible,
