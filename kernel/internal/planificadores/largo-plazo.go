@@ -16,7 +16,7 @@ const (
 	PlanificadorEstadoStart = "START"
 )
 
-// TODO: Agregar escucha ante un nuevo proceso en la cola de New y ante un enter.
+// TODO: Agregar que le mande el path al archivo + tamaño a la memoria en ConsultarEspacio()
 
 // PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
 func (p *Service) PlanificadorLargoPlazoFIFO() {
@@ -36,12 +36,16 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 	p.Log.Info("Planificador de largo plazo iniciado")
 
 	if estado == PlanificadorEstadoStart {
+		// TODO: Agregar channel que avise cuando un proceso haya terminado.
 		for _, proceso := range p.Planificador.SuspReadyQueue {
 			if p.Memoria.ConsultarEspacio() {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de suspendidos ready
 
 				p.Planificador.SuspReadyQueue = p.Planificador.SuspReadyQueue[1:] // lo saco de la cola
+				if proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] == nil {
+					proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] = &internal.EstadoTiempo{}
+				}
 				timeSusp := proceso.PCB.MetricasTiempo[internal.EstadoSuspReady]
 				timeSusp.TiempoAcumulado = timeSusp.TiempoAcumulado + time.Since(timeSusp.TiempoInicio)
 
@@ -73,6 +77,9 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 				// y lo elimino de la cola de new
 
 				p.Planificador.NewQueue = p.Planificador.NewQueue[1:] // lo saco de la cola
+				if proceso.PCB.MetricasTiempo[internal.EstadoNew] == nil {
+					proceso.PCB.MetricasTiempo[internal.EstadoNew] = &internal.EstadoTiempo{}
+				}
 				timeNew := proceso.PCB.MetricasTiempo[internal.EstadoNew]
 				timeNew.TiempoAcumulado = timeNew.TiempoAcumulado + time.Since(timeNew.TiempoInicio)
 

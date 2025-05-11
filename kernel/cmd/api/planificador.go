@@ -4,13 +4,21 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/sisoputnfrba/tp-golang/kernel/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 // EjecutarPlanificadores envia un proceso a la Memoria
 func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	// Creo un proceso
-	//proceso := internal.Proceso{}
+	proceso := internal.Proceso{
+		PCB: &internal.PCB{
+			PID:            0,
+			ProgramCounter: 0,
+			MetricasTiempo: map[internal.Estado]*internal.EstadoTiempo{},
+			MetricasEstado: map[internal.Estado]int{},
+		},
+	}
 
 	// TODO: Hacer un switch para elegir un planificador y que ejecute interfaces
 	// TODO: Hacer que los planificadores se ejecuten en async
@@ -26,7 +34,7 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 
 	switch h.Config.SchedulerAlgorithm {
 	case "FIFO":
-		h.Planificador.PlanificadorCortoPlazoFIFO()
+		go h.Planificador.PlanificadorCortoPlazoFIFO()
 	case "SJFSD":
 
 	case "SJFD":
@@ -34,6 +42,12 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	default:
 		h.Log.Warn("Algoritmo de corto plazo no reconocido")
 	}
+
+	if len(h.Planificador.Planificador.NewQueue) == 0 {
+		// Si la cola de New está vacía, la inicializo
+		h.Planificador.Planificador.NewQueue = make([]*internal.Proceso, 1)
+	}
+	h.Planificador.Planificador.NewQueue[0] = &proceso
 }
 
 //LA IDEA ES QUE LA CONSUMA EL PLANIFICADOR CORTO
