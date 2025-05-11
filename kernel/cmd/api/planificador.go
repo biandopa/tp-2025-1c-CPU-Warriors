@@ -8,6 +8,13 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
+type rtaCPU struct {
+	PID         int      `json:"pid"`
+	PC          int      `json:"pc"`
+	Instruccion string   `json:"instruccion"`
+	Args        []string `json:"args,omitempty"`
+}
+
 // EjecutarPlanificadores envia un proceso a la Memoria
 func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	// Creo un proceso
@@ -25,7 +32,7 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 
 	switch h.Config.ReadyIngressAlgorithm {
 	case "FIFO":
-		go h.Planificador.PlanificadorLargoPlazoFIFO()
+		go h.Planificador.PlanificadorLargoPlazoFIFO(archivoNombre, tamanioProceso)
 	case "PMCP":
 
 	default:
@@ -67,35 +74,6 @@ func (h *Handler) SeleccionarPlanificador() {
 		h.Log.Warn("Algoritmo no reconocido")
 	}
 
-}
-
-/*func (h *Handler) PlanificadorCortoPlazoFIFO() {
-
-	h.Log.Debug("Entre Al PLannificador")
-
-	//TODO: MANDARLO AL PLANFICADOR Y RECIBIR EL PORCESO Y LA CPU DONDE DEBE EJECUTAR
-	//PlanificadorCortoPlazoFIFO
-	cpu := CPUIdentificacion{
-		IP:     "127.0.0.1",
-		Puerto: 8004,
-		ID:     "CPU-1",
-		ESTADO: true,
-	}
-	//TODO: RECIBIR EL PROCESO A ENVIAR A CPU
-	h.enviarProcesoACPU(cpu)
-}*/
-
-//ESto devuelve el PID + PC + alguno de estos
-//IO 25000
-//INIT_PROC proceso1 256
-//DUMP_MEMORY
-//EXIT
-
-type rtaCPU struct {
-	PID         int      `json:"pid"`
-	PC          int      `json:"pc"`
-	Instruccion string   `json:"instruccion"`
-	Args        []string `json:"args,omitempty"`
 }
 
 func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {

@@ -19,7 +19,7 @@ const (
 // TODO: Agregar que le mande el path al archivo + tamaño a la memoria en ConsultarEspacio()
 
 // PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
-func (p *Service) PlanificadorLargoPlazoFIFO() {
+func (p *Service) PlanificadorLargoPlazoFIFO(file, sizeProceso string) {
 	estado := PlanificadorEstadoStop
 
 	// Lanzamos una goroutine que espera el Enter
@@ -38,7 +38,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 	if estado == PlanificadorEstadoStart {
 		// TODO: Agregar channel que avise cuando un proceso haya terminado.
 		for _, proceso := range p.Planificador.SuspReadyQueue {
-			if p.Memoria.ConsultarEspacio() {
+			if p.Memoria.ConsultarEspacio(file, sizeProceso) {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de suspendidos ready
 
@@ -72,7 +72,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 		}
 
 		for _, proceso := range p.Planificador.NewQueue {
-			if p.Memoria.ConsultarEspacio() {
+			if p.Memoria.ConsultarEspacio(file, sizeProceso) {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de new
 
@@ -97,7 +97,6 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 				proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
 				p.Log.Info(fmt.Sprintf("%d Pasa del estado NEW al estado READY", proceso.PCB.PID))
-				// proceso.PCB = nil // Libero el PCB asociado al proceso
 			} else {
 				/* Si la respuesta es negativa (ya que la Memoria no tiene espacio suficiente para inicializarlo)
 				se deberá esperar la finalización de otro proceso para volver a intentar inicializarlo.

@@ -34,7 +34,7 @@ func TestHandler_ConsultarEspacioDisponible(t *testing.T) {
 			// Create a ResponseRecorder to record the response
 			rr := httptest.NewRecorder()
 			// Create a handler function
-			handler := http.HandlerFunc(h.ConsultarEspacioDisponible)
+			handler := http.HandlerFunc(h.ConsultarEspacioEInicializar)
 			// Serve the HTTP request
 			handler.ServeHTTP(rr, req)
 

@@ -29,7 +29,5 @@ type PCB struct {
 }
 
 type Proceso struct {
-	PCB            *PCB
-	NombreArchivo  string
-	TamanioMemoria int
+	PCB *PCB
 }

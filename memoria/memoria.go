@@ -17,12 +17,11 @@ func main() {
 	h := api.NewHandler(configFilePath)
 
 	// Recepción de valores
-	mux.HandleFunc("POST /kernel/acceso", h.RecibirPeticionAcceso)                 // Kernel --> Memoria
-	mux.HandleFunc("POST /cpu/instruccion", h.RecibirInstruccion)                  // CPU --> Memoria
-	mux.HandleFunc("POST /kernel/proceso", h.RecibirProceso)                       // Kernel --> Memoria
-	mux.HandleFunc("GET /kernel/espacio-disponible", h.ConsultarEspacioDisponible) // Kernel --> Memoria
-	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso)           // Kernel --> Memoria
-	mux.HandleFunc("GET /kernel/archivo-instrucciones", h.RecibirInstrucciones)    // Kernel --> Memoria
+	mux.HandleFunc("POST /kernel/acceso", h.RecibirPeticionAcceso)                   // Kernel --> Memoria
+	mux.HandleFunc("POST /cpu/instruccion", h.RecibirInstruccion)                    // CPU --> Memoria
+	mux.HandleFunc("POST /kernel/proceso", h.RecibirProceso)                         // Kernel --> Memoria
+	mux.HandleFunc("GET /kernel/espacio-disponible", h.ConsultarEspacioEInicializar) // Kernel --> Memoria
+	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso)             // Kernel --> Memoria
 
 	// Envío de valores
 	mux.HandleFunc("POST /cpu/instrucciones", h.EnviarInstrucciones) // Memoria --> CPU
