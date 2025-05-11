@@ -1,11 +1,7 @@
 package planificadores
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
@@ -23,9 +19,9 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 
 				var cpuSeleccionada *cpu.Cpu
 				for {
-					if len(p.CPUConectadas) > 0 {
-						for i := range p.CPUConectadas {
-							if p.CPUConectadas[i].Estado {
+					if len(p.CPUsConectadas) > 0 {
+						for i := range p.CPUsConectadas {
+							if p.CPUsConectadas[i].Estado {
 								// Mover proceso de READY a EXEC
 								p.Planificador.ReadyQueue = p.Planificador.ReadyQueue[1:]
 								timeNew := proceso.PCB.MetricasTiempo[internal.EstadoReady]
@@ -41,11 +37,11 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 								p.Log.Info("Proceso movido de READY a EXEC",
 									log.IntAttr("PID", proceso.PCB.PID),
 								)
-								cpuSeleccionada = p.CPUConectadas[i]
-								p.CPUConectadas[i].Estado = false
+								cpuSeleccionada = p.CPUsConectadas[i]
+								p.CPUsConectadas[i].Estado = false
 								fmt.Println("CPU seleccionada:", cpuSeleccionada)
 
-								p.enviarProcesoACPU(*cpuSeleccionada, proceso)
+								cpuSeleccionada.DispatchProcess(proceso.PCB.PID, proceso.PCB.PC)
 								break
 							}
 						}
@@ -57,41 +53,4 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 			}
 		}
 	}()
-}
-
-func (p *Service) enviarProcesoACPU(cpuID cpu.Cpu, proceso *internal.Proceso) {
-
-	p.Log.Debug("Entre al EjecutarPlanificadores")
-	data := map[string]interface{}{
-		"cpuID": cpuID,
-		"pc":    proceso.PCB.PID,
-		"pid":   proceso.PCB.ProgramCounter, // Cambiar por el ID real
-	}
-
-	body, err := json.Marshal(data)
-	if err != nil {
-		p.Log.Error("Error al serializar ioIdentificacion",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
-		)
-		return
-	}
-
-	url := fmt.Sprintf("http://%s:%d/kernel/procesos", cpuID.IP, cpuID.Puerto)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
-	if err != nil {
-		p.Log.Error("error enviando mensaje",
-			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
-			slog.Attr{Key: "ip", Value: slog.StringValue(cpuID.IP)},
-			slog.Attr{Key: "puerto", Value: slog.IntValue(cpuID.Puerto)},
-		)
-	}
-
-	if resp != nil {
-		p.Log.Info("Respuesta del servidor",
-			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
-			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
-		)
-	} else {
-		p.Log.Info("Respuesta del servidor: nil")
-	}
 }

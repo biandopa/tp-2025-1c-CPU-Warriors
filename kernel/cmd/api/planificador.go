@@ -14,7 +14,7 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	proceso := internal.Proceso{
 		PCB: &internal.PCB{
 			PID:            0,
-			ProgramCounter: 0,
+			PC:             0,
 			MetricasTiempo: map[internal.Estado]*internal.EstadoTiempo{},
 			MetricasEstado: map[internal.Estado]int{},
 		},

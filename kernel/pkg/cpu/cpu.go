@@ -1,7 +1,11 @@
 package cpu
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"log/slog"
+	"net/http"
 )
 
 type Cpu struct {
@@ -10,6 +14,11 @@ type Cpu struct {
 	ID     string
 	Estado bool
 	Log    *slog.Logger
+}
+
+type ProcesoCpu struct {
+	PID int `json:"pid"`
+	PC  int `json:"pc"`
 }
 
 func NewCpu(ip string, puerto int, id string, logger *slog.Logger) *Cpu {
@@ -22,6 +31,34 @@ func NewCpu(ip string, puerto int, id string, logger *slog.Logger) *Cpu {
 	}
 }
 
-func (c *Cpu) DispatchProcess(pID, pc int) {
-	// Do something
+func (c *Cpu) DispatchProcess(pid int, pc int) {
+	data := ProcesoCpu{
+		PID: pid,
+		PC:  pc,
+	}
+
+	body, err := json.Marshal(data)
+	if err != nil {
+		c.Log.Error("Error al serializar el proceso",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+		)
+		return
+	}
+
+	url := fmt.Sprintf("http://%s:%d/kernel/procesos", c.IP, c.Puerto)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		c.Log.Error("error enviando mensaje",
+			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
+			slog.Attr{Key: "ip", Value: slog.StringValue(c.IP)},
+			slog.Attr{Key: "puerto", Value: slog.IntValue(c.Puerto)},
+		)
+	}
+
+	if resp != nil {
+		c.Log.Info("Respuesta del servidor",
+			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
+			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
+		)
+	}
 }

@@ -102,7 +102,7 @@ func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	h.Planificador.AddCpuConectada(identificacionCPU)
 
 	h.Log.DebugContext(ctx, "Lista actual de CPUs conectadas",
-		log.AnyAttr("CPUConectadas", h.Planificador.CPUConectadas),
+		log.AnyAttr("CPUsConectadas", h.Planificador.CPUsConectadas),
 	)
 
 	w.WriteHeader(http.StatusOK)
