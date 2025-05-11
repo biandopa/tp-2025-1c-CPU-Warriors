@@ -13,46 +13,50 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
-// TODO: Agregar escucha ante un nuevo proceso en la cola de ready
 func (p *Service) PlanificadorCortoPlazoFIFO() {
-
-	for _, proceso := range p.Planificador.ReadyQueue {
-
-		var cpuSeleccionada *cpu.Cpu
+	go func() {
 		for {
-			if len(p.CPUConectadas) > 0 {
-				for i := range p.CPUConectadas {
-					if p.CPUConectadas[i].Estado {
+			<-p.canalNuevoProcesoReady // Espera una notificación
 
-						// Si el proceso ouede ejecutarse en una cpu, lo muevo a la cola de EXEC
-						// y lo elimino de la cola de Ready
-						p.Planificador.ReadyQueue = p.Planificador.ReadyQueue[1:] // lo saco de la cola
-						timeNew := proceso.PCB.MetricasTiempo[internal.EstadoReady]
-						timeNew.TiempoAcumulado = timeNew.TiempoAcumulado + time.Since(timeNew.TiempoInicio)
+			for len(p.Planificador.ReadyQueue) > 0 { // Procesa mientras haya elementos en ReadyQueue
+				proceso := p.Planificador.ReadyQueue[0]
 
-						// Agrego el proceso a la cola de EXEC
-						p.Planificador.ExecQueue = append(p.Planificador.ExecQueue, proceso)
-						if proceso.PCB.MetricasTiempo[internal.EstadoExec] == nil {
-							proceso.PCB.MetricasTiempo[internal.EstadoExec] = &internal.EstadoTiempo{}
+				var cpuSeleccionada *cpu.Cpu
+				for {
+					if len(p.CPUConectadas) > 0 {
+						for i := range p.CPUConectadas {
+							if p.CPUConectadas[i].Estado {
+								// Mover proceso de READY a EXEC
+								p.Planificador.ReadyQueue = p.Planificador.ReadyQueue[1:]
+								timeNew := proceso.PCB.MetricasTiempo[internal.EstadoReady]
+								timeNew.TiempoAcumulado += time.Since(timeNew.TiempoInicio)
+
+								p.Planificador.ExecQueue = append(p.Planificador.ExecQueue, proceso)
+								if proceso.PCB.MetricasTiempo[internal.EstadoExec] == nil {
+									proceso.PCB.MetricasTiempo[internal.EstadoExec] = &internal.EstadoTiempo{}
+								}
+								proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio = time.Now()
+								proceso.PCB.MetricasEstado[internal.EstadoExec]++
+
+								p.Log.Info("Proceso movido de READY a EXEC",
+									log.IntAttr("PID", proceso.PCB.PID),
+								)
+								cpuSeleccionada = p.CPUConectadas[i]
+								p.CPUConectadas[i].Estado = false
+								fmt.Println("CPU seleccionada:", cpuSeleccionada)
+
+								p.enviarProcesoACPU(*cpuSeleccionada, proceso)
+								break
+							}
 						}
-						proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio = time.Now()
-
-						proceso.PCB.MetricasEstado[internal.EstadoExec]++
-
-						p.Log.Info("Proceso movido de READY a EXEC",
-							log.IntAttr("PID", proceso.PCB.PID),
-						)
-						cpuSeleccionada = p.CPUConectadas[i]
-						p.CPUConectadas[i].Estado = false
-						fmt.Println("CPU seleccionada:", cpuSeleccionada)
-
-						p.enviarProcesoACPU(*cpuSeleccionada, proceso) // Envio el proceso a la CPU seleccionada
-						// Se encontró una CPU activa, salir de la función y mandarle la cpu y el PID Y PC
+					}
+					if cpuSeleccionada != nil {
+						break
 					}
 				}
 			}
 		}
-	}
+	}()
 }
 
 func (p *Service) enviarProcesoACPU(cpuID cpu.Cpu, proceso *internal.Proceso) {

@@ -9,11 +9,12 @@ import (
 )
 
 type Service struct {
-	Planificador  *Planificador
-	Log           *slog.Logger
-	Memoria       *memoria.Memoria
-	CPUConectadas []*cpu.Cpu // TODO: Ver si hace falta exponerlo o se puede hacer privado
-	CanalEnter    chan struct{}
+	Planificador           *Planificador
+	Log                    *slog.Logger
+	Memoria                *memoria.Memoria
+	CPUConectadas          []*cpu.Cpu // TODO: Ver si hace falta exponerlo o se puede hacer privado
+	CanalEnter             chan struct{}
+	canalNuevoProcesoReady chan struct{}
 }
 
 type Planificador struct {
@@ -46,9 +47,10 @@ func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int) *Ser
 			ExecQueue:      make([]*internal.Proceso, 0),
 			ExitQueue:      make([]*internal.Proceso, 0),
 		},
-		Log:           log,
-		Memoria:       memoria.NewMemoria(ipMemoria, puertoMemoria, log),
-		CPUConectadas: make([]*cpu.Cpu, 0),
-		CanalEnter:    make(chan struct{}),
+		Log:                    log,
+		Memoria:                memoria.NewMemoria(ipMemoria, puertoMemoria, log),
+		CPUConectadas:          make([]*cpu.Cpu, 0),
+		CanalEnter:             make(chan struct{}),
+		canalNuevoProcesoReady: make(chan struct{}, 1), // Canal con buffer de 1
 	}
 }

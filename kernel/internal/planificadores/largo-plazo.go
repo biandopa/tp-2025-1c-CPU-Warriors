@@ -47,6 +47,10 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 
 				// Agrego el proceso a la cola de ready
 				p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
+				if len(p.canalNuevoProcesoReady) == 0 {
+					p.canalNuevoProcesoReady <- struct{}{}
+				}
+
 				if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
 					proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
 				}
@@ -74,6 +78,11 @@ func (p *Service) PlanificadorLargoPlazoFIFO() {
 
 				// Agrego el proceso a la cola de ready
 				p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
+				// Notificar al channel de nuevo proceso ready
+				if len(p.canalNuevoProcesoReady) == 0 {
+					p.canalNuevoProcesoReady <- struct{}{}
+				}
+
 				if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
 					proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
 				}
