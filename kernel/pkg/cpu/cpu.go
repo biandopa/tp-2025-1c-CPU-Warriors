@@ -17,6 +17,7 @@ func NewCpu(ip string, puerto int, id string, logger *slog.Logger) *Cpu {
 		IP:     ip,
 		Puerto: puerto,
 		ID:     id,
+		Estado: true,
 		Log:    logger,
 	}
 }
