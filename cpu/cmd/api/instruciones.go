@@ -89,13 +89,16 @@ return "", err
 defer resp.Body.Close()
 
 var response struct {
-instruccion string `json:&quot;instruccion&quot;`
+instruccion string `json:"instruccion"`
 }
 
 if err := json.NewDecoder(resp.Body).Decode(&amp;response); err != nil {
 return "";, err
 }
-h.log.Info(pid, "FETCH", pc)
+h.log.InfoContext(ctx, "FETCH realizado", 
+log.IntAttr("pid", pid)
+log.IntAttr("pc", pc)
+)
 return response.Instruccion, nil
 }
 //DECODE
@@ -112,11 +115,11 @@ func decode(instruccion string) (string, []string){
 	return tipo, args
 }
 // EXECUTE
-func (h *Handler) execute(tipo string, args []string, pid int) (bool, int) {
+func (h *Handler) execute(tipo string, args []string, pid int, pc int) (bool, int) {
 	switch tipo {
 	case "NOOP":
 	time.Sleep(h.Config.CacheDelay * time.Millisecond)
-	nuevoPC = incrementarPC()
+	nuevoPC := pc + 1
 	case "WRITE":
 	direccion := args[0]
 	datos := args[1]
@@ -124,16 +127,16 @@ func (h *Handler) execute(tipo string, args []string, pid int) (bool, int) {
 	h.writeMemoria(pid, dirFisica, datos)
 	//TODO: implementar traducirDireccion, writeMemoria
 	h.log.String(pid,"ESCRIBIR", dirFisica, datos)
-	nuevoPC = incrementarPC()
+	nuevoPC := pc + 1
 	case "READ":
-	direccion := args[0]
-	tamanio := args[1]
+	direccion := strconv.Atoi(args[0])
+	tamanio := strconv.Atoi(args[1])
 	dirFisica := traducirDireccion(pid, direccion)
-	datoLeido = h.readMemoria(pid, dirFisica, tamanio)
+	datoLeido := h.readMemoria(pid, dirFisica, tamanio)
 	//TODO: implementar readMemoria
-	fmt.printf(datoLeido)
-	h.log.String(pid,"LEER", dirFisica, datoLeido)
-	nuevoPC = incrementarPC()
+	fmt.println(datoLeido)
+	h.log.Info(pid,"LEER", dirFisica, datoLeido)
+	nuevoPC := pc + 1
 	case "GOTO":
 		saltarAPC()
 	
@@ -142,10 +145,21 @@ func (h *Handler) execute(tipo string, args []string, pid int) (bool, int) {
 	
 	default:
 	h.Log.Warn("Instrucción no reconocida", log.String("tipo", tipo))
-	nuevoPC = incrementarPC()
+	nuevoPC := pc + 1
 	}
-	
-	
-	//TODO: Implementar incrementarPC
+
 	return true, nuevoPC
+	}
+
+	//CICLO DE INSTRUCCION
+	func (h *Handler) ciclo(proceso *Proceso) int {
+		instruccion, err := h.fetch(proceso.PID, proceso.PC)
+		if err != nil {
+			h.log.Error("Error en fetch", log.ErrAttr(err))
+			return
+		}
+
+		tipo, args := decode(instruccion)
+		_, nuevoPc := h.execute(tipo, args, proceso.pid, proceso.pc)
+		return nuevoPC
 	}
