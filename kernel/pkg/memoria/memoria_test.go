@@ -13,13 +13,22 @@ func TestMemoria_ConsultarEspacio(t *testing.T) {
 	httpmock.Activate(t)
 	defer httpmock.DeactivateAndReset()
 
+	type args struct {
+		filePath string
+		size     string
+	}
 	tests := []struct {
 		name    string
+		args    args
 		expects func(m *Memoria)
 		want    bool
 	}{
 		{
 			name: "Hay espacio en memoria",
+			args: args{
+				filePath: "/tmp/archivo",
+				size:     "1024",
+			},
 			expects: func(m *Memoria) {
 				httpmock.RegisterResponder(
 					"GET",
@@ -34,6 +43,10 @@ func TestMemoria_ConsultarEspacio(t *testing.T) {
 		},
 		{
 			name: "No hay espacio en memoria",
+			args: args{
+				filePath: "/tmp/archivo",
+				size:     "1024",
+			},
 			expects: func(m *Memoria) {
 				httpmock.RegisterResponder(
 					"GET",
@@ -48,6 +61,10 @@ func TestMemoria_ConsultarEspacio(t *testing.T) {
 		},
 		{
 			name: "Error al consultar espacio en memoria",
+			args: args{
+				filePath: "/tmp/archivo",
+				size:     "1024",
+			},
 			expects: func(m *Memoria) {
 				httpmock.RegisterResponder(
 					"GET",
@@ -61,7 +78,7 @@ func TestMemoria_ConsultarEspacio(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.expects(m)
-			if got := m.ConsultarEspacio(); got != tt.want {
+			if got := m.ConsultarEspacio(tt.args.filePath, tt.args.size); got != tt.want {
 				t.Errorf("ConsultarEspacio() = %v, want %v", got, tt.want)
 			}
 		})
