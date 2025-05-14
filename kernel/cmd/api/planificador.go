@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -57,14 +58,11 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	h.Planificador.Planificador.NewQueue[0] = &proceso
 }
 
-//LA IDEA ES QUE LA CONSUMA EL PLANIFICADOR CORTO
-
-// SeleccionarPlanificador selecciona el planificador de corto plazo a utilizar.
-func (h *Handler) SeleccionarPlanificador() {
-
+// ejecutarPlanificadorCortoPlazo selecciona el planificador de corto plazo a utilizar y lo ejecuta como una goroutine.
+func (h *Handler) ejecutarPlanificadorCortoPlazo() {
 	switch h.Config.ReadyIngressAlgorithm {
 	case "FIFO":
-		h.Planificador.PlanificadorCortoPlazoFIFO()
+		go h.Planificador.PlanificadorCortoPlazoFIFO()
 	case "SJFSD":
 
 	case "SJFD":
@@ -73,14 +71,13 @@ func (h *Handler) SeleccionarPlanificador() {
 	default:
 		h.Log.Warn("Algoritmo no reconocido")
 	}
-
 }
 
 func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	var proceso rtaCPU
+	var syscall rtaCPU
 
-	err := decoder.Decode(&proceso)
+	err := decoder.Decode(&syscall)
 	if err != nil {
 		h.Log.Error("Error al decodificar la RTA del Proceso",
 			log.ErrAttr(err),
@@ -90,16 +87,32 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Log.Debug("Me llego la RTA del Proceso",
-		log.AnyAttr("proceso", proceso),
+		log.AnyAttr("syscall", syscall),
 	)
 
-	// TODO: Implementar lógica para manejar la respuesta del proceso
-	switch proceso.Instruccion {
+	switch syscall.Instruccion {
 	case "INIT_PROC":
-		// TODO: Implementar lógica INIT_PROC (Aca creo un nuevo proceso y los paso a new)
-		/* Crea otro nuevo proceso y lo agrega a la cola de New.
-		Vuelve a ejecutar en el planificador de Largo Plazo creando su PCB en este nuevo proceso
-		y el padre sigue en su estado*/
+		mu := sync.Mutex{}
+		if len(syscall.Args) < 2 {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte("Error: no se recibieron los argumentos necesarios (archivo y tamaño)"))
+			return
+		}
+
+		// Creo un proceso hijo
+		proceso := internal.Proceso{
+			PCB: &internal.PCB{
+				PID:            1,
+				PC:             0,
+				MetricasTiempo: map[internal.Estado]*internal.EstadoTiempo{},
+				MetricasEstado: map[internal.Estado]int{},
+			},
+		}
+
+		// TODO: Agregar channel NewQueue
+		mu.Lock()
+		h.Planificador.Planificador.NewQueue = append(h.Planificador.Planificador.NewQueue, &proceso)
+		mu.Unlock()
 	case "IO":
 		// TODO: Implementar lógica IO
 		/* Primero verifica que existe el IO. Si no existe, se manda a EXIT.
@@ -109,10 +122,7 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		// Nota: Este todavía no!!!!!
 		/* Esta bloquea el proceso. En caso de error se envía a exit y sino se pasa a Ready*/
 	case "EXIT":
-		// TODO: Implementar lógica EXIT (aca busco el PID en Exec y lo paso a Exit)
-		/* Como le devuelve el PID, tiene que buscar al proceso en la cola de exec y terminarlo.
-		Hay que cambiar el estado de la CPU tmb!!!!!*/
-		go h.Planificador.FinalizarProceso(proceso.PID)
+		go h.Planificador.FinalizarProceso(syscall.PID)
 	default:
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("Instrucción no reconocida"))
@@ -121,5 +131,4 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
-
 }
