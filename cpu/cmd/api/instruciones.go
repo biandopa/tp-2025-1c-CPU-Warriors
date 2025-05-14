@@ -123,33 +123,33 @@ func (h *Handler) execute(tipo string, args []string, pid int, pc int) (bool, in
 	nuevoPC := pc
 	switch tipo {
 	case "NOOP":
-		time.Sleep(h.Config.CacheDelay * time.Millisecond)
+		time.Sleep(time.Duration(h.Config.CacheDelay) * time.Millisecond)
 		nuevoPC = pc + 1
 	case "WRITE":
-		direccion := args[0]
+		/*direccion := args[0]
 		datos := args[1]
 		dirFisica := traducirDireccion(pid, direccion)
-		h.writeMemoria(pid, dirFisica, datos)
+		h.writeMemoria("pid", pid, dirFisica, datos)
 		//TODO: implementar traducirDireccion, writeMemoria
 		h.Log.Info("ESCRIBIR", pid, dirFisica, datos)
-		nuevoPC = pc + 1
+		nuevoPC = pc + 1*/
 	case "READ":
-		direccion, _ := strconv.Atoi(args[0])
+		/*direccion, _ := strconv.Atoi(args[0])
 		tamanio, _ := strconv.Atoi(args[1])
 		dirFisica := traducirDireccion(pid, direccion)
 		datoLeido := h.readMemoria(pid, dirFisica, tamanio)
 		//TODO: implementar readMemoria
 		fmt.Println(datoLeido)
-		h.Log.Info(pid, "LEER", dirFisica, datoLeido)
-		nuevoPC = pc + 1
+		h.Log.Info("pid", pid, "LEER", dirFisica, datoLeido)
+		nuevoPC = pc + 1*/
 	case "GOTO":
 		nuevoPC, _ = strconv.Atoi(args[0])
 
 	case "IO", "INIT_PROC", "DUMP_MEMORY", "EXIT":
-		h.EnviarProcesoSyscall(pid, tipo, args) //TODO: ver parametros
+		//h.EnviarProcesoSyscall(pid, tipo, args) //TODO: ver parametros
 
 	default:
-		h.Log.Warn("Instrucción no reconocida", log.String("tipo", tipo))
+		h.Log.Warn("Instrucción no reconocida", log.StringAttr("tipo", tipo))
 		nuevoPC = pc + 1
 	}
 
@@ -158,13 +158,29 @@ func (h *Handler) execute(tipo string, args []string, pid int, pc int) (bool, in
 
 // CICLO DE INSTRUCCION
 func (h *Handler) Ciclo(proceso *Proceso) int {
+	//for {
+	fmt.Println("Entre al ciclo")
 	instruccion, err := h.fetch(proceso.PID, proceso.PC)
+
+	fmt.Println("Ins", instruccion)
+
 	if err != nil {
 		h.Log.Error("Error en fetch", log.ErrAttr(err))
 		return 0
 	}
 
-	tipo, args := decode(instruccion)
-	_, nuevoPc := h.execute(tipo, args, proceso.PID, proceso.PC)
-	return nuevoPC
+	/*
+		tipo, args := decode(instruccion)
+		_, nuevoPC := h.execute(tipo, args, proceso.PID, proceso.PC)
+
+			if tipo == "EXIT" {
+				h.Log.Info("Proceso finalizado", "pid", proceso.PID)
+				return 0
+				//Seria return vacio si se modifica el pc directo
+			}
+		//Podria ser mas facil modificar el PC directamente en ves del return
+		//proceso.PC = nuevoPC
+		return nuevoPC
+	}*/
+	return 0
 }
