@@ -9,24 +9,26 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
-// TODO: usarla donde sea necesario  -> Borrar porque no es una llamada en el handler, sino en internal.
-func (h *Handler) EnviarPeticionAIO(w http.ResponseWriter, tiempoSleep int) {
-	body, err := json.Marshal(tiempoSleep)
-	if err != nil {
-		h.Log.Error("Error codificando tiempoSleep",
-			log.ErrAttr(err),
-		)
-		http.Error(w, "error codificando mensaje", http.StatusInternalServerError)
-		return
-	}
+type Usleep struct {
+	PID         int `json:"pid"`
+	TiempoSleep int `json:"tiempo_sleep"`
+}
 
-	url := fmt.Sprintf("http://%s:%d/io/peticion", ioIdentificacion.IP, ioIdentificacion.Puerto)
+// Envia la peticion de usar la IO
+func (h *Handler) EnviarPeticionAIO(tiempoSleep int, io IOIdentificacion, pid int) {
+
+	usleep := Usleep{}
+	usleep.PID = 123
+	usleep.TiempoSleep = tiempoSleep
+
+	body, err := json.Marshal(usleep)
+
+	url := fmt.Sprintf("http://%s:%d/kernel/usleep", io.IP, io.Puerto)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.Error("Error enviando mensaje a peticion",
 			log.ErrAttr(err),
 		)
-		http.Error(w, "error enviando mensaje", http.StatusBadRequest)
 		return
 	}
 
@@ -40,6 +42,7 @@ func (h *Handler) EnviarPeticionAIO(w http.ResponseWriter, tiempoSleep int) {
 	}
 }
 
+// Devuelve la peticion luego de usar la IO
 func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var ioIdentificacionPeticion IOIdentificacion

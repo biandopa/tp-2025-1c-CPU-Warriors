@@ -17,10 +17,13 @@ type Config struct {
 	LogLevel              string  `json:"log_level"`
 }
 
-var ioIdentificacion IOIdentificacion
+// Se usa para almacenar las IOs
+var ioIdentificacion []IOIdentificacion
 
+// EStructura que definimos para manejar las IOs
 type IOIdentificacion struct {
 	Nombre string `json:"nombre"`
 	IP     string `json:"ip"`
 	Puerto int    `json:"puerto"`
+	Estado bool   `json:"estado"`
 }

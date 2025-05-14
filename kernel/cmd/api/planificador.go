@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
@@ -105,7 +107,41 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		h.Planificador.Planificador.NewQueue = append(h.Planificador.Planificador.NewQueue, &proceso)
 		mu.Unlock()
 	case "IO":
-		// TODO: Implementar lógica IO
+		var ioInfo IOIdentificacion
+		ioBuscada := syscall.Args[0]
+		existeIO := false
+
+		for _, io := range ioIdentificacion {
+			if io.Nombre == ioBuscada {
+				existeIO = true
+				ioInfo = io
+				break
+			}
+		}
+
+		if !existeIO {
+			go h.Planificador.FinalizarProceso(syscall.PID)
+			return
+		} else if ioInfo.Estado {
+			//Existe y esta libre, blocked y ademas manda la señal
+			timeSleep, err := strconv.Atoi(syscall.Args[1])
+			if err != nil {
+				h.Log.Error("Error convirtiendo a int",
+					log.ErrAttr(err),
+				)
+				return
+			}
+			h.EnviarPeticionAIO(timeSleep, ioInfo, syscall.PID)
+
+			//TODO proxima entrega: mandar a block
+			return
+		} else {
+			//TODO proxima entrega: mandar a block
+			fmt.Println("existe y no esta libre")
+			return
+		}
+
+		//
 		/* Primero verifica que existe el IO. Si no existe, se manda a EXIT.
 		Si existe y está ocupado, se manda a Blocked. Veremos...*/
 	case "DUMP_MEMORY":
