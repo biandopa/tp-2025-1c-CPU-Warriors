@@ -28,9 +28,17 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 		},
 	}
 
-	// TODO: Hacer un switch para elegir un planificador y que ejecute interfaces
-	// TODO: Hacer que los planificadores se ejecuten en async
+	h.ejecutarPlanificadorLargoPlazo(archivoNombre, tamanioProceso)
+	h.ejecutarPlanificadorCortoPlazo()
 
+	if len(h.Planificador.Planificador.NewQueue) == 0 {
+		// Si la cola de New está vacía, la inicializo
+		h.Planificador.Planificador.NewQueue = make([]*internal.Proceso, 1)
+	}
+	h.Planificador.Planificador.NewQueue[0] = &proceso
+}
+
+func (h *Handler) ejecutarPlanificadorLargoPlazo(archivoNombre, tamanioProceso string) {
 	switch h.Config.ReadyIngressAlgorithm {
 	case "FIFO":
 		go h.Planificador.PlanificadorLargoPlazoFIFO(archivoNombre, tamanioProceso)
@@ -39,23 +47,6 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	default:
 		h.Log.Warn("Algoritmo de largo plazo no reconocido")
 	}
-
-	switch h.Config.SchedulerAlgorithm {
-	case "FIFO":
-		go h.Planificador.PlanificadorCortoPlazoFIFO()
-	case "SJFSD":
-
-	case "SJFD":
-
-	default:
-		h.Log.Warn("Algoritmo de corto plazo no reconocido")
-	}
-
-	if len(h.Planificador.Planificador.NewQueue) == 0 {
-		// Si la cola de New está vacía, la inicializo
-		h.Planificador.Planificador.NewQueue = make([]*internal.Proceso, 1)
-	}
-	h.Planificador.Planificador.NewQueue[0] = &proceso
 }
 
 // ejecutarPlanificadorCortoPlazo selecciona el planificador de corto plazo a utilizar y lo ejecuta como una goroutine.
