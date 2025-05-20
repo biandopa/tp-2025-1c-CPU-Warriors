@@ -23,13 +23,11 @@ type EstadoTiempo struct {
 
 type PCB struct {
 	PID            int                      `json:"pid"`
-	ProgramCounter int                      `json:"pc"`
+	PC             int                      `json:"pc"`
 	MetricasEstado map[Estado]int           `json:"metricas_estado"`
 	MetricasTiempo map[Estado]*EstadoTiempo `json:"metricas_tiempo"`
 }
 
 type Proceso struct {
-	PCB            *PCB
-	NombreArchivo  string
-	TamanioMemoria int
+	PCB *PCB
 }

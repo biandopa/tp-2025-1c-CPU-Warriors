@@ -5,38 +5,46 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHandler_ConsultarEspacioDisponible(t *testing.T) {
+func TestHandler_FinalizarProceso(t *testing.T) {
 	ass := assert.New(t)
 	h := NewHandler("../../configs/config.json")
 
+	type args struct {
+		pid string
+	}
 	tests := []struct {
 		name         string
+		args         args
 		wantedStatus int
 		wantedBody   string
 	}{
 		{
-			name:         "Hay espacio disponible",
+			name:         "Finalizar proceso exitoso",
+			args:         args{pid: "1234"},
 			wantedStatus: http.StatusOK,
-			wantedBody:   `{"mensaje":"Espacio disponible en memoria","tamaño":1024}`,
+			wantedBody:   `{"message":"Proceso 1234 finalizado con éxito"}`,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Configurar el router de forma idéntica a la app real
+			r := chi.NewRouter()
+			r.Post("/kernel/fin-proceso/{pid}", h.FinalizarProceso)
+
 			// Create a new request
-			req, err := http.NewRequest("GET", "/kernel/espacio-disponible", nil)
+			req, err := http.NewRequest("POST", "/kernel/fin-proceso/"+tt.args.pid, nil)
 			if err != nil {
 				t.Fatalf("Error creating request: %v", err)
 			}
 
 			// Create a ResponseRecorder to record the response
 			rr := httptest.NewRecorder()
-			// Create a handler function
-			handler := http.HandlerFunc(h.ConsultarEspacioEInicializar)
 			// Serve the HTTP request
-			handler.ServeHTTP(rr, req)
+			r.ServeHTTP(rr, req)
 
 			// Check the status code
 			ass.Equal(tt.wantedStatus, rr.Code)

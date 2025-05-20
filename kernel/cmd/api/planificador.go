@@ -2,80 +2,14 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
+	"sync"
 
+	"github.com/sisoputnfrba/tp-golang/kernel/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
-
-// EjecutarPlanificadores envia un proceso a la Memoria
-func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
-	// Creo un proceso
-	//proceso := internal.Proceso{}
-
-	// TODO: Hacer un switch para elegir un planificador y que ejecute interfaces
-	// TODO: Hacer que los planificadores se ejecuten en async
-
-	switch h.Config.ReadyIngressAlgorithm {
-	case "FIFO":
-		go h.Planificador.PlanificadorLargoPlazoFIFO()
-	case "PMCP":
-
-	default:
-		h.Log.Warn("Algoritmo de largo plazo no reconocido")
-	}
-
-	switch h.Config.SchedulerAlgorithm {
-	case "FIFO":
-		h.Planificador.PlanificadorCortoPlazoFIFO()
-	case "SJFSD":
-
-	case "SJFD":
-
-	default:
-		h.Log.Warn("Algoritmo de corto plazo no reconocido")
-	}
-}
-
-//LA IDEA ES QUE LA CONSUMA EL PLANIFICADOR CORTO
-
-// SeleccionarPlanificador selecciona el planificador de corto plazo a utilizar.
-func (h *Handler) SeleccionarPlanificador() {
-
-	switch h.Config.ReadyIngressAlgorithm {
-	case "FIFO":
-		h.Planificador.PlanificadorCortoPlazoFIFO()
-	case "SJFSD":
-
-	case "SJFD":
-	case "PMCP":
-
-	default:
-		h.Log.Warn("Algoritmo no reconocido")
-	}
-
-}
-
-/*func (h *Handler) PlanificadorCortoPlazoFIFO() {
-
-	h.Log.Debug("Entre Al PLannificador")
-
-	//TODO: MANDARLO AL PLANFICADOR Y RECIBIR EL PORCESO Y LA CPU DONDE DEBE EJECUTAR
-	//PlanificadorCortoPlazoFIFO
-	cpu := CPUIdentificacion{
-		IP:     "127.0.0.1",
-		Puerto: 8004,
-		ID:     "CPU-1",
-		ESTADO: true,
-	}
-	//TODO: RECIBIR EL PROCESO A ENVIAR A CPU
-	h.enviarProcesoACPU(cpu)
-}*/
-
-//ESto devuelve el PID + PC + alguno de estos
-//IO 25000
-//INIT_PROC proceso1 256
-//DUMP_MEMORY
-//EXIT
 
 type rtaCPU struct {
 	PID         int      `json:"pid"`
@@ -84,11 +18,59 @@ type rtaCPU struct {
 	Args        []string `json:"args,omitempty"`
 }
 
+// EjecutarPlanificadores envia un proceso a la Memoria
+func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
+	// Creo un proceso
+	proceso := internal.Proceso{
+		PCB: &internal.PCB{
+			PID:            0,
+			PC:             0,
+			MetricasTiempo: map[internal.Estado]*internal.EstadoTiempo{},
+			MetricasEstado: map[internal.Estado]int{},
+		},
+	}
+
+	h.ejecutarPlanificadorLargoPlazo(archivoNombre, tamanioProceso)
+	h.ejecutarPlanificadorCortoPlazo()
+
+	if len(h.Planificador.Planificador.NewQueue) == 0 {
+		// Si la cola de New está vacía, la inicializo
+		h.Planificador.Planificador.NewQueue = make([]*internal.Proceso, 1)
+	}
+	h.Planificador.Planificador.NewQueue[0] = &proceso
+}
+
+func (h *Handler) ejecutarPlanificadorLargoPlazo(archivoNombre, tamanioProceso string) {
+	switch h.Config.ReadyIngressAlgorithm {
+	case "FIFO":
+		go h.Planificador.PlanificadorLargoPlazoFIFO(archivoNombre, tamanioProceso)
+	case "PMCP":
+
+	default:
+		h.Log.Warn("Algoritmo de largo plazo no reconocido")
+	}
+}
+
+// ejecutarPlanificadorCortoPlazo selecciona el planificador de corto plazo a utilizar y lo ejecuta como una goroutine.
+func (h *Handler) ejecutarPlanificadorCortoPlazo() {
+	switch h.Config.ReadyIngressAlgorithm {
+	case "FIFO":
+		go h.Planificador.PlanificadorCortoPlazoFIFO()
+	case "SJFSD":
+
+	case "SJFD":
+	case "PMCP":
+
+	default:
+		h.Log.Warn("Algoritmo no reconocido")
+	}
+}
+
 func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	var proceso rtaCPU
+	var syscall rtaCPU
 
-	err := decoder.Decode(&proceso)
+	err := decoder.Decode(&syscall)
 	if err != nil {
 		h.Log.Error("Error al decodificar la RTA del Proceso",
 			log.ErrAttr(err),
@@ -98,24 +80,82 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Log.Debug("Me llego la RTA del Proceso",
-		log.AnyAttr("proceso", proceso),
+		log.AnyAttr("syscall", syscall),
 	)
 
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("ok"))
-
-	switch proceso.Instruccion {
+	switch syscall.Instruccion {
 	case "INIT_PROC":
-		// TODO: Implementar lógica INIT_PROC (Aca creo un nuevo proceso y los paso a new)
+		mu := sync.Mutex{}
+		if len(syscall.Args) < 2 {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte("Error: no se recibieron los argumentos necesarios (archivo y tamaño)"))
+			return
+		}
+
+		// Creo un proceso hijo
+		proceso := internal.Proceso{
+			PCB: &internal.PCB{
+				PID:            1,
+				PC:             0,
+				MetricasTiempo: map[internal.Estado]*internal.EstadoTiempo{},
+				MetricasEstado: map[internal.Estado]int{},
+			},
+		}
+
+		// TODO: Agregar channel NewQueue
+		mu.Lock()
+		h.Planificador.Planificador.NewQueue = append(h.Planificador.Planificador.NewQueue, &proceso)
+		mu.Unlock()
 	case "IO":
-		// TODO: Implementar lógica IO
+		var ioInfo IOIdentificacion
+		ioBuscada := syscall.Args[0]
+		existeIO := false
+
+		for _, io := range ioIdentificacion {
+			if io.Nombre == ioBuscada {
+				existeIO = true
+				ioInfo = io
+				break
+			}
+		}
+
+		if !existeIO {
+			go h.Planificador.FinalizarProceso(syscall.PID)
+			return
+		} else if ioInfo.Estado {
+			//Existe y esta libre, blocked y ademas manda la señal
+			timeSleep, err := strconv.Atoi(syscall.Args[1])
+			if err != nil {
+				h.Log.Error("Error convirtiendo a int",
+					log.ErrAttr(err),
+				)
+				return
+			}
+			h.EnviarPeticionAIO(timeSleep, ioInfo, syscall.PID)
+
+			//TODO proxima entrega: mandar a block
+			return
+		} else {
+			//TODO proxima entrega: mandar a block
+			fmt.Println("existe y no esta libre")
+			return
+		}
+
+		//
+		/* Primero verifica que existe el IO. Si no existe, se manda a EXIT.
+		Si existe y está ocupado, se manda a Blocked. Veremos...*/
 	case "DUMP_MEMORY":
 		// TODO: Implementar lógica DUMP_MEMORY
+		// Nota: Este todavía no!!!!!
+		/* Esta bloquea el proceso. En caso de error se envía a exit y sino se pasa a Ready*/
 	case "EXIT":
-		// TODO: Implementar lógica EXIT (aca busco el PID en Exec y lo paso a Exit)
+		go h.Planificador.FinalizarProceso(syscall.PID)
 	default:
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("Instrucción no reconocida"))
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -14,10 +15,14 @@ const (
 )
 
 func main() {
-	h := api.NewHandler(configFilePath)
-
 	//para que tome el argumento debe ingresarse asi "go run io.go NOMBRE"
 	nombreIO := os.Args[1]
+	if nombreIO == "" {
+		slog.Error("El nombre del IO no puede estar vacío")
+		os.Exit(1)
+	}
+
+	h := api.NewHandler(configFilePath, nombreIO)
 
 	h.Log.Debug("Inicializando interfaz IO",
 		log.StringAttr("nombreIO", nombreIO),

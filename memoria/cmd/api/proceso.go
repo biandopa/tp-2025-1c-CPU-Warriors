@@ -2,13 +2,16 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 func (h *Handler) RecibirProceso(w http.ResponseWriter, r *http.Request) {
 	var (
+		ctx = r.Context()
 		// Leer tamanioProceso del queryparameter
 		tamanioProceso = r.URL.Query().Get("tamanioProceso")
 	)
@@ -28,7 +31,7 @@ func (h *Handler) RecibirProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Log.Info("Petición recibida con éxito",
+	h.Log.DebugContext(ctx, "Petición recibida con éxito",
 		log.AnyAttr("peticion", peticion),
 	)
 
@@ -41,4 +44,21 @@ func (h *Handler) RecibirProceso(w http.ResponseWriter, r *http.Request) {
 	// Respond with success
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("request processed successfully"))
+}
+
+func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
+	var (
+		// Leer PID del endpoint /kernel/fin-proceso/{pid}
+		pid = chi.URLParam(r, "pid")
+	)
+
+	// Inserte función para finalizar el proceso en memoria
+	// Si no se puede finalizar, responde con un error
+
+	w.WriteHeader(http.StatusOK)
+	response := map[string]string{
+		"message": fmt.Sprintf("Proceso %s finalizado con éxito", pid),
+	}
+	jsonResponse, _ := json.Marshal(response)
+	_, _ = w.Write(jsonResponse)
 }

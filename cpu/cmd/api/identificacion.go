@@ -5,14 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 func (h *Handler) EnviarIdentificacion(nombre string) {
+	puerto, _ := strconv.Atoi(nombre)
+
 	data := map[string]interface{}{
 		"ip":     h.Config.IpCpu,
-		"puerto": h.Config.PortCpu,
+		"puerto": puerto, // Cambiar por el puerto real
 		"id":     nombre, // Cambiar por el ID real
 	}
 

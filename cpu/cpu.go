@@ -32,12 +32,8 @@ func main() {
 	mux.HandleFunc("POST /kernel/procesos", h.RecibirProcesos)             // Kernel --> CPU
 	mux.HandleFunc("POST /kernel/interrupciones", h.RecibirInterrupciones) // Kernel --> CPU
 
-	// Envío de valores
-	mux.HandleFunc("POST /kernel/proceso", h.EnviarProceso) // CPU --> Kernel
-	//mux.HandleFunc("POST /kernel/identificacion", h.EnviarIdentificacion) // CPU --> Kernel
-	mux.HandleFunc("POST /memoria/instruccion", h.EnviarInstruccion) // CPU --> Memoria
-
-	cpuAddress := fmt.Sprintf("%s:%d", h.Config.IpCpu, h.Config.PortCpu)
+	// Nota: Le pasamos por argumento el puerto para que levante muchas CPUs
+	cpuAddress := fmt.Sprintf("%s:%s", h.Config.IpCpu, identificadorCPU)
 	if err := http.ListenAndServe(cpuAddress, mux); err != nil {
 		h.Log.Error("Error starting server", log.ErrAttr(err))
 		panic(err)

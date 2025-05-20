@@ -3,13 +3,15 @@ package api
 import (
 	"log/slog"
 
+	"github.com/sisoputnfrba/tp-golang/cpu/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 type Handler struct {
-	Log    *slog.Logger
-	Config *Config
+	Log     *slog.Logger
+	Config  *Config
+	Service *internal.Service
 }
 
 func NewHandler(configFile string) *Handler {
@@ -26,9 +28,11 @@ func NewHandler(configFile string) *Handler {
 
 	// Initialize the logger with the log level from the configuration
 	logLevel := configStruct.LogLevel
+	logger := log.BuildLogger(logLevel)
 
 	return &Handler{
-		Config: configStruct,
-		Log:    log.BuildLogger(logLevel),
+		Config:  configStruct,
+		Log:     logger,
+		Service: internal.NewService(logger, configStruct.IpKernel, configStruct.PortKernel),
 	}
 }

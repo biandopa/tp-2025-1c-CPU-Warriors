@@ -14,4 +14,19 @@ type Config struct {
 	SwapDelay      int    `json:"swap_delay"`
 	LogLevel       string `json:"log_level"`
 	DumpPath       string `json:"dump_path"`
+	ScriptsPath    string `json:"scripts_path"`
+}
+
+type MetricasProceso struct {
+	AccesosTablaDePaginas    int `json:"accesos_tabla_de_paginas"`
+	InstruccionesSolicitadas int `json:"instrucciones_solicitadas"`
+	BajadasAlSwap            int `json:"bajadas_a_swap"`
+	SubidasAMemPpal          int `json:"subidas_a_memoria_principal"`
+	LecturasDeMemoria        int `json:"lecturas_de_memoria"`
+	EscriturasDeMemoria      int `json:"escrituras_de_memoria"`
+}
+
+type Instruccion struct {
+	Instruccion string   `json:"instruccion"`
+	Parametros  []string `json:"parametros"`
 }

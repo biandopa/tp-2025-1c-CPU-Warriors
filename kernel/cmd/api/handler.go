@@ -35,7 +35,6 @@ func NewHandler(configFile string) *Handler {
 		Log:    logger,
 		Planificador: planificadores.NewPlanificador(
 			logger, configStruct.IpMemory, configStruct.PortMemory,
-			[]*planificadores.CpuIdentificacion{},
 		),
 	}
 }

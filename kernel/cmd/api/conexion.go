@@ -10,6 +10,7 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
+// Recibe la conexion de la memoria (es unica)
 func (h *Handler) ConexionInicialMemoria(archivoNombre, tamanioProceso string) {
 	h.Log.Debug("Conexión Inicial",
 		log.StringAttr("archivo", archivoNombre),
@@ -45,9 +46,10 @@ func (h *Handler) ConexionInicialMemoria(archivoNombre, tamanioProceso string) {
 	}
 }
 
+// Recibe la lista de IOs
 func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	ioInfo := IOIdentificacion{}
+	var ioInfo IOIdentificacion
 
 	// Leer el cuerpo de la solicitud
 	decoder := json.NewDecoder(r.Body)
@@ -62,19 +64,18 @@ func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Config.IpIo = ioInfo.IP
-	h.Config.PortIo = ioInfo.Puerto
-	// Agregar nombre si es necesario
+	ioInfo.Estado = true
+	ioIdentificacion = append(ioIdentificacion, ioInfo)
 
-	h.Log.DebugContext(ctx, "Me llego la conexion de un IO",
-		log.StringAttr("nombre", ioInfo.Nombre),
+	h.Log.DebugContext(ctx, "Lista de IOs conectadas",
+		log.AnyAttr("IOsConectadas", ioIdentificacion),
 	)
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }
 
-// TRANSFORMAR ESTO A UNA LISTA DE CPUS
+// Recibe la lista de IOs
 func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	identificacionCPU := &planificadores.CpuIdentificacion{}
@@ -87,23 +88,23 @@ func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	// Decodificar el cuerpo de la solicitud en la estructura identificacionCPU
 	err := decoder.Decode(&identificacionCPU)
 	if err != nil {
-		h.Log.ErrorContext(ctx, "Error al decodificar ioIdentificacion",
+		h.Log.ErrorContext(ctx, "Error al decodificar cpuIdentificacion",
 			log.ErrAttr(err),
 		)
 		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
+		_, _ = w.Write([]byte("Error al decodificar cpuIdentificacion"))
 	}
 
 	h.Log.DebugContext(ctx, "Me llego la conexion de CPU",
 		log.AnyAttr("identificacionCPU", identificacionCPU),
 	)
 
-	identificacionCPU.ESTADO = true
+	identificacionCPU.Estado = true
 
 	h.Planificador.AddCpuConectada(identificacionCPU)
 
 	h.Log.DebugContext(ctx, "Lista actual de CPUs conectadas",
-		log.AnyAttr("CPUConectadas", h.Planificador.CPUConectadas),
+		log.AnyAttr("CPUsConectadas", h.Planificador.CPUsConectadas),
 	)
 
 	w.WriteHeader(http.StatusOK)
