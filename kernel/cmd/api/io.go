@@ -22,6 +22,12 @@ func (h *Handler) EnviarPeticionAIO(tiempoSleep int, io IOIdentificacion, pid in
 	usleep.TiempoSleep = tiempoSleep
 
 	body, err := json.Marshal(usleep)
+	if err != nil {
+		h.Log.Error("Error al serializar la peticion",
+			log.ErrAttr(err),
+		)
+		return
+	}
 
 	url := fmt.Sprintf("http://%s:%d/kernel/usleep", io.IP, io.Puerto)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
