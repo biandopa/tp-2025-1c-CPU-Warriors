@@ -1,8 +1,7 @@
-package internal
+package api
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -19,7 +18,7 @@ func (h *Handler) RecibirPeticionAcceso(w http.ResponseWriter, r *http.Request) 
 	}
 
 	h.Log.Info("Petición de acceso recibida con éxito",
-		slog.Attr{Key: "peticion", Value: slog.AnyValue(peticion)},
+		log.AnyAttr("peticion", peticion),
 	)
 
 	// Respond with success
