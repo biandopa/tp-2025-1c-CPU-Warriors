@@ -14,7 +14,7 @@ type Usleep struct {
 	TiempoSleep int `json:"tiempo_sleep"`
 }
 
-// Envia la peticion de usar la IO
+// EnviarPeticionAIO Envia la peticion de usar la IO
 func (h *Handler) EnviarPeticionAIO(tiempoSleep int, io IOIdentificacion, pid int) {
 
 	usleep := Usleep{}
@@ -42,7 +42,7 @@ func (h *Handler) EnviarPeticionAIO(tiempoSleep int, io IOIdentificacion, pid in
 	}
 }
 
-// Devuelve la peticion luego de usar la IO
+// TerminoPeticionIO Devuelve la peticion luego de usar la IO
 func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var ioIdentificacionPeticion IOIdentificacion
