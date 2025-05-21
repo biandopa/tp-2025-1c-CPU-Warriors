@@ -29,8 +29,7 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	)
 	// Agregar ciclo de instrucción
 	go func() {
-		nuevoPC := h.Ciclo(proceso)
-		proceso.PC = nuevoPC
+		h.Ciclo(proceso)
 	}()
 	// TODO: Agregar ejecución de instrucción
 	// Añadir la syscall

@@ -76,7 +76,7 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 }
 
 // FETCH
-func (h *Handler) fetch(pid int, pc int) (string, error) {
+func (h *Handler) Fetch(pid int, pc int) (string, error) {
 	request := map[string]interface{}{
 		"pid": pid,
 		"pc":  pc,
@@ -94,8 +94,7 @@ func (h *Handler) fetch(pid int, pc int) (string, error) {
 	var response struct {
 		Instruccion string `json:"instruccion"`
 	}
-
-	if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return "", err
 	}
 
@@ -103,6 +102,27 @@ func (h *Handler) fetch(pid int, pc int) (string, error) {
 
 	return response.Instruccion, nil
 }
+
+// Fetch De prueba hasta tener hecho memoria
+/*
+func (h *Handler) Fetch(pid int, pc int) (string, error) {
+	mockInstrucciones := []string{
+		"NOOP",
+		"WRITE 100 42",
+		"READ 100 4",
+		"GOTO 3",
+		"EXIT",
+	}
+
+	if pc < len(mockInstrucciones) {
+		instruccion := mockInstrucciones[pc]
+		h.Log.Info("FETCH mockeado", "pid", pid, "pc", pc, "instruccion", instruccion)
+		return instruccion, nil
+	}
+
+	h.Log.Warn("PC fuera de rango de instrucciones mock", "pc", pc)
+	return "EXIT", nil
+}*/
 
 // DECODE
 func decode(instruccion string) (string, []string) {
@@ -119,7 +139,7 @@ func decode(instruccion string) (string, []string) {
 }
 
 // EXECUTE
-func (h *Handler) execute(tipo string, args []string, pid int, pc int) (bool, int) {
+func (h *Handler) Execute(tipo string, args []string, pid int, pc int) (bool, int) {
 	nuevoPC := pc
 	switch tipo {
 	case "NOOP":
@@ -157,30 +177,23 @@ func (h *Handler) execute(tipo string, args []string, pid int, pc int) (bool, in
 }
 
 // CICLO DE INSTRUCCION
-func (h *Handler) Ciclo(proceso *Proceso) int {
-	//for {
-	fmt.Println("Entre al ciclo")
-	instruccion, err := h.fetch(proceso.PID, proceso.PC)
+func (h *Handler) Ciclo(proceso *Proceso) {
+	for {
+		fmt.Println("Entre al ciclo")
+		instruccion, err := h.Fetch(proceso.PID, proceso.PC)
 
-	fmt.Println("Ins", instruccion)
+		if err != nil {
+			h.Log.Error("Error en fetch", log.ErrAttr(err))
+			return
+		}
 
-	if err != nil {
-		h.Log.Error("Error en fetch", log.ErrAttr(err))
-		return 0
-	}
-
-	/*
 		tipo, args := decode(instruccion)
-		_, nuevoPC := h.execute(tipo, args, proceso.PID, proceso.PC)
-
-			if tipo == "EXIT" {
-				h.Log.Info("Proceso finalizado", "pid", proceso.PID)
-				return 0
-				//Seria return vacio si se modifica el pc directo
-			}
-		//Podria ser mas facil modificar el PC directamente en ves del return
-		//proceso.PC = nuevoPC
-		return nuevoPC
-	}*/
-	return 0
+		_, nuevoPC := h.Execute(tipo, args, proceso.PID, proceso.PC)
+		fmt.Println("Ins", tipo, "Arg", args)
+		if tipo == "EXIT" {
+			h.Log.Info("Proceso finalizado", "pid", proceso.PID)
+			return
+		}
+		proceso.PC = nuevoPC
+	}
 }
