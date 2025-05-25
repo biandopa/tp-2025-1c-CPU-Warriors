@@ -27,7 +27,10 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	h.Log.DebugContext(ctx, "Me llego la peticion del Kernel",
 		log.AnyAttr("paquete", proceso),
 	)
-
+	// Agregar ciclo de instrucción
+	go func() {
+		h.Ciclo(proceso)
+	}()
 	// TODO: Agregar ejecución de instrucción
 	// Añadir la syscall
 	syscall := &internal.ProcesoSyscall{
