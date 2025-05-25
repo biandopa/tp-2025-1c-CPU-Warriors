@@ -12,11 +12,25 @@ import (
 
 func (h *Handler) EnviarInstrucciones(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	// Creo instruccion
-	instruccion := map[string]interface{}{
-		"tipo": "instruccion",
-		"datos": map[string]interface{}{
-			"codigo": "codigo de la instruccion",
+	// Creo instrucciones mockeadas
+	instruccion := []Instruccion{
+		{
+			Instruccion: "NOOP",
+		},
+		{
+			Instruccion: "WRITE",
+			Parametros:  []string{"100", "42"},
+		},
+		{
+			Instruccion: "READ",
+			Parametros:  []string{"100", "4"},
+		},
+		{
+			Instruccion: "GOTO",
+			Parametros:  []string{"3"},
+		},
+		{
+			Instruccion: "EXIT",
 		},
 	}
 
@@ -31,12 +45,12 @@ func (h *Handler) EnviarInstrucciones(w http.ResponseWriter, r *http.Request) {
 	url := fmt.Sprintf("http://%s:%d/memoria/instrucciones", h.Config.IpCpu, h.Config.PortCpu)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		h.Log.Error("Error enviando mensaje",
+		h.Log.Error("Error enviando instrucciones",
 			slog.Attr{Key: "ip", Value: slog.StringValue(h.Config.IpCpu)},
 			slog.Attr{Key: "puerto", Value: slog.IntValue(h.Config.PortCpu)},
 			log.ErrAttr(err),
 		)
-		http.Error(w, "Error enviando mensaje", http.StatusBadRequest)
+		http.Error(w, "Error enviando instrucciones", http.StatusBadRequest)
 		return
 	}
 
@@ -57,10 +71,6 @@ func (h *Handler) EnviarInstrucciones(w http.ResponseWriter, r *http.Request) {
 		h.Log.Info("Mensaje enviado al CPU con éxito",
 			log.IntAttr("status_code", resp.StatusCode),
 		)
-	} else {
-		h.Log.Error("Error al enviar mensaje al CPU")
-		http.Error(w, "error al enviar mensaje al CPU", http.StatusInternalServerError)
-		return
 	}
 
 	// Agrego el status Code 200 a la respuesta
@@ -72,7 +82,7 @@ func (h *Handler) EnviarInstrucciones(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 	// Decode the request body
-	var instruccion map[string]interface{}
+	var instruccion Instruccion
 	err := json.NewDecoder(r.Body).Decode(&instruccion)
 	if err != nil {
 		h.Log.Error("Error decoding request body", log.ErrAttr(err))
