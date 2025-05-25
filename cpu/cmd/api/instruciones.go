@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -89,7 +90,10 @@ func (h *Handler) Fetch(pid int, pc int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	var response struct {
 		Instruccion string `json:"instruccion"`
@@ -195,5 +199,7 @@ func (h *Handler) Ciclo(proceso *Proceso) {
 			return
 		}
 		proceso.PC = nuevoPC
+
+		// TODO: Implementar la lógica de interrupciones
 	}
 }
