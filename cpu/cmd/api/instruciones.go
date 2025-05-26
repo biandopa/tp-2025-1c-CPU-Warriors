@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sisoputnfrba/tp-golang/cpu/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
@@ -98,7 +99,7 @@ func (h *Handler) Fetch(pid int, pc int) (string, error) {
 	var response struct {
 		Instruccion string `json:"instruccion"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return "", err
 	}
 
@@ -143,7 +144,7 @@ func decode(instruccion string) (string, []string) {
 }
 
 // EXECUTE
-func (h *Handler) Execute(tipo string, args []string, pid int, pc int) (bool, int) {
+func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 	nuevoPC := pc
 	switch tipo {
 	case "NOOP":
@@ -170,7 +171,17 @@ func (h *Handler) Execute(tipo string, args []string, pid int, pc int) (bool, in
 		nuevoPC, _ = strconv.Atoi(args[0])
 
 	case "IO", "INIT_PROC", "DUMP_MEMORY", "EXIT":
-		//h.EnviarProcesoSyscall(pid, tipo, args) //TODO: ver parametros
+		syscall := &internal.ProcesoSyscall{
+			PID:         pid,
+			PC:          pc,
+			Instruccion: tipo,
+			Args:        args,
+		}
+
+		if err := h.Service.EnviarProcesoSyscall(syscall); err != nil {
+			h.Log.Error("Error al enviar proceso syscall", log.ErrAttr(err))
+			return false, pc // Si hay error, no avanzamos el PC
+		}
 
 	default:
 		h.Log.Warn("Instrucción no reconocida", log.StringAttr("tipo", tipo))

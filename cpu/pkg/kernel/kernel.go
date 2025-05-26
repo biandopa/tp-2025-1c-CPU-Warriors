@@ -2,7 +2,6 @@ package kernel
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -24,11 +23,11 @@ func NewKernel(ip string, puerto int, logger *slog.Logger) *Kernel {
 	}
 }
 
-func (k *Kernel) EnviarSyscall(ctx context.Context, body []byte) error {
+func (k *Kernel) EnviarSyscall(body []byte) error {
 	url := fmt.Sprintf("http://%s:%d/cpu/proceso", k.IP, k.Puerto)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		k.Log.ErrorContext(ctx, "Error enviando proceso al Kernel",
+		k.Log.Error("Error enviando proceso al Kernel",
 			log.StringAttr("ip", k.IP),
 			log.IntAttr("puerto", k.Puerto),
 			log.ErrAttr(err),
