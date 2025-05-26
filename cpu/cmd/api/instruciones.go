@@ -186,24 +186,25 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 }
 
 // CICLO DE INSTRUCCION
-func (h *Handler) Ciclo(proceso *Proceso) {
+func (h *Handler) Ciclo(proceso *Proceso) int {
 	for {
 		fmt.Println("Entre al ciclo")
 		instruccion, err := h.Fetch(proceso.PID, proceso.PC)
 
 		if err != nil {
 			h.Log.Error("Error en fetch", log.ErrAttr(err))
-			return
+			return proceso.PC // Si hay error, no avanzamos el PC
 		}
 
 		tipo, args := decode(instruccion)
 		_, nuevoPC := h.Execute(tipo, args, proceso.PID, proceso.PC)
 		fmt.Println("Ins", tipo, "Arg", args)
+		proceso.PC = nuevoPC
+
 		if tipo == "EXIT" {
 			h.Log.Info("Proceso finalizado", "pid", proceso.PID)
-			return
+			return proceso.PC // Salimos del ciclo si la instrucción es EXIT
 		}
-		proceso.PC = nuevoPC
 
 		// TODO: Implementar la lógica de interrupciones
 	}

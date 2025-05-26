@@ -28,11 +28,19 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	)
 
 	// TODO: Devolver PID y PC al Kernel luego de ejecutar
-	h.Ciclo(proceso)
+	newPC := h.Ciclo(proceso)
+
+	respose := Proceso{
+		PID: proceso.PID,
+		PC:  newPC,
+	}
+
+	// Conviero la estructura del proceso a un []bytes (formato en el que se envían las peticiones)
+	body, _ := json.Marshal(respose)
 
 	// Agrego el status Code 200 a la respuesta
 	w.WriteHeader(http.StatusOK)
 
 	// Envío la respuesta al cliente con un mensaje de éxito
-	_, _ = w.Write([]byte("ok"))
+	_, _ = w.Write(body)
 }
