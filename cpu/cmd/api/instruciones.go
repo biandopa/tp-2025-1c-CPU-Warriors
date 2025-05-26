@@ -78,34 +78,32 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 }
 
 // FETCH
-func (h *Handler) Fetch(pid int, pc int) (string, error) {
+func (h *Handler) Fetch(pid int, pc int) (Instruccion, error) {
+	var response Instruccion
 	request := map[string]interface{}{
 		"pid": pid,
 		"pc":  pc,
 	}
 
 	body, _ := json.Marshal(request)
-	url := fmt.Sprintf("http://%s:%d/memoria/instruccion", h.Config.IpMemory,
+	url := fmt.Sprintf("http://%s:%d/cpu/instruccion", h.Config.IpMemory,
 		h.Config.PortMemory)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		return "", err
+		return response, err
 	}
 
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
 
-	var response struct {
-		Instruccion string `json:"instruccion"`
-	}
 	if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return "", err
+		return response, err
 	}
 
 	h.Log.Info("FETCH realizado", "pid", pid, "pc", pc)
 
-	return response.Instruccion, nil
+	return response, nil
 }
 
 // Fetch De prueba hasta tener hecho memoria
@@ -129,16 +127,12 @@ func (h *Handler) Fetch(pid int, pc int) (string, error) {
 	return "EXIT", nil
 }*/
 
-// DECODE
-func decode(instruccion string) (string, []string) {
-	partes := strings.Fields(instruccion)
-
-	if len(partes) == 0 {
-		return "", []string{}
-	}
-
-	tipo := strings.ToUpper(partes[0])
-	args := partes[1:]
+// Decode Interpreta la instrucción y sus argumentos. Además, verifica si la misma requiere de una
+// traducción de dirección lógica a física.
+func decode(instruccion Instruccion) (string, []string) {
+	//TODO: Implementar la parte de la traducción de dirección lógica a física.
+	tipo := strings.ToUpper(instruccion.Instruccion)
+	args := instruccion.Parametros
 
 	return tipo, args
 }

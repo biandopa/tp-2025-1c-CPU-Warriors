@@ -19,3 +19,8 @@ type Proceso struct {
 	PID int `json:"pid"`
 	PC  int `json:"pc"`
 }
+
+type Instruccion struct {
+	Instruccion string   `json:"instruccion"`
+	Parametros  []string `json:"parametros"`
+}

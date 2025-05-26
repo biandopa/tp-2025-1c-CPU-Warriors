@@ -19,12 +19,10 @@ func main() {
 	// Recepción de valores
 	mux.HandleFunc("POST /kernel/acceso", h.RecibirPeticionAcceso)                   // Kernel --> Memoria
 	mux.HandleFunc("POST /cpu/instruccion", h.RecibirInstruccion)                    // CPU --> Memoria
+	mux.HandleFunc("GET /cpu/instruccion", h.EnviarInstruccion)                      // Memoria --> CPU
 	mux.HandleFunc("POST /kernel/proceso", h.RecibirProceso)                         // Kernel --> Memoria
 	mux.HandleFunc("GET /kernel/espacio-disponible", h.ConsultarEspacioEInicializar) // Kernel --> Memoria
 	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso)             // Kernel --> Memoria
-
-	// Envío de valores
-	mux.HandleFunc("POST /cpu/instrucciones", h.EnviarInstrucciones) // Memoria --> CPU
 
 	memoriaAddress := fmt.Sprintf("%s:%d", h.Config.IpMemory, h.Config.PortMemory)
 	if err := http.ListenAndServe(memoriaAddress, mux); err != nil {

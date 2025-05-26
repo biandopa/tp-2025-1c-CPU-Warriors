@@ -1,16 +1,13 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
-func (h *Handler) EnviarInstrucciones(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	// Creo instrucciones mockeadas
 	instruccion := []Instruccion{
@@ -35,49 +32,18 @@ func (h *Handler) EnviarInstrucciones(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Conviero la estructura del proceso a un []bytes (formato en el que se envían las peticiones)
-	body, err := json.Marshal(instruccion)
+	body, err := json.Marshal(instruccion[0]) // Enviamos solo la primera instrucción como ejemplo
 	if err != nil {
 		h.Log.ErrorContext(ctx, "Error codificando mensaje", log.ErrAttr(err))
 		http.Error(w, "Error codificando mensaje", http.StatusBadRequest)
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/memoria/instrucciones", h.Config.IpCpu, h.Config.PortCpu)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
-	if err != nil {
-		h.Log.Error("Error enviando instrucciones",
-			slog.Attr{Key: "ip", Value: slog.StringValue(h.Config.IpCpu)},
-			slog.Attr{Key: "puerto", Value: slog.IntValue(h.Config.PortCpu)},
-			log.ErrAttr(err),
-		)
-		http.Error(w, "Error enviando instrucciones", http.StatusBadRequest)
-		return
-	}
-
-	if resp != nil {
-		defer func() {
-			if err = resp.Body.Close(); err != nil {
-				h.Log.Error("Error cerrando el cuerpo de la respuesta", log.ErrAttr(err))
-			}
-		}()
-
-		if resp.StatusCode != http.StatusOK {
-			h.Log.Error("Error en la respuesta del CPU",
-				log.IntAttr("status_code", resp.StatusCode),
-			)
-			http.Error(w, "error en la respuesta del CPU", http.StatusInternalServerError)
-			return
-		}
-		h.Log.Info("Mensaje enviado al CPU con éxito",
-			log.IntAttr("status_code", resp.StatusCode),
-		)
-	}
-
 	// Agrego el status Code 200 a la respuesta
 	w.WriteHeader(http.StatusOK)
 
 	// Envío la respuesta al cliente con un mensaje de éxito
-	_, _ = w.Write([]byte("ok"))
+	_, _ = w.Write(body)
 }
 
 func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
