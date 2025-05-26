@@ -26,10 +26,9 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	h.Log.DebugContext(ctx, "Me llego la peticion del Kernel",
 		log.AnyAttr("paquete", proceso),
 	)
-	// Agregar ciclo de instrucción
-	go func() {
-		h.Ciclo(proceso)
-	}()
+
+	// TODO: Devolver PID y PC al Kernel luego de ejecutar
+	h.Ciclo(proceso)
 
 	// Agrego el status Code 200 a la respuesta
 	w.WriteHeader(http.StatusOK)
