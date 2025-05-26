@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/sisoputnfrba/tp-golang/cpu/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
@@ -30,17 +29,6 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	// Agregar ciclo de instrucción
 	go func() {
 		h.Ciclo(proceso)
-	}()
-	// TODO: Agregar ejecución de instrucción
-	// Añadir la syscall
-	syscall := &internal.ProcesoSyscall{
-		PID:         proceso.PID,
-		PC:          proceso.PC,
-		Instruccion: "EXIT",     // Ejemplo de instrucción mockeado
-		Args:        []string{}, // Ejemplo de argumentos mockeados
-	}
-	go func() {
-		err = h.Service.EnviarProcesoSyscall(ctx, syscall)
 	}()
 
 	// Agrego el status Code 200 a la respuesta
