@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sisoputnfrba/tp-golang/kernel/internal"
+	"github.com/sisoputnfrba/tp-golang/kernel/cmd/api"
 )
 
 const (
@@ -13,17 +13,15 @@ const (
 )
 
 func main() {
-	h := internal.NewHandler(configFilePath)
+	h := api.NewHandler(configFilePath)
 
 	if len(os.Args) < 2 {
 		h.Log.Error(fmt.Sprintf("Faltan %d argumentos.", len(os.Args)))
+		panic("Faltan argumentos para inicializar el módulo Kernel.")
 	}
 
-	internal.ArchivoNombre = os.Args[1]
-	internal.TamanioProceso = os.Args[2]
-
-	//IO --> Kernel  (le enviará su nombre, ip y puerto) HANDSHAKE
-	h.ConexionInicial()
+	archivoNombre := os.Args[1]
+	tamanioProceso := os.Args[2] // Tamaño en bytes
 
 	mux := http.NewServeMux()
 
@@ -33,7 +31,8 @@ func main() {
 
 	mux.HandleFunc("/cpu/proceso", h.RespuestaProcesoCPU) //CPU --> Kernel (Recibe respuesta del proceso de la CPU) PROCESO
 
-	//mux.HandleFunc("/interrupciones", .RecibirInterrupciones) // Kernel --> CPU Procesos a ejecutar
+	// Kernel --> Memoria
+	h.EjecutarPlanificadores(archivoNombre, tamanioProceso)
 
 	err := http.ListenAndServe(fmt.Sprintf(":%d", h.Config.PortKernel), mux)
 	if err != nil {
