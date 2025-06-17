@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -79,26 +78,15 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 
 // FETCH
 func (h *Handler) Fetch(pid int, pc int) (Instruccion, error) {
-	var response Instruccion
-	request := map[string]interface{}{
-		"pid": pid,
-		"pc":  pc,
-	}
-
-	body, _ := json.Marshal(request)
-	url := fmt.Sprintf("http://%s:%d/cpu/instruccion", h.Config.IpMemory,
-		h.Config.PortMemory)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	instruccion, err := h.Memoria.FetchInstruccion(pid, pc)
 	if err != nil {
-		return response, err
+		return Instruccion{}, err
 	}
 
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
-
-	if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return response, err
+	// Convertir de memoria.Instruccion a api.Instruccion
+	response := Instruccion{
+		Instruccion: instruccion.Instruccion,
+		Parametros:  instruccion.Parametros,
 	}
 
 	h.Log.Info("FETCH realizado", "pid", pid, "pc", pc)
@@ -145,29 +133,77 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		time.Sleep(time.Duration(h.Config.CacheDelay) * time.Millisecond)
 		nuevoPC = pc + 1
 	case "WRITE":
-		/*direccion := args[0]
+		if len(args) < 2 {
+			h.Log.Error("WRITE requiere al menos 2 argumentos: dirección y datos",
+				log.IntAttr("pid", pid),
+				log.IntAttr("pc", pc))
+			return false, pc
+		}
+		direccion := args[0]
 		datos := args[1]
-		dirFisica := traducirDireccion(pid, direccion)
-		h.writeMemoria("pid", pid, dirFisica, datos)
-		//TODO: implementar traducirDireccion, writeMemoria
-		h.Log.Info("ESCRIBIR", pid, dirFisica, datos)
-		nuevoPC = pc + 1*/
+
+		// TODO: Por ahora usamos la dirección lógica directamente (implementar traducción)
+		dirFisica := direccion
+
+		if err := h.Memoria.Write(pid, dirFisica, datos); err != nil {
+			h.Log.Error("Error al escribir en memoria",
+				log.ErrAttr(err),
+				log.IntAttr("pid", pid),
+				log.StringAttr("direccion", dirFisica),
+				log.StringAttr("datos", datos))
+			return false, pc
+		}
+
+		h.Log.Debug("WRITE ejecutado exitosamente",
+			log.IntAttr("pid", pid),
+			log.StringAttr("direccion_fisica", dirFisica),
+			log.StringAttr("datos", datos))
+		nuevoPC = pc + 1
+
 	case "READ":
-		/*direccion, _ := strconv.Atoi(args[0])
-		tamanio, _ := strconv.Atoi(args[1])
-		dirFisica := traducirDireccion(pid, direccion)
-		datoLeido := h.readMemoria(pid, dirFisica, tamanio)
-		//TODO: implementar readMemoria
-		fmt.Println(datoLeido)
-		h.Log.Info("pid", pid, "LEER", dirFisica, datoLeido)
-		nuevoPC = pc + 1*/
+		if len(args) < 2 {
+			h.Log.Error("READ requiere al menos 2 argumentos: dirección y tamaño",
+				log.IntAttr("pid", pid),
+				log.IntAttr("pc", pc))
+			return false, pc
+		}
+		direccion := args[0]
+		tamanio, err := strconv.Atoi(args[1])
+		if err != nil {
+			h.Log.Error("Tamaño inválido en instrucción READ",
+				log.ErrAttr(err),
+				log.IntAttr("pid", pid),
+				log.StringAttr("tamanio_str", args[1]))
+			return false, pc
+		}
+
+		// TODO: Por ahora usamos la dirección lógica directamente (implementar traducción)
+		dirFisica := direccion
+
+		datoLeido, err := h.Memoria.Read(pid, dirFisica, tamanio)
+		if err != nil {
+			h.Log.Error("Error al leer de memoria",
+				log.ErrAttr(err),
+				log.IntAttr("pid", pid),
+				log.StringAttr("direccion", dirFisica),
+				log.IntAttr("tamanio", tamanio))
+			return false, pc
+		}
+
+		h.Log.Debug("READ ejecutado exitosamente",
+			log.IntAttr("pid", pid),
+			log.StringAttr("direccion_fisica", dirFisica),
+			log.StringAttr("dato_leido", datoLeido),
+			log.IntAttr("tamanio", tamanio))
+		nuevoPC = pc + 1
+
 	case "GOTO":
 		nuevoPC, _ = strconv.Atoi(args[0])
 
 	case "IO", "INIT_PROC", "DUMP_MEMORY", "EXIT":
 		syscall := &internal.ProcesoSyscall{
 			PID:         pid,
-			PC:          pc,
+			PC:          pc + 1, // Avanzamos el PC para la syscall
 			Instruccion: tipo,
 			Args:        args,
 		}
@@ -176,6 +212,14 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			h.Log.Error("Error al enviar proceso syscall", log.ErrAttr(err))
 			return false, pc // Si hay error, no avanzamos el PC
 		}
+
+		h.Log.Debug("Syscall enviada al kernel",
+			log.IntAttr("pid", pid),
+			log.StringAttr("instruccion", tipo),
+			log.IntAttr("pc_nuevo", pc+1))
+
+		// Para syscalls, retornamos false para indicar que el CPU debe devolver el control al kernel
+		return false, pc + 1
 
 	default:
 		h.Log.Warn("Instrucción no reconocida", log.StringAttr("tipo", tipo))
@@ -188,22 +232,40 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 // CICLO DE INSTRUCCION
 func (h *Handler) Ciclo(proceso *Proceso) int {
 	for {
-		fmt.Println("Entre al ciclo")
-		instruccion, err := h.Fetch(proceso.PID, proceso.PC)
+		h.Log.Debug("Iniciando ciclo de instrucción",
+			log.IntAttr("pid", proceso.PID),
+			log.IntAttr("pc", proceso.PC))
 
+		instruccion, err := h.Fetch(proceso.PID, proceso.PC)
 		if err != nil {
 			h.Log.Error("Error en fetch", log.ErrAttr(err))
 			return proceso.PC // Si hay error, no avanzamos el PC
 		}
 
 		tipo, args := decode(instruccion)
-		_, nuevoPC := h.Execute(tipo, args, proceso.PID, proceso.PC)
-		fmt.Println("Ins", tipo, "Arg", args)
+		h.Log.Debug("Instrucción decodificada",
+			log.StringAttr("tipo", tipo),
+			log.AnyAttr("args", args))
+
+		continuar, nuevoPC := h.Execute(tipo, args, proceso.PID, proceso.PC)
 		proceso.PC = nuevoPC
 
+		// Si Execute retorna false, significa que hay que devolver el control al kernel
+		// (por ejemplo, por una syscall o error)
+		if !continuar {
+			h.Log.Debug("Devolviendo control al kernel",
+				log.IntAttr("pid", proceso.PID),
+				log.StringAttr("razon", tipo),
+				log.IntAttr("pc_final", nuevoPC))
+			return proceso.PC
+		}
+
+		// Si la instrucción es EXIT, finalizamos el ciclo
 		if tipo == "EXIT" {
-			h.Log.Info("Proceso finalizado", "pid", proceso.PID)
-			return proceso.PC // Salimos del ciclo si la instrucción es EXIT
+			h.Log.Debug("Proceso finalizado por EXIT",
+				log.IntAttr("pid", proceso.PID),
+				log.IntAttr("pc_final", proceso.PC))
+			return proceso.PC
 		}
 
 		// TODO: Implementar la lógica de interrupciones

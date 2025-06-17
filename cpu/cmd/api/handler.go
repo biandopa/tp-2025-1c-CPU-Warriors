@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/sisoputnfrba/tp-golang/cpu/internal"
+	"github.com/sisoputnfrba/tp-golang/cpu/pkg/memoria"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
@@ -12,6 +13,7 @@ type Handler struct {
 	Log     *slog.Logger
 	Config  *Config
 	Service *internal.Service
+	Memoria *memoria.Memoria
 }
 
 func NewHandler(configFile string) *Handler {
@@ -34,5 +36,6 @@ func NewHandler(configFile string) *Handler {
 		Config:  configStruct,
 		Log:     logger,
 		Service: internal.NewService(logger, configStruct.IpKernel, configStruct.PortKernel),
+		Memoria: memoria.NewMemoria(configStruct.IpMemory, configStruct.PortMemory, logger),
 	}
 }
