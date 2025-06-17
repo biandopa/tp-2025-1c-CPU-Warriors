@@ -135,7 +135,8 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 	switch tipo {
 	case "NOOP":
 		time.Sleep(time.Duration(h.Config.CacheDelay) * time.Millisecond)
-		nuevoPC = pc + 1
+		nuevoPC++
+
 	case "WRITE":
 		if len(args) < 2 {
 			h.Log.Error("WRITE requiere al menos 2 argumentos: dirección y datos",
@@ -162,7 +163,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			log.IntAttr("pid", pid),
 			log.StringAttr("direccion_fisica", dirFisica),
 			log.StringAttr("datos", datos))
-		nuevoPC = pc + 1
+		nuevoPC++
 
 	case "READ":
 		if len(args) < 2 {
@@ -199,7 +200,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			log.StringAttr("direccion_fisica", dirFisica),
 			log.StringAttr("dato_leido", datoLeido),
 			log.IntAttr("tamanio", tamanio))
-		nuevoPC = pc + 1
+		nuevoPC++
 
 	case "GOTO":
 		pcAtoi, err := strconv.Atoi(args[0])
@@ -232,11 +233,11 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 
 		// Para syscalls, retornamos false para indicar que el CPU debe devolver el control al kernel
 		returnControl = true
-		nuevoPC = pc + 1 // Avanzamos el PC para la syscall
+		nuevoPC++ // Avanzamos el PC para la syscall
 
 	default:
 		h.Log.Warn("Instrucción no reconocida", log.StringAttr("tipo", tipo))
-		nuevoPC = pc + 1
+		nuevoPC++
 	}
 
 	return returnControl, nuevoPC
