@@ -127,7 +127,11 @@ func decode(instruccion Instruccion) (string, []string) {
 
 // EXECUTE
 func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
-	nuevoPC := pc
+	var (
+		nuevoPC       = pc
+		returnControl bool
+	)
+
 	switch tipo {
 	case "NOOP":
 		time.Sleep(time.Duration(h.Config.CacheDelay) * time.Millisecond)
@@ -198,7 +202,15 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		nuevoPC = pc + 1
 
 	case "GOTO":
-		nuevoPC, _ = strconv.Atoi(args[0])
+		pcAtoi, err := strconv.Atoi(args[0])
+		if err != nil {
+			h.Log.Error("GOTO requiere un argumento numérico válido",
+				log.ErrAttr(err),
+				log.IntAttr("pid", pid),
+				log.StringAttr("argumento", args[0]))
+			return false, pc
+		}
+		nuevoPC = pcAtoi
 
 	case "IO", "INIT_PROC", "DUMP_MEMORY", "EXIT":
 		syscall := &internal.ProcesoSyscall{
@@ -219,14 +231,15 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			log.IntAttr("pc_nuevo", pc+1))
 
 		// Para syscalls, retornamos false para indicar que el CPU debe devolver el control al kernel
-		return false, pc + 1
+		returnControl = true
+		nuevoPC = pc + 1 // Avanzamos el PC para la syscall
 
 	default:
 		h.Log.Warn("Instrucción no reconocida", log.StringAttr("tipo", tipo))
 		nuevoPC = pc + 1
 	}
 
-	return true, nuevoPC
+	return returnControl, nuevoPC
 }
 
 // CICLO DE INSTRUCCION
