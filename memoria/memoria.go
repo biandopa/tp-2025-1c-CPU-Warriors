@@ -18,6 +18,7 @@ func main() {
 
 	// Recepción de valores
 	mux.HandleFunc("POST /kernel/acceso", h.RecibirPeticionAcceso)                   // Kernel --> Memoria
+	mux.HandleFunc("POST /cpu/acceso", h.RecibirPeticionAcceso)                      // CPU --> Memoria (READ/WRITE)
 	mux.HandleFunc("POST /cpu/instruccion", h.RecibirInstruccion)                    // CPU --> Memoria
 	mux.HandleFunc("GET /cpu/instruccion", h.EnviarInstruccion)                      // Memoria --> CPU
 	mux.HandleFunc("POST /kernel/proceso", h.RecibirProceso)                         // Kernel --> Memoria
