@@ -84,6 +84,7 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 		if len(valores[1:]) > 0 {
 			instruccion.Parametros = valores[1:]
 		}
+		// TODO: Que sea un mapa donde la key sea el PID
 		h.Instrucciones = append(h.Instrucciones, instruccion)
 	}
 

@@ -48,7 +48,7 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 	// Decode the request body
-	var instruccion Instruccion
+	var instruccion map[string]interface{}
 	err := json.NewDecoder(r.Body).Decode(&instruccion)
 	if err != nil {
 		h.Log.Error("Error decoding request body", log.ErrAttr(err))
@@ -60,7 +60,10 @@ func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 		log.AnyAttr("instruccion", instruccion),
 	)
 
+	var i = h.Instrucciones[0] // Simulamos que tomamos la primera instrucción
+	body, _ := json.Marshal(i)
+
 	// Respond with success
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("request processed successfully"))
+	_, _ = w.Write(body)
 }

@@ -16,7 +16,7 @@ const (
 	PlanificadorEstadoStart = "START"
 )
 
-// TODO: Agregar que le mande el path al archivo + tamaño a la memoria en ConsultarEspacio()
+// TODO: Agregar un channel que avise cuando haya un nuevo proceso en la cola de ready!!!!!
 
 // PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
 func (p *Service) PlanificadorLargoPlazoFIFO(file, sizeProceso string) {
@@ -36,72 +36,76 @@ func (p *Service) PlanificadorLargoPlazoFIFO(file, sizeProceso string) {
 	p.Log.Info("Planificador de largo plazo iniciado")
 
 	if estado == PlanificadorEstadoStart {
-		// TODO: Agregar channel que avise cuando un proceso haya terminado.
-		for _, proceso := range p.Planificador.SuspReadyQueue {
-			if p.Memoria.ConsultarEspacio(file, sizeProceso) {
-				// Si el proceso se carga en memoria, lo muevo a la cola de ready
-				// y lo elimino de la cola de suspendidos ready
+		for {
+			<-p.CanalNuevoProcesoNew // Espera una notificación
+			// TODO: Agregar channel que avise cuando un proceso haya terminado.
+			// Si no hay espacio en memoria y el proceso está en la cole de SuspReady, es bloqueante.
+			for _, proceso := range p.Planificador.SuspReadyQueue {
+				if p.Memoria.ConsultarEspacio(file, sizeProceso) {
+					// Si el proceso se carga en memoria, lo muevo a la cola de ready
+					// y lo elimino de la cola de suspendidos ready
 
-				p.Planificador.SuspReadyQueue = p.Planificador.SuspReadyQueue[1:] // lo saco de la cola
-				if proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] == nil {
-					proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] = &internal.EstadoTiempo{}
+					p.Planificador.SuspReadyQueue = p.Planificador.SuspReadyQueue[1:] // lo saco de la cola
+					if proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] == nil {
+						proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] = &internal.EstadoTiempo{}
+					}
+					timeSusp := proceso.PCB.MetricasTiempo[internal.EstadoSuspReady]
+					timeSusp.TiempoAcumulado = timeSusp.TiempoAcumulado + time.Since(timeSusp.TiempoInicio)
+
+					// Agrego el proceso a la cola de ready
+					p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
+					if len(p.canalNuevoProcesoReady) == 0 {
+						p.canalNuevoProcesoReady <- struct{}{}
+					}
+
+					if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
+						proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
+					}
+					proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
+
+					proceso.PCB.MetricasEstado[internal.EstadoReady]++
+
+					p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
+				} else {
+					/* Si la respuesta es negativa (ya que la Memoria no tiene espacio suficiente para inicializarlo)
+					se deberá esperar la finalización de otro proceso para volver a intentar inicializarlo.
+					Vuelvo a agregar al proceso a la cola de suspendidos ready en el lugar que estaba (al principio por ser FIFO) */
+					p.Planificador.SuspReadyQueue = append([]*internal.Proceso{proceso}, p.Planificador.SuspReadyQueue...)
 				}
-				timeSusp := proceso.PCB.MetricasTiempo[internal.EstadoSuspReady]
-				timeSusp.TiempoAcumulado = timeSusp.TiempoAcumulado + time.Since(timeSusp.TiempoInicio)
-
-				// Agrego el proceso a la cola de ready
-				p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-				if len(p.canalNuevoProcesoReady) == 0 {
-					p.canalNuevoProcesoReady <- struct{}{}
-				}
-
-				if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
-					proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
-				}
-				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
-
-				proceso.PCB.MetricasEstado[internal.EstadoReady]++
-
-				p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
-			} else {
-				/* Si la respuesta es negativa (ya que la Memoria no tiene espacio suficiente para inicializarlo)
-				se deberá esperar la finalización de otro proceso para volver a intentar inicializarlo.
-				Vuelvo a agregar al proceso a la cola de suspendidos ready en el lugar que estaba (al principio por ser FIFO) */
-				p.Planificador.SuspReadyQueue = append([]*internal.Proceso{proceso}, p.Planificador.SuspReadyQueue...)
 			}
-		}
 
-		for _, proceso := range p.Planificador.NewQueue {
-			if p.Memoria.ConsultarEspacio(file, sizeProceso) {
-				// Si el proceso se carga en memoria, lo muevo a la cola de ready
-				// y lo elimino de la cola de new
+			for _, proceso := range p.Planificador.NewQueue {
+				if p.Memoria.ConsultarEspacio(file, sizeProceso) {
+					// Si el proceso se carga en memoria, lo muevo a la cola de ready
+					// y lo elimino de la cola de new
 
-				p.Planificador.NewQueue = p.Planificador.NewQueue[1:] // lo saco de la cola
-				if proceso.PCB.MetricasTiempo[internal.EstadoNew] == nil {
-					proceso.PCB.MetricasTiempo[internal.EstadoNew] = &internal.EstadoTiempo{}
+					p.Planificador.NewQueue = p.Planificador.NewQueue[1:] // lo saco de la cola
+					if proceso.PCB.MetricasTiempo[internal.EstadoNew] == nil {
+						proceso.PCB.MetricasTiempo[internal.EstadoNew] = &internal.EstadoTiempo{}
+					}
+					timeNew := proceso.PCB.MetricasTiempo[internal.EstadoNew]
+					timeNew.TiempoAcumulado = timeNew.TiempoAcumulado + time.Since(timeNew.TiempoInicio)
+
+					// Agrego el proceso a la cola de ready
+					p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
+					// Notificar al channel de nuevo proceso ready
+					if len(p.canalNuevoProcesoReady) == 0 {
+						p.canalNuevoProcesoReady <- struct{}{}
+					}
+
+					if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
+						proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
+					}
+					proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
+					proceso.PCB.MetricasEstado[internal.EstadoReady]++
+
+					p.Log.Info(fmt.Sprintf("%d Pasa del estado NEW al estado READY", proceso.PCB.PID))
+				} else {
+					/* Si la respuesta es negativa (ya que la Memoria no tiene espacio suficiente para inicializarlo)
+					se deberá esperar la finalización de otro proceso para volver a intentar inicializarlo.
+					Vuelvo a agregar al proceso a la cola de new en el lugar que estaba (al principio por ser FIFO) */
+					p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
 				}
-				timeNew := proceso.PCB.MetricasTiempo[internal.EstadoNew]
-				timeNew.TiempoAcumulado = timeNew.TiempoAcumulado + time.Since(timeNew.TiempoInicio)
-
-				// Agrego el proceso a la cola de ready
-				p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-				// Notificar al channel de nuevo proceso ready
-				if len(p.canalNuevoProcesoReady) == 0 {
-					p.canalNuevoProcesoReady <- struct{}{}
-				}
-
-				if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
-					proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
-				}
-				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
-				proceso.PCB.MetricasEstado[internal.EstadoReady]++
-
-				p.Log.Info(fmt.Sprintf("%d Pasa del estado NEW al estado READY", proceso.PCB.PID))
-			} else {
-				/* Si la respuesta es negativa (ya que la Memoria no tiene espacio suficiente para inicializarlo)
-				se deberá esperar la finalización de otro proceso para volver a intentar inicializarlo.
-				Vuelvo a agregar al proceso a la cola de new en el lugar que estaba (al principio por ser FIFO) */
-				p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
 			}
 		}
 	}
@@ -165,4 +169,9 @@ func (p *Service) FinalizarProceso(pid int) {
 
 	// 7. Liberar PCB
 	proceso.PCB = nil // Libero el PCB asociado al proceso
+
+	// 8. Le avisamos al channel de nuevo proceso ready
+	if len(p.CanalNuevoProcesoNew) == 0 {
+		p.CanalNuevoProcesoNew <- struct{}{}
+	}
 }
