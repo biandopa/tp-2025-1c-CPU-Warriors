@@ -36,6 +36,9 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	if len(h.Planificador.Planificador.NewQueue) == 0 {
 		// Si la cola de New está vacía, la inicializo
 		h.Planificador.Planificador.NewQueue = make([]*internal.Proceso, 1)
+
+		// Mando una señal al canal de nuevo proceso
+		h.Planificador.CanalNuevoProcesoNew <- struct{}{}
 	}
 	h.Planificador.Planificador.NewQueue[0] = &proceso
 }
@@ -102,9 +105,9 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 			},
 		}
 
-		// TODO: Agregar channel NewQueue
 		mu.Lock()
 		h.Planificador.Planificador.NewQueue = append(h.Planificador.Planificador.NewQueue, &proceso)
+		h.Planificador.CanalNuevoProcesoNew <- struct{}{}
 		mu.Unlock()
 	case "IO":
 		var ioInfo IOIdentificacion

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -25,18 +26,39 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 		// Leemos el nombre del archivo y el tamaño del proceso de la consulta
 		filePath       = r.URL.Query().Get("archivo")
 		tamanioProceso = r.URL.Query().Get("tamanio-proceso")
+		pid            = r.URL.Query().Get("pid")
 	)
 
 	if tamanioProceso == "" {
 		h.Log.Error("Tamaño del Proceso no proporcionado")
-		http.Error(w, "tamaño del oroceso no proporcionado", http.StatusBadRequest)
+		http.Error(w, "tamaño del proceso no proporcionado", http.StatusBadRequest)
 		return
 	}
 
-	if filePath != "" {
-		h.Log.DebugContext(ctx, "Archivo de pseudocodigo recibido",
-			log.AnyAttr("path-archivo", filePath),
+	if filePath == "" {
+		h.Log.Error("Archivo de pseudocódigo no proporcionado")
+		http.Error(w, "archivo de pseudocódigo no proporcionado", http.StatusBadRequest)
+		return
+	}
+
+	if pid == "" {
+		h.Log.Error("PID no proporcionado")
+		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
+		return
+	}
+
+	pidInt, err := strconv.Atoi(pid)
+	if err != nil {
+		h.Log.Error("Error al convertir PID a entero",
+			log.ErrAttr(err),
+			log.StringAttr("pid", pid),
 		)
+		http.Error(w, "error al convertir PID a entero", http.StatusBadRequest)
+		return
+	}
+
+	if h.Instrucciones[pidInt] == nil {
+		h.Instrucciones[pidInt] = make([]Instruccion, 0)
 	}
 
 	// Verifica si hay suficiente espacio
@@ -66,7 +88,7 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 		}
 	}()
 
-	// Almacenamos el valor del archivo en el array de instrucciones
+	// Almacenamos el valor del archivo en el mapa de instrucciones
 
 	scanner := bufio.NewScanner(file)
 
@@ -84,7 +106,8 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 		if len(valores[1:]) > 0 {
 			instruccion.Parametros = valores[1:]
 		}
-		h.Instrucciones = append(h.Instrucciones, instruccion)
+
+		h.Instrucciones[pidInt] = append(h.Instrucciones[pidInt], instruccion)
 	}
 
 	// Simulamos una consulta al espacio disponible
@@ -102,7 +125,7 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	h.Log.InfoContext(ctx, "Consulta de espacio disponible respondida con éxito",
+	h.Log.DebugContext(ctx, "Consulta de espacio disponible respondida con éxito",
 		log.IntAttr("tamaño_disponible", espacioDisponible),
 		log.StringAttr("mensaje", response.Mensaje),
 	)
