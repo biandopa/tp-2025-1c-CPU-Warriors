@@ -16,8 +16,6 @@ const (
 	PlanificadorEstadoStart = "START"
 )
 
-// TODO: Agregar un channel que avise cuando haya un nuevo proceso en la cola de ready!!!!!
-
 // PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
 func (p *Service) PlanificadorLargoPlazoFIFO(file, sizeProceso string) {
 	estado := PlanificadorEstadoStop
@@ -32,16 +30,15 @@ func (p *Service) PlanificadorLargoPlazoFIFO(file, sizeProceso string) {
 
 	// Se queda escuchando hasta que el usuario presione la tecla ENTER por consola para iniciar el planificador
 	<-p.CanalEnter
-	//estado = PlanificadorEstadoStart
-	p.Log.Info("Planificador de largo plazo iniciado")
+
+	p.Log.Debug("Planificador de largo plazo iniciado")
 
 	if estado == PlanificadorEstadoStart {
 		for {
-			<-p.CanalNuevoProcesoNew // Espera una notificación
-			// TODO: Agregar channel que avise cuando un proceso haya terminado.
-			// Si no hay espacio en memoria y el proceso está en la cole de SuspReady, es bloqueante.
+			<-p.CanalNuevoProcesoNew
+			// Si no hay espacio en memoria y el proceso está en la cola de SuspReady, es bloqueante.
 			for _, proceso := range p.Planificador.SuspReadyQueue {
-				if p.Memoria.ConsultarEspacio(file, sizeProceso) {
+				if p.Memoria.ConsultarEspacio(file, sizeProceso, proceso.PCB.PID) {
 					// Si el proceso se carga en memoria, lo muevo a la cola de ready
 					// y lo elimino de la cola de suspendidos ready
 
@@ -75,7 +72,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO(file, sizeProceso string) {
 			}
 
 			for _, proceso := range p.Planificador.NewQueue {
-				if p.Memoria.ConsultarEspacio(file, sizeProceso) {
+				if p.Memoria.ConsultarEspacio(file, sizeProceso, proceso.PCB.PID) {
 					// Si el proceso se carga en memoria, lo muevo a la cola de ready
 					// y lo elimino de la cola de new
 

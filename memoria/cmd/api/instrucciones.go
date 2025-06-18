@@ -48,20 +48,39 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 	// Decode the request body
-	var instruccion map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&instruccion)
+	var proceso Proceso
+	err := json.NewDecoder(r.Body).Decode(&proceso)
 	if err != nil {
 		h.Log.Error("Error decoding request body", log.ErrAttr(err))
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	h.Log.Info("Instrucción recibida con éxito",
-		log.AnyAttr("instruccion", instruccion),
+	h.Log.Debug("Petición de envío de instrucción recibida con éxito",
+		log.AnyAttr("proceso", proceso),
 	)
 
-	var i = h.Instrucciones[0] // Simulamos que tomamos la primera instrucción
-	body, _ := json.Marshal(i)
+	// Verificamos si el proceso tiene almacenadas instrucciones
+	if _, exists := h.Instrucciones[proceso.PID]; !exists {
+		h.Log.Debug("No hay instrucciones almacenadas para el proceso",
+			log.IntAttr("pid", proceso.PID),
+		)
+		http.Error(w, "no instructions available for the process", http.StatusBadRequest)
+		return
+	}
+
+	// Si tuvo, pero no quedan más instrucciones, devolvemos un status 204
+	if len(h.Instrucciones[proceso.PID]) == 0 {
+		h.Log.Debug("No quedan más instrucciones para el proceso",
+			log.IntAttr("pid", proceso.PID),
+		)
+		http.Error(w, "no more instructions for the process", http.StatusNoContent)
+		return
+	}
+
+	// Leemos la primera instruccón asociada al proceso, la enviamos al cliente y la eliminamos de la lista de instrucciones
+	body, _ := json.Marshal(h.Instrucciones[proceso.PID][0])
+	h.Instrucciones[proceso.PID] = h.Instrucciones[proceso.PID][1:]
 
 	// Respond with success
 	w.WriteHeader(http.StatusOK)

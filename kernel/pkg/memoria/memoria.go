@@ -24,9 +24,9 @@ func NewMemoria(ip string, puerto int, logger *slog.Logger) *Memoria {
 	}
 }
 
-func (m *Memoria) ConsultarEspacio(file, sizeProceso string) bool {
+func (m *Memoria) ConsultarEspacio(file, sizeProceso string, pid int) bool {
 	url := fmt.Sprintf("http://%s:%d/kernel/espacio-disponible", m.IP, m.Puerto)
-	url = fmt.Sprintf("%s?archivo=%s&tamanio-proceso=%s", url, file, sizeProceso)
+	url = fmt.Sprintf("%s?archivo=%s&tamanio-proceso=%s&pid=%d", url, file, sizeProceso, pid)
 
 	resp, err := http.Get(url)
 	if err != nil {
