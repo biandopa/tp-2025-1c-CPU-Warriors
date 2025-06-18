@@ -15,6 +15,7 @@ type Service struct {
 	CPUsConectadas         []*cpu.Cpu // TODO: Ver si hace falta exponerlo o se puede hacer privado
 	CanalEnter             chan struct{}
 	canalNuevoProcesoReady chan struct{}
+	CanalNuevoProcesoNew   chan struct{} // Canal para recibir notificaciones de nuevos procesos en NewQueue
 }
 
 type Planificador struct {

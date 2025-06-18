@@ -16,6 +16,7 @@ func TestMemoria_ConsultarEspacio(t *testing.T) {
 	type args struct {
 		filePath string
 		size     string
+		pid      int
 	}
 	tests := []struct {
 		name    string
@@ -28,6 +29,7 @@ func TestMemoria_ConsultarEspacio(t *testing.T) {
 			args: args{
 				filePath: "/tmp/archivo",
 				size:     "1024",
+				pid:      1,
 			},
 			expects: func(m *Memoria) {
 				httpmock.RegisterResponder(
@@ -46,6 +48,7 @@ func TestMemoria_ConsultarEspacio(t *testing.T) {
 			args: args{
 				filePath: "/tmp/archivo",
 				size:     "1024",
+				pid:      1,
 			},
 			expects: func(m *Memoria) {
 				httpmock.RegisterResponder(
@@ -64,6 +67,7 @@ func TestMemoria_ConsultarEspacio(t *testing.T) {
 			args: args{
 				filePath: "/tmp/archivo",
 				size:     "1024",
+				pid:      1,
 			},
 			expects: func(m *Memoria) {
 				httpmock.RegisterResponder(
@@ -78,7 +82,7 @@ func TestMemoria_ConsultarEspacio(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.expects(m)
-			if got := m.ConsultarEspacio(tt.args.filePath, tt.args.size); got != tt.want {
+			if got := m.ConsultarEspacio(tt.args.filePath, tt.args.size, tt.args.pid); got != tt.want {
 				t.Errorf("ConsultarEspacio() = %v, want %v", got, tt.want)
 			}
 		})
