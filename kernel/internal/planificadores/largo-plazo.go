@@ -84,7 +84,6 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 			yaLoAgregue = false
 			break
 		}
-		i++
 	}
 
 	if yaLoAgregue {
