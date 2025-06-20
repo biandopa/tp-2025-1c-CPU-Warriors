@@ -64,6 +64,7 @@ func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 	if _, exists := h.Instrucciones[proceso.PID]; !exists {
 		h.Log.Debug("No hay instrucciones almacenadas para el proceso",
 			log.IntAttr("pid", proceso.PID),
+			log.IntAttr("pc", proceso.PC),
 		)
 		http.Error(w, "no instructions available for the process", http.StatusBadRequest)
 		return
@@ -73,14 +74,14 @@ func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 	if len(h.Instrucciones[proceso.PID]) == 0 {
 		h.Log.Debug("No quedan más instrucciones para el proceso",
 			log.IntAttr("pid", proceso.PID),
+			log.IntAttr("pc", proceso.PC),
 		)
 		http.Error(w, "no more instructions for the process", http.StatusNoContent)
 		return
 	}
 
-	// Leemos la primera instruccón asociada al proceso, la enviamos al cliente y la eliminamos de la lista de instrucciones
-	body, _ := json.Marshal(h.Instrucciones[proceso.PID][0])
-	h.Instrucciones[proceso.PID] = h.Instrucciones[proceso.PID][1:]
+	// Leemos la instrucción asociada al proceso. Usamos el PC como index del array y luego la enviamos al cliente
+	body, _ := json.Marshal(h.Instrucciones[proceso.PID][proceso.PC])
 
 	// Respond with success
 	w.WriteHeader(http.StatusOK)
