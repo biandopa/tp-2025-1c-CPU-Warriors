@@ -10,11 +10,10 @@ import (
 )
 
 func (p *Service) PlanificadorCortoPlazoFIFO() {
-	for {
-		<-p.canalNuevoProcesoReady // Espera una notificación
+		for {
+			proceso := <-p.canalNuevoProcesoReady // Espera una notificación
 
-		for len(p.Planificador.ReadyQueue) > 0 { // Procesa mientras haya elementos en ReadyQueue
-			proceso := p.Planificador.ReadyQueue[0]
+			for len(p.Planificador.ReadyQueue) > 0 { // Procesa mientras haya elementos en ReadyQueue
 
 			var cpuSeleccionada *cpu.Cpu
 			for {

@@ -21,37 +21,20 @@ type rtaCPU struct {
 // EjecutarPlanificadores envia un proceso a la Memoria
 func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	// Creo un proceso
-	proceso := internal.Proceso{
+	proceso := &internal.Proceso{
 		PCB: &internal.PCB{
 			PID:            0,
 			PC:             0,
 			MetricasTiempo: map[internal.Estado]*internal.EstadoTiempo{},
 			MetricasEstado: map[internal.Estado]int{},
+			Tamanio:        tamanioProceso,
+			NombreArchivo:  archivoNombre,
 		},
 	}
 
-	h.ejecutarPlanificadorLargoPlazo(archivoNombre, tamanioProceso)
+	go h.Planificador.PlanificadorLargoPlazo(h.Config.ReadyIngressAlgorithm)
 	h.ejecutarPlanificadorCortoPlazo()
-
-	if len(h.Planificador.Planificador.NewQueue) == 0 {
-		// Si la cola de New está vacía, la inicializo
-		h.Planificador.Planificador.NewQueue = make([]*internal.Proceso, 1)
-
-		// Mando una señal al canal de nuevo proceso
-		h.Planificador.CanalNuevoProcesoNew <- struct{}{}
-	}
-	h.Planificador.Planificador.NewQueue[0] = &proceso
-}
-
-func (h *Handler) ejecutarPlanificadorLargoPlazo(archivoNombre, tamanioProceso string) {
-	switch h.Config.ReadyIngressAlgorithm {
-	case "FIFO":
-		go h.Planificador.PlanificadorLargoPlazoFIFO(archivoNombre, tamanioProceso)
-	case "PMCP":
-
-	default:
-		h.Log.Warn("Algoritmo de largo plazo no reconocido")
-	}
+	h.Planificador.CanalNuevoProcesoNew <- proceso
 }
 
 // ejecutarPlanificadorCortoPlazo selecciona el planificador de corto plazo a utilizar y lo ejecuta como una goroutine.
@@ -97,7 +80,7 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Creo un proceso hijo
-		proceso := internal.Proceso{
+		proceso := &internal.Proceso{
 			PCB: &internal.PCB{
 				PID:            1,
 				PC:             0,
@@ -107,8 +90,7 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		}
 
 		mu.Lock()
-		h.Planificador.Planificador.NewQueue = append(h.Planificador.Planificador.NewQueue, &proceso)
-		h.Planificador.CanalNuevoProcesoNew <- struct{}{}
+		h.Planificador.CanalNuevoProcesoNew <- proceso
 		mu.Unlock()
 	case "IO":
 		var ioInfo IOIdentificacion
