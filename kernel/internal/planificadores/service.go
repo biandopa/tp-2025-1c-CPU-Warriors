@@ -11,14 +11,18 @@ import (
 
 type Service struct {
 	Planificador           *Planificador
+	LargoPlazoAlgorithm    string // Algoritmo de largo plazo utilizado
+	ShortTermAlgorithm     string // Algoritmo de corto plazo utilizado
 	Log                    *slog.Logger
 	Memoria                *memoria.Memoria
-	CPUsConectadas         []*cpu.Cpu // TODO: Ver si hace falta exponerlo o se puede hacer privado
+	CPUsConectadas         []*cpu.Cpu
 	CanalEnter             chan struct{}
 	canalNuevoProcesoReady chan *internal.Proceso
 	CanalNuevoProcesoNew   chan *internal.Proceso // Canal para recibir notificaciones de nuevos procesos en NewQueue
 	mutexNewQueue          *sync.Mutex
 	mutexReadyQueue        *sync.Mutex
+	mutexBlockQueue        *sync.Mutex
+	mutexExecQueue         *sync.Mutex
 	SjfConfig              *SjfConfig
 }
 
@@ -46,7 +50,8 @@ type SjfConfig struct {
 
 // NewPlanificador función que sirve para crear una nueva instancia del planificador de procesos. El planificador posee
 // varias colas para gestionar los procesos en diferentes estados: New, Ready, Block, Suspended Ready, Suspended Block, Exec y Exit.
-func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int, sjfConfig *SjfConfig) *Service {
+func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlazoAlgoritmo string,
+	puertoMemoria int, sjfConfig *SjfConfig) *Service {
 	return &Service{
 		Planificador: &Planificador{
 			NewQueue:       make([]*internal.Proceso, 0),
@@ -57,11 +62,12 @@ func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int, sjfC
 			ExecQueue:      make([]*internal.Proceso, 0),
 			ExitQueue:      make([]*internal.Proceso, 0),
 		},
-		Log:                    log,
-		Memoria:                memoria.NewMemoria(ipMemoria, puertoMemoria, log),
-		CPUsConectadas:         make([]*cpu.Cpu, 0),
-		CanalEnter:             make(chan struct{}),
-		canalNuevoProcesoReady: make(chan struct{}, 1), // Canal con buffer de 1
-		SjfConfig:              sjfConfig,
+		Log:                 log,
+		Memoria:             memoria.NewMemoria(ipMemoria, puertoMemoria, log),
+		CPUsConectadas:      make([]*cpu.Cpu, 0),
+		CanalEnter:          make(chan struct{}),
+		SjfConfig:           sjfConfig,
+		LargoPlazoAlgorithm: largoPlazoAlgoritmo,
+		ShortTermAlgorithm:  cortoPlazoAlgoritmo,
 	}
 }

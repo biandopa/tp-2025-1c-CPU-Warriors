@@ -23,16 +23,17 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	// Creo un proceso
 	proceso := &internal.Proceso{
 		PCB: &internal.PCB{
-			PID:            0,
-			PC:             0,
-			MetricasTiempo: map[internal.Estado]*internal.EstadoTiempo{},
-			MetricasEstado: map[internal.Estado]int{},
-			Tamanio:        tamanioProceso,
-			NombreArchivo:  archivoNombre,
+			PID:                0,
+			PC:                 0,
+			MetricasTiempo:     map[internal.Estado]*internal.EstadoTiempo{},
+			MetricasEstado:     map[internal.Estado]int{},
+			Tamanio:            tamanioProceso,
+			NombreArchivo:      archivoNombre,
+			EstimacionAnterior: float64(h.Config.InitialEstimate),
 		},
 	}
 
-	go h.Planificador.PlanificadorLargoPlazo(h.Config.ReadyIngressAlgorithm)
+	go h.Planificador.PlanificadorLargoPlazo()
 	h.ejecutarPlanificadorCortoPlazo()
 	h.Planificador.CanalNuevoProcesoNew <- proceso
 }

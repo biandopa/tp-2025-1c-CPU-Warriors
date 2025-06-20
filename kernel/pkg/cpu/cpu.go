@@ -9,11 +9,12 @@ import (
 )
 
 type Cpu struct {
-	IP     string
-	Puerto int
-	ID     string
-	Estado bool
-	Log    *slog.Logger
+	IP      string
+	Puerto  int
+	ID      string
+	Estado  bool
+	Log     *slog.Logger
+	Proceso *ProcesoCpu
 }
 
 type ProcesoCpu struct {
@@ -23,21 +24,17 @@ type ProcesoCpu struct {
 
 func NewCpu(ip string, puerto int, id string, logger *slog.Logger) *Cpu {
 	return &Cpu{
-		IP:     ip,
-		Puerto: puerto,
-		ID:     id,
-		Estado: true,
-		Log:    logger,
+		IP:      ip,
+		Puerto:  puerto,
+		ID:      id,
+		Estado:  true,
+		Log:     logger,
+		Proceso: &ProcesoCpu{},
 	}
 }
 
-func (c *Cpu) DispatchProcess(pid int, pc int) {
-	data := ProcesoCpu{
-		PID: pid,
-		PC:  pc,
-	}
-
-	body, err := json.Marshal(data)
+func (c *Cpu) DispatchProcess() {
+	body, err := json.Marshal(*c.Proceso)
 	if err != nil {
 		c.Log.Error("Error al serializar el proceso",
 			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},

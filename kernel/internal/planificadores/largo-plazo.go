@@ -18,7 +18,7 @@ const (
 )
 
 // PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
-func (p *Service) PlanificadorLargoPlazo(tipoAlgoritmo string) {
+func (p *Service) PlanificadorLargoPlazo() {
 	estado := PlanificadorEstadoStop
 
 	// Lanzamos una goroutine que espera el Enter
@@ -38,7 +38,7 @@ func (p *Service) PlanificadorLargoPlazo(tipoAlgoritmo string) {
 			procesoNew := <-p.CanalNuevoProcesoNew
 
 			//agrego al planificador
-			switch tipoAlgoritmo {
+			switch p.LargoPlazoAlgorithm {
 			case "FIFO":
 				p.PlanificadorLargoPlazoFIFO(procesoNew)
 			case "PMCP":

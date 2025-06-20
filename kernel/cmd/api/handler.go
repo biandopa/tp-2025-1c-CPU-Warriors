@@ -34,7 +34,9 @@ func NewHandler(configFile string) *Handler {
 		Config: configStruct,
 		Log:    logger,
 		Planificador: planificadores.NewPlanificador(
-			logger, configStruct.IpMemory, configStruct.PortMemory,
+			logger, configStruct.IpMemory,
+			configStruct.ReadyIngressAlgorithm, configStruct.SchedulerAlgorithm,
+			configStruct.PortMemory,
 			&planificadores.SjfConfig{
 				Alpha:           configStruct.Alpha,
 				InitialEstimate: configStruct.InitialEstimate,
