@@ -62,6 +62,7 @@ func (h *Handler) ejecutarPlanificadorCortoPlazo() {
 	case "SJFSD":
 
 	case "SJFD":
+		go h.Planificador.PlanificarCortoPlazoSjfDesalojo()
 	case "PMCP":
 
 	default:

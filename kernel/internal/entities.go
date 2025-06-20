@@ -22,10 +22,12 @@ type EstadoTiempo struct {
 }
 
 type PCB struct {
-	PID            int                      `json:"pid"`
-	PC             int                      `json:"pc"`
-	MetricasEstado map[Estado]int           `json:"metricas_estado"`
-	MetricasTiempo map[Estado]*EstadoTiempo `json:"metricas_tiempo"`
+	PID                int                      `json:"pid"`
+	PC                 int                      `json:"pc"`
+	MetricasEstado     map[Estado]int           `json:"metricas_estado"`
+	MetricasTiempo     map[Estado]*EstadoTiempo `json:"metricas_tiempo"`
+	RafagaAnterior     *time.Duration           `json:"rafaga_anterior,omitempty"`     // Tiempo real de la ráfaga anterior
+	EstimacionAnterior float64                  `json:"estimacion_anterior,omitempty"` // Estimación anterior de ráfaga
 }
 
 type Proceso struct {

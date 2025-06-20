@@ -14,8 +14,9 @@ type Service struct {
 	Memoria                *memoria.Memoria
 	CPUsConectadas         []*cpu.Cpu // TODO: Ver si hace falta exponerlo o se puede hacer privado
 	CanalEnter             chan struct{}
-	canalNuevoProcesoReady chan struct{}
-	CanalNuevoProcesoNew   chan struct{} // Canal para recibir notificaciones de nuevos procesos en NewQueue
+	canalNuevoProcesoReady chan internal.Proceso
+	CanalNuevoProcesoNew   chan internal.Proceso // Canal para recibir notificaciones de nuevos procesos en NewQueue
+	SjfConfig              *SjfConfig            // Configuración para acceder a alpha e initial_estimate
 }
 
 type Planificador struct {
@@ -35,9 +36,14 @@ type CpuIdentificacion struct {
 	Estado bool   `json:"estado"`
 }
 
+type SjfConfig struct {
+	Alpha           float64 `json:"alpha"`
+	InitialEstimate int     `json:"initial_estimate"`
+}
+
 // NewPlanificador función que sirve para crear una nueva instancia del planificador de procesos. El planificador posee
 // varias colas para gestionar los procesos en diferentes estados: New, Ready, Block, Suspended Ready, Suspended Block, Exec y Exit.
-func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int) *Service {
+func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int, sjfConfig *SjfConfig) *Service {
 	return &Service{
 		Planificador: &Planificador{
 			NewQueue:       make([]*internal.Proceso, 0),
@@ -53,5 +59,6 @@ func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int) *Ser
 		CPUsConectadas:         make([]*cpu.Cpu, 0),
 		CanalEnter:             make(chan struct{}),
 		canalNuevoProcesoReady: make(chan struct{}, 1), // Canal con buffer de 1
+		SjfConfig:              sjfConfig,
 	}
 }
