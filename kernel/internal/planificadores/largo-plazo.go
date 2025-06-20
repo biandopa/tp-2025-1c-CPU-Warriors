@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
@@ -17,7 +18,7 @@ const (
 )
 
 // PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
-func (p *Service) PlanificadorLargoPlazoFIFO(file, sizeProceso string) {
+func (p *Service) PlanificadorLargoPlazo(tipoAlgoritmo string) {
 	estado := PlanificadorEstadoStop
 
 	// Lanzamos una goroutine que espera el Enter
@@ -31,78 +32,130 @@ func (p *Service) PlanificadorLargoPlazoFIFO(file, sizeProceso string) {
 	// Se queda escuchando hasta que el usuario presione la tecla ENTER por consola para iniciar el planificador
 	<-p.CanalEnter
 
-	p.Log.Debug("Planificador de largo plazo iniciado")
-
 	if estado == PlanificadorEstadoStart {
 		for {
-			<-p.CanalNuevoProcesoNew
-			// Si no hay espacio en memoria y el proceso está en la cola de SuspReady, es bloqueante.
-			for _, proceso := range p.Planificador.SuspReadyQueue {
-				if p.Memoria.ConsultarEspacio(file, sizeProceso, proceso.PCB.PID) {
-					// Si el proceso se carga en memoria, lo muevo a la cola de ready
-					// y lo elimino de la cola de suspendidos ready
 
-					p.Planificador.SuspReadyQueue = p.Planificador.SuspReadyQueue[1:] // lo saco de la cola
-					if proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] == nil {
-						proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] = &internal.EstadoTiempo{}
-					}
-					timeSusp := proceso.PCB.MetricasTiempo[internal.EstadoSuspReady]
-					timeSusp.TiempoAcumulado = timeSusp.TiempoAcumulado + time.Since(timeSusp.TiempoInicio)
+			procesoNew := <-p.CanalNuevoProcesoNew
 
-					// Agrego el proceso a la cola de ready
-					p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-					if len(p.canalNuevoProcesoReady) == 0 {
-						p.canalNuevoProcesoReady <- struct{}{}
-					}
-
-					if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
-						proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
-					}
-					proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
-
-					proceso.PCB.MetricasEstado[internal.EstadoReady]++
-
-					p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
-				} else {
-					/* Si la respuesta es negativa (ya que la Memoria no tiene espacio suficiente para inicializarlo)
-					se deberá esperar la finalización de otro proceso para volver a intentar inicializarlo.
-					Vuelvo a agregar al proceso a la cola de suspendidos ready en el lugar que estaba (al principio por ser FIFO) */
-					p.Planificador.SuspReadyQueue = append([]*internal.Proceso{proceso}, p.Planificador.SuspReadyQueue...)
-				}
+			//agrego al planificador
+			switch tipoAlgoritmo {
+			case "FIFO":
+				p.PlanificadorLargoPlazoFIFO(procesoNew)
+			case "PMCP":
+				p.PlanificadorLargoPlazoPMCP(procesoNew)
+			default:
+				p.Log.Warn("Algoritmo de largo plazo no reconocido")
 			}
 
-			for _, proceso := range p.Planificador.NewQueue {
-				if p.Memoria.ConsultarEspacio(file, sizeProceso, proceso.PCB.PID) {
-					// Si el proceso se carga en memoria, lo muevo a la cola de ready
-					// y lo elimino de la cola de new
+			p.CheckearEspacioEnMemoria()
 
-					p.Planificador.NewQueue = p.Planificador.NewQueue[1:] // lo saco de la cola
-					if proceso.PCB.MetricasTiempo[internal.EstadoNew] == nil {
-						proceso.PCB.MetricasTiempo[internal.EstadoNew] = &internal.EstadoTiempo{}
-					}
-					timeNew := proceso.PCB.MetricasTiempo[internal.EstadoNew]
-					timeNew.TiempoAcumulado = timeNew.TiempoAcumulado + time.Since(timeNew.TiempoInicio)
+			// Checkear si la cola de suspReady puede ingresar, en caso de que se vacie consultar la de NEW
 
-					// Agrego el proceso a la cola de ready
-					p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-					// Notificar al channel de nuevo proceso ready
-					if len(p.canalNuevoProcesoReady) == 0 {
-						p.canalNuevoProcesoReady <- struct{}{}
-					}
+		}
+	}
+}
 
-					if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
-						proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
-					}
-					proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
-					proceso.PCB.MetricasEstado[internal.EstadoReady]++
+func (p *Service) PlanificadorLargoPlazoFIFO(proceso *internal.Proceso) {
 
-					p.Log.Info(fmt.Sprintf("%d Pasa del estado NEW al estado READY", proceso.PCB.PID))
-				} else {
-					/* Si la respuesta es negativa (ya que la Memoria no tiene espacio suficiente para inicializarlo)
-					se deberá esperar la finalización de otro proceso para volver a intentar inicializarlo.
-					Vuelvo a agregar al proceso a la cola de new en el lugar que estaba (al principio por ser FIFO) */
-					p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
+	p.mutexNewQueue.Lock()
+	p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
+	p.mutexNewQueue.Unlock()
+
+}
+
+func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
+
+	sizeProcesoEntrante, _ := strconv.Atoi(proceso.PCB.Tamanio)
+
+	p.mutexNewQueue.Lock()
+	var yaLoAgregue = true
+
+	for i, procesoEncolado := range p.Planificador.NewQueue {
+
+		sizeProcesoEncolado, _ := strconv.Atoi(procesoEncolado.PCB.Tamanio)
+		if sizeProcesoEntrante < sizeProcesoEncolado {
+
+			p.Planificador.NewQueue = append(
+				p.Planificador.NewQueue[:i+1],  // lo que viene después
+				p.Planificador.NewQueue[i:]..., // desplazamos lo que estaba en i
+			)
+			p.Planificador.NewQueue[i] = proceso
+
+			yaLoAgregue = false
+			break
+		}
+		i++
+	}
+
+	if yaLoAgregue {
+		p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
+	}
+
+	p.mutexNewQueue.Unlock()
+
+}
+
+func (p *Service) CheckearEspacioEnMemoria() {
+
+	for _, proceso := range p.Planificador.SuspReadyQueue {
+		if p.Memoria.ConsultarEspacio(proceso.PCB.NombreArchivo, proceso.PCB.Tamanio, proceso.PCB.PID) {
+			// Si el proceso se carga en memoria, lo muevo a la cola de ready
+			// y lo elimino de la cola de suspendidos ready
+
+			p.Planificador.SuspReadyQueue = p.Planificador.SuspReadyQueue[1:] // lo saco de la cola
+			if proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] == nil {
+				proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] = &internal.EstadoTiempo{}
+			}
+			timeSusp := proceso.PCB.MetricasTiempo[internal.EstadoSuspReady]
+			timeSusp.TiempoAcumulado = timeSusp.TiempoAcumulado + time.Since(timeSusp.TiempoInicio)
+
+			// Agrego el proceso a la cola de ready
+			p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
+			if len(p.canalNuevoProcesoReady) == 0 {
+				//p.canalNuevoProcesoReady <- struct{}{}
+			}
+
+			if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
+				proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
+			}
+			proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
+
+			proceso.PCB.MetricasEstado[internal.EstadoReady]++
+
+			p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
+		} else {
+			break
+		}
+	}
+
+	if len(p.Planificador.SuspReadyQueue) != 0 {
+		for _, proceso := range p.Planificador.NewQueue {
+			if p.Memoria.ConsultarEspacio(proceso.PCB.NombreArchivo, proceso.PCB.Tamanio, proceso.PCB.PID) {
+				// Si el proceso se carga en memoria, lo muevo a la cola de ready
+				// y lo elimino de la cola de new
+
+				p.mutexNewQueue.Lock()
+				p.Planificador.NewQueue = p.Planificador.NewQueue[1:] // lo saco de la cola
+				p.mutexNewQueue.Unlock()
+
+				if proceso.PCB.MetricasTiempo[internal.EstadoNew] == nil {
+					proceso.PCB.MetricasTiempo[internal.EstadoNew] = &internal.EstadoTiempo{}
 				}
+				timeNew := proceso.PCB.MetricasTiempo[internal.EstadoNew]
+				timeNew.TiempoAcumulado = timeNew.TiempoAcumulado + time.Since(timeNew.TiempoInicio)
+
+				// Notificar al channel de nuevo proceso ready
+				p.canalNuevoProcesoReady <- proceso
+
+				if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
+					proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
+				}
+				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
+				proceso.PCB.MetricasEstado[internal.EstadoReady]++
+
+				p.Log.Info(fmt.Sprintf("%d Pasa del estado NEW al estado READY", proceso.PCB.PID))
+			} else {
+				break
 			}
 		}
 	}
@@ -168,7 +221,5 @@ func (p *Service) FinalizarProceso(pid int) {
 	proceso.PCB = nil // Libero el PCB asociado al proceso
 
 	// 8. Le avisamos al channel de nuevo proceso ready
-	if len(p.CanalNuevoProcesoNew) == 0 {
-		p.CanalNuevoProcesoNew <- struct{}{}
-	}
+	p.CheckearEspacioEnMemoria()
 }

@@ -2,6 +2,7 @@ package planificadores
 
 import (
 	"log/slog"
+	"sync"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
 	"github.com/sisoputnfrba/tp-golang/kernel/pkg/cpu"
@@ -14,8 +15,10 @@ type Service struct {
 	Memoria                *memoria.Memoria
 	CPUsConectadas         []*cpu.Cpu // TODO: Ver si hace falta exponerlo o se puede hacer privado
 	CanalEnter             chan struct{}
-	canalNuevoProcesoReady chan struct{}
-	CanalNuevoProcesoNew   chan struct{} // Canal para recibir notificaciones de nuevos procesos en NewQueue
+	canalNuevoProcesoReady chan *internal.Proceso
+	CanalNuevoProcesoNew   chan *internal.Proceso // Canal para recibir notificaciones de nuevos procesos en NewQueue
+	mutexNewQueue          *sync.Mutex
+	mutexReadyQueue        *sync.Mutex
 }
 
 type Planificador struct {

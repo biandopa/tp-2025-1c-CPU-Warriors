@@ -26,6 +26,8 @@ type PCB struct {
 	PC             int                      `json:"pc"`
 	MetricasEstado map[Estado]int           `json:"metricas_estado"`
 	MetricasTiempo map[Estado]*EstadoTiempo `json:"metricas_tiempo"`
+	Tamanio        string                   `json:"tamanio"`
+	NombreArchivo  string                   `json:"nombre_archivo"`
 }
 
 type Proceso struct {
