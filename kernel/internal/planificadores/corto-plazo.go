@@ -62,7 +62,8 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 							p.CPUsConectadas[i].Estado = false
 							fmt.Println("CPU seleccionada:", cpuSeleccionada)
 
-							cpuSeleccionada.DispatchProcess()
+							newPC := cpuSeleccionada.DispatchProcess()
+							proceso.PCB.PC = newPC
 							break
 						}
 					}
@@ -268,9 +269,7 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) {
 		log.IntAttr("PID", proceso.PCB.PID),
 	)
 
-	// Enviar interrupción a la CPU para desalojar el proceso
-	// Esto dependerá de la implementación específica de tu sistema
-	// Por ahora se asume que el cambio de estado es suficiente
+	// TODO: Enviar interrupción a la CPU para desalojar el proceso
 }
 
 // buscarCPUPorPID busca una CPU que esté ejecutando un proceso específico por su PID
@@ -317,5 +316,7 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 	cpuAsignada.Proceso.PC = proceso.PCB.PC
 
 	// Enviar proceso a la CPU
-	cpuAsignada.DispatchProcess()
+	newPC := cpuAsignada.DispatchProcess()
+
+	proceso.PCB.PC = newPC
 }

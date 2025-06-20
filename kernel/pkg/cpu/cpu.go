@@ -33,13 +33,13 @@ func NewCpu(ip string, puerto int, id string, logger *slog.Logger) *Cpu {
 	}
 }
 
-func (c *Cpu) DispatchProcess() {
+func (c *Cpu) DispatchProcess() int {
 	body, err := json.Marshal(*c.Proceso)
 	if err != nil {
 		c.Log.Error("Error al serializar el proceso",
 			slog.Attr{Key: "error", Value: slog.StringValue(err.Error())},
 		)
-		return
+		return c.Proceso.PC
 	}
 
 	url := fmt.Sprintf("http://%s:%d/kernel/procesos", c.IP, c.Puerto)
@@ -52,10 +52,17 @@ func (c *Cpu) DispatchProcess() {
 		)
 	}
 
+	newResponse := &ProcesoCpu{}
 	if resp != nil {
-		c.Log.Info("Respuesta del servidor",
+		c.Log.Debug("Respuesta del servidor",
 			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
 			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
 		)
+
+		_ = json.NewDecoder(resp.Body).Decode(newResponse)
+		c.Proceso.PID = newResponse.PID
+		c.Proceso.PC = newResponse.PC
 	}
+
+	return c.Proceso.PC
 }
