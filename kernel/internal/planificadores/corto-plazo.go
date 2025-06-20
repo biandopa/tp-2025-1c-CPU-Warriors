@@ -14,7 +14,7 @@ func (p *Service) PlanificadorCortoPlazo() {
 	case "FIFO":
 		go p.PlanificadorCortoPlazoFIFO()
 	case "SJFSD":
-		go p.PlanificarCortoPlazoSjfDesalojo()
+		go p.PlanificarCortoPlazoSjfSinDesalojo()
 	case "SJFD":
 		go p.PlanificarCortoPlazoSjfDesalojo()
 	default:
@@ -112,6 +112,28 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 				}
 
 				break // Salir del bucle si no hay CPUs libres y no se puede desalojar
+			}
+		}
+	}
+}
+
+// PlanificarCortoPlazoSjfSinDesalojo planifica los procesos de corto plazo utilizando el algoritmo SJF sin desalojo.
+func (p *Service) PlanificarCortoPlazoSjfSinDesalojo() {
+	for {
+		proceso := <-p.canalNuevoProcesoReady // Espera una notificación
+		p.odenarColaReadySjf(proceso)
+
+		// Procesar todos los procesos en ReadyQueue
+		for len(p.Planificador.ReadyQueue) > 0 {
+			cpuLibre := p.buscarCPULibre()
+
+			if cpuLibre != nil {
+				// Asignar el proceso con ráfaga más corta (el primero de ReadyQueue)
+				procesoMasCorto := p.Planificador.ReadyQueue[0]
+
+				p.asignarProcesoACPU(procesoMasCorto, cpuLibre)
+			} else {
+				break // No hay CPUs libres, salir del bucle
 			}
 		}
 	}
