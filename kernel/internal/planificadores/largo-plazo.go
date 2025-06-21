@@ -48,9 +48,6 @@ func (p *Service) PlanificadorLargoPlazo() {
 			}
 
 			p.CheckearEspacioEnMemoria()
-
-			// Checkear si la cola de suspReady puede ingresar, en caso de que se vacie consultar la de NEW
-
 		}
 	}
 }
@@ -142,12 +139,13 @@ func (p *Service) CheckearEspacioEnMemoria() {
 				timeNew := proceso.PCB.MetricasTiempo[internal.EstadoNew]
 				timeNew.TiempoAcumulado = timeNew.TiempoAcumulado + time.Since(timeNew.TiempoInicio)
 
-				// Notificar al channel de nuevo proceso ready
-				p.canalNuevoProcesoReady <- proceso
-
 				if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
 					proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
 				}
+
+				// Notificar al channel de que puede ejecutar el algoritmo de corto plazo
+				p.canalNuevoProcesoReady <- struct{}{}
+
 				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 				proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
@@ -221,6 +219,6 @@ func (p *Service) FinalizarProceso(pid int) {
 	// 7. Liberar PCB
 	proceso.PCB = nil // Libero el PCB asociado al proceso
 
-	// 8. Le avisamos al channel de nuevo proceso ready
-	p.CheckearEspacioEnMemoria()
+	// 8. Le avisamos al channel de que puede ejecutar el algoritmo de largo plazo
+	//p.CanalNuevoProcesoNew <- struct{}{}
 }

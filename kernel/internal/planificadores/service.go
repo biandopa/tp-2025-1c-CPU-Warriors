@@ -17,13 +17,14 @@ type Service struct {
 	Memoria                *memoria.Memoria
 	CPUsConectadas         []*cpu.Cpu
 	CanalEnter             chan struct{}
-	canalNuevoProcesoReady chan *internal.Proceso
+	canalNuevoProcesoReady chan struct{}
 	CanalNuevoProcesoNew   chan *internal.Proceso // Canal para recibir notificaciones de nuevos procesos en NewQueue
 	mutexNewQueue          *sync.Mutex
 	mutexReadyQueue        *sync.Mutex
 	//mutexBlockQueue        *sync.Mutex
-	mutexExecQueue *sync.Mutex
-	SjfConfig      *SjfConfig
+	mutexCPUsConectadas *sync.Mutex
+	mutexExecQueue      *sync.Mutex
+	SjfConfig           *SjfConfig
 }
 
 type Planificador struct {
@@ -69,11 +70,11 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		SjfConfig:              sjfConfig,
 		LargoPlazoAlgorithm:    largoPlazoAlgoritmo,
 		ShortTermAlgorithm:     cortoPlazoAlgoritmo,
-		canalNuevoProcesoReady: make(chan *internal.Proceso, 100), // Buffer para evitar deadlocks
+		canalNuevoProcesoReady: make(chan struct{}, 100),          // Buffer para evitar deadlocks
 		CanalNuevoProcesoNew:   make(chan *internal.Proceso, 100), // Buffer para evitar deadlocks
 		mutexNewQueue:          &sync.Mutex{},
 		mutexReadyQueue:        &sync.Mutex{},
 		mutexExecQueue:         &sync.Mutex{},
-		//mutexBlockQueue:     &sync.Mutex{},
+		mutexCPUsConectadas:    &sync.Mutex{},
 	}
 }
