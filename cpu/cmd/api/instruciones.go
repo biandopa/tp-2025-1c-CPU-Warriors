@@ -201,11 +201,19 @@ func (h *Handler) Ciclo(proceso *Proceso) int {
 		fmt.Println("Ins", tipo, "Arg", args)
 		proceso.PC = nuevoPC
 
-		if tipo == "EXIT" {
-			h.Log.Info("Proceso finalizado", "pid", proceso.PID)
-			return proceso.PC // Salimos del ciclo si la instrucción es EXIT
+		// Si hay una interrupción, se devuelve el PC y el PID del proceso al Kernel
+		if h.Service.HayInterrupciones() {
+			h.Log.Info("Interrupción detectada, saliendo del ciclo de instrucción", "pid", proceso.PID)
+			return proceso.PC // Salimos del ciclo si hay interrupciones
 		}
 
-		// TODO: Implementar la lógica de interrupciones
+		// Si la instrucción es EXIT, finalizamos el proceso
+		if tipo == "EXIT" {
+			h.Log.Debug("Proceso finalizado", "pid", proceso.PID)
+			break
+		}
 	}
+
+	h.Log.Debug("Ciclo de instrucción completado", "pid", proceso.PID, "pc", proceso.PC)
+	return proceso.PC // Retornamos el PC actualizado
 }
