@@ -227,12 +227,13 @@ func (h *Handler) Ciclo(proceso *Proceso) int {
 	for {
 		h.Log.Debug("Iniciando ciclo de instrucción",
 			log.IntAttr("pid", proceso.PID),
-			log.IntAttr("pc", proceso.PC))
+			log.IntAttr("pc", proceso.PC),
+		)
 
 		instruccion, err := h.Fetch(proceso.PID, proceso.PC)
 		if err != nil {
 			h.Log.Error("Error en fetch", log.ErrAttr(err))
-			return proceso.PC // Si hay error, no avanzamos el PC
+			return proceso.PC
 		}
 
 		tipo, args := decode(instruccion)
@@ -240,27 +241,36 @@ func (h *Handler) Ciclo(proceso *Proceso) int {
 			log.StringAttr("tipo", tipo),
 			log.AnyAttr("args", args))
 
+		// Ejecutar instrucción
 		continuar, nuevoPC := h.Execute(tipo, args, proceso.PID, proceso.PC)
 		proceso.PC = nuevoPC
 
-		// Si Execute retorna false, significa que hay que devolver el control al kernel
-		// (por ejemplo, por una syscall o error)
-		if !continuar {
-			h.Log.Debug("Devolviendo control al kernel",
-				log.IntAttr("pid", proceso.PID),
-				log.StringAttr("razon", tipo),
-				log.IntAttr("pc_final", nuevoPC))
-			return proceso.PC
-		}
-
-		// Si la instrucción es EXIT, finalizamos el ciclo
+		// Si la instrucción es EXIT, finalizamos el proceso
 		if tipo == "EXIT" {
-			h.Log.Debug("Proceso finalizado por EXIT",
-				log.IntAttr("pid", proceso.PID),
-				log.IntAttr("pc_final", proceso.PC))
-			return proceso.PC
+			h.Log.Debug("Proceso finalizado",
+				log.IntAttr("pid", proceso.PID))
+			break
 		}
 
-		// TODO: Implementar la lógica de interrupciones
+		// Si no se debe continuar (por syscall bloqueante), salir del ciclo
+		if !continuar {
+			h.Log.Debug("Proceso pausado por syscall",
+				log.IntAttr("pid", proceso.PID))
+			break
+		}
+
+		// Verificar interrupciones después de cada instrucción
+		if h.Service.HayInterrupciones() {
+			h.Log.Info("Interrupción detectada, saliendo del ciclo de instrucción",
+				log.IntAttr("pid", proceso.PID),
+				log.IntAttr("pc", proceso.PC),
+			)
+			return proceso.PC
+		}
 	}
+
+	h.Log.Debug("Ciclo de instrucción completado",
+		log.IntAttr("pid", proceso.PID),
+		log.IntAttr("pc", proceso.PC))
+	return proceso.PC
 }
