@@ -17,7 +17,7 @@ const (
 	PlanificadorEstadoStart = "START"
 )
 
-// PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
+// PlanificadorLargoPlazo realiza las funciones correspondientes al planificador de largo plazo.
 func (p *Service) PlanificadorLargoPlazo() {
 	estado := PlanificadorEstadoStop
 
@@ -95,7 +95,7 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 }
 
 func (p *Service) CheckearEspacioEnMemoria() {
-
+	// Priorizamos los procesos suspendidos ready
 	for _, proceso := range p.Planificador.SuspReadyQueue {
 		if p.Memoria.ConsultarEspacio(proceso.PCB.NombreArchivo, proceso.PCB.Tamanio, proceso.PCB.PID) {
 			// Si el proceso se carga en memoria, lo muevo a la cola de ready
@@ -127,7 +127,7 @@ func (p *Service) CheckearEspacioEnMemoria() {
 		}
 	}
 
-	if len(p.Planificador.SuspReadyQueue) != 0 {
+	if len(p.Planificador.SuspReadyQueue) == 0 {
 		for _, proceso := range p.Planificador.NewQueue {
 			if p.Memoria.ConsultarEspacio(proceso.PCB.NombreArchivo, proceso.PCB.Tamanio, proceso.PCB.PID) {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
