@@ -67,10 +67,13 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		// Creo un proceso hijo
 		proceso := &internal.Proceso{
 			PCB: &internal.PCB{
-				PID:            h.UniqueID.GetUniqueID(),
-				PC:             0,
-				MetricasTiempo: map[internal.Estado]*internal.EstadoTiempo{},
-				MetricasEstado: map[internal.Estado]int{},
+				PID:                h.UniqueID.GetUniqueID(),
+				PC:                 0,
+				MetricasTiempo:     map[internal.Estado]*internal.EstadoTiempo{},
+				MetricasEstado:     map[internal.Estado]int{},
+				Tamanio:            syscall.Args[1],
+				NombreArchivo:      syscall.Args[0],
+				EstimacionAnterior: float64(h.Config.InitialEstimate),
 			},
 		}
 
