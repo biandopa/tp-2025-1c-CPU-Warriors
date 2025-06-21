@@ -24,13 +24,19 @@ func (p *Service) PlanificadorCortoPlazo() {
 
 func (p *Service) PlanificadorCortoPlazoFIFO() {
 	for {
+		p.Log.Debug("Planificador FIFO esperando señal del canal")
 		<-p.canalNuevoProcesoReady
+		p.Log.Debug("Planificador FIFO recibió señal, procesando ReadyQueue",
+			log.IntAttr("ready_queue_size", len(p.Planificador.ReadyQueue)))
 
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
 			cpuLibre := p.buscarCPULibre()
 
 			if cpuLibre != nil {
+				p.Log.Debug("CPU libre encontrada, asignando proceso",
+					log.StringAttr("cpu_id", cpuLibre.ID))
+
 				// Mover proceso de READY a EXEC
 				p.mutexReadyQueue.Lock()
 				procesoElegido := p.Planificador.ReadyQueue[0]
@@ -81,6 +87,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 					)
 				}(cpuLibre, procesoElegido)
 			} else {
+				p.Log.Debug("No hay CPUs libres, saliendo del bucle")
 				// No hay CPUs libres, salir del bucle
 
 				// Notificar al channel para volver a ejecutar el algoritmo de corto plazo
