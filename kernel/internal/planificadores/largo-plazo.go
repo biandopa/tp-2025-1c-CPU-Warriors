@@ -105,10 +105,9 @@ func (p *Service) CheckearEspacioEnMemoria() {
 			timeSusp.TiempoAcumulado = timeSusp.TiempoAcumulado + time.Since(timeSusp.TiempoInicio)
 
 			// Agrego el proceso a la cola de ready
+			p.mutexReadyQueue.Lock()
 			p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-			/*if len(p.canalNuevoProcesoReady) == 0 {
-				//p.canalNuevoProcesoReady <- struct{}{}
-			}*/
+			p.mutexReadyQueue.Unlock()
 
 			if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
 				proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
@@ -118,6 +117,12 @@ func (p *Service) CheckearEspacioEnMemoria() {
 			proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
 			p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
+
+			// Enviar señal al canal de corto plazo para procesos suspendidos
+			p.Log.Debug("Enviando señal al canal de corto plazo (SUSP.READY -> READY)",
+				log.IntAttr("pid", proceso.PCB.PID))
+			p.canalNuevoProcesoReady <- struct{}{}
+			p.Log.Debug("Señal enviada al canal de corto plazo (SUSP.READY -> READY)")
 		} else {
 			break
 		}
@@ -143,14 +148,24 @@ func (p *Service) CheckearEspacioEnMemoria() {
 					proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
 				}
 
-				// Notificar al channel de que puede ejecutar el algoritmo de corto plazo
-				p.canalNuevoProcesoReady <- struct{}{}
+				// Primero agrego el proceso a la cola de ready
+				p.mutexReadyQueue.Lock()
+				p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
+				p.mutexReadyQueue.Unlock()
 
 				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 				proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
 				p.Log.Info(fmt.Sprintf("%d Pasa del estado NEW al estado READY", proceso.PCB.PID))
+
+				// Luego, envío la señal para que el planificador de corto plazo pueda ejecutar el proceso
+				p.Log.Debug("Enviando señal al canal de corto plazo",
+					log.IntAttr("pid", proceso.PCB.PID))
+				p.canalNuevoProcesoReady <- struct{}{}
+				p.Log.Debug("Señal enviada al canal de corto plazo")
 			} else {
+				p.Log.Debug("No hay espacio en memoria para el proceso",
+					log.IntAttr("pid", proceso.PCB.PID))
 				break
 			}
 		}
