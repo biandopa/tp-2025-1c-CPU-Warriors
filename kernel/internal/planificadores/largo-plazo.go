@@ -195,7 +195,10 @@ func (p *Service) FinalizarProceso(pid int) {
 	p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:lugarColaExec], p.Planificador.ExecQueue[lugarColaExec+1:]...)
 
 	// 4. Cambiar el estado de la CPU
-	// TODO: Preguntar el sabado :)
+	cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
+	if cpuFound != nil {
+		cpuFound.Estado = true
+	}
 
 	// 5. Cambiar el estado del proceso a EXIT
 	proceso.PCB.MetricasEstado[internal.EstadoExit]++
