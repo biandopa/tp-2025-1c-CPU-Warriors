@@ -18,7 +18,7 @@ Su argumento es el directorio de almacenamiento de las intrucciones del proceso 
 el tamaño de la memoria asignada al proceso.
 
 ```bash
-cd kernel && go run kernel.go examples\proceso1 10
+cd kernel && go run kernel.go examples/proceso1 10
 ```
 
 **Terminal 3 - CPU:**
