@@ -76,10 +76,9 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 		if sizeProcesoEntrante < sizeProcesoEncolado {
 
 			p.Planificador.NewQueue = append(
-				p.Planificador.NewQueue[:i+1],  // lo que viene después
-				p.Planificador.NewQueue[i:]..., // desplazamos lo que estaba en i
+				p.Planificador.NewQueue[:i],
+				append([]*internal.Proceso{proceso}, p.Planificador.NewQueue[i:]...)...,
 			)
-			p.Planificador.NewQueue[i] = proceso
 
 			yaLoAgregue = false
 			break
