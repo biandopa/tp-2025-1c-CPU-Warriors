@@ -94,27 +94,6 @@ func (h *Handler) Fetch(pid int, pc int) (Instruccion, error) {
 	return response, nil
 }
 
-// Fetch De prueba hasta tener hecho memoria
-/*
-func (h *Handler) Fetch(pid int, pc int) (string, error) {
-	mockInstrucciones := []string{
-		"NOOP",
-		"WRITE 100 42",
-		"READ 100 4",
-		"GOTO 3",
-		"EXIT",
-	}
-
-	if pc < len(mockInstrucciones) {
-		instruccion := mockInstrucciones[pc]
-		h.Log.Info("FETCH mockeado", "pid", pid, "pc", pc, "instruccion", instruccion)
-		return instruccion, nil
-	}
-
-	h.Log.Warn("PC fuera de rango de instrucciones mock", "pc", pc)
-	return "EXIT", nil
-}*/
-
 // Decode Interpreta la instrucción y sus argumentos. Además, verifica si la misma requiere de una
 // traducción de dirección lógica a física.
 func decode(instruccion Instruccion) (string, []string) {
