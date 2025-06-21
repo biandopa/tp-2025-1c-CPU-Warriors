@@ -223,13 +223,10 @@ func (p *Service) evaluarDesalojo(procesoNuevo *internal.Proceso) *internal.Proc
 // desalojarProceso desaloja un proceso de la CPU y lo devuelve a ReadyQueue
 func (p *Service) desalojarProceso(proceso *internal.Proceso) {
 	// Encontrar y liberar la CPU
-	for i := range p.CPUsConectadas {
-		if !p.CPUsConectadas[i].Estado {
-			// Verificar si esta CPU está ejecutando el proceso a desalojar
-			// (Esta lógica puede necesitar mejorarse dependiendo de cómo se maneje la asignación)
-			p.CPUsConectadas[i].Estado = true
-			break
-		}
+	cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
+	if cpuFound != nil {
+		cpuFound.EnviarInterrupcion("Desalojo", false)
+		cpuFound.Estado = true
 	}
 
 	// Actualizar métricas del proceso
@@ -265,11 +262,9 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) {
 	proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
-	p.Log.Info("Proceso desalojado por SJF",
+	p.Log.Debug("Proceso desalojado por SJF",
 		log.IntAttr("PID", proceso.PCB.PID),
 	)
-
-	// TODO: Enviar interrupción a la CPU para desalojar el proceso
 }
 
 // buscarCPUPorPID busca una CPU que esté ejecutando un proceso específico por su PID
