@@ -2,6 +2,7 @@ package planificadores
 
 import (
 	"log/slog"
+	"sync"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
 	"github.com/sisoputnfrba/tp-golang/kernel/pkg/cpu"
@@ -10,12 +11,20 @@ import (
 
 type Service struct {
 	Planificador           *Planificador
+	LargoPlazoAlgorithm    string // Algoritmo de largo plazo utilizado
+	ShortTermAlgorithm     string // Algoritmo de corto plazo utilizado
 	Log                    *slog.Logger
 	Memoria                *memoria.Memoria
-	CPUsConectadas         []*cpu.Cpu // TODO: Ver si hace falta exponerlo o se puede hacer privado
+	CPUsConectadas         []*cpu.Cpu
 	CanalEnter             chan struct{}
 	canalNuevoProcesoReady chan struct{}
-	CanalNuevoProcesoNew   chan struct{} // Canal para recibir notificaciones de nuevos procesos en NewQueue
+	CanalNuevoProcesoNew   chan *internal.Proceso // Canal para recibir notificaciones de nuevos procesos en NewQueue
+	mutexNewQueue          *sync.Mutex
+	mutexReadyQueue        *sync.Mutex
+	//mutexBlockQueue        *sync.Mutex
+	mutexCPUsConectadas *sync.Mutex
+	mutexExecQueue      *sync.Mutex
+	SjfConfig           *SjfConfig
 }
 
 type Planificador struct {
@@ -35,9 +44,15 @@ type CpuIdentificacion struct {
 	Estado bool   `json:"estado"`
 }
 
+type SjfConfig struct {
+	Alpha           float64 `json:"alpha"`
+	InitialEstimate int     `json:"initial_estimate"`
+}
+
 // NewPlanificador función que sirve para crear una nueva instancia del planificador de procesos. El planificador posee
 // varias colas para gestionar los procesos en diferentes estados: New, Ready, Block, Suspended Ready, Suspended Block, Exec y Exit.
-func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int) *Service {
+func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlazoAlgoritmo string,
+	puertoMemoria int, sjfConfig *SjfConfig) *Service {
 	return &Service{
 		Planificador: &Planificador{
 			NewQueue:       make([]*internal.Proceso, 0),
@@ -52,6 +67,14 @@ func NewPlanificador(log *slog.Logger, ipMemoria string, puertoMemoria int) *Ser
 		Memoria:                memoria.NewMemoria(ipMemoria, puertoMemoria, log),
 		CPUsConectadas:         make([]*cpu.Cpu, 0),
 		CanalEnter:             make(chan struct{}),
-		canalNuevoProcesoReady: make(chan struct{}, 1), // Canal con buffer de 1
+		SjfConfig:              sjfConfig,
+		LargoPlazoAlgorithm:    largoPlazoAlgoritmo,
+		ShortTermAlgorithm:     cortoPlazoAlgoritmo,
+		canalNuevoProcesoReady: make(chan struct{}, 100),          // Buffer para evitar deadlocks
+		CanalNuevoProcesoNew:   make(chan *internal.Proceso, 100), // Buffer para evitar deadlocks
+		mutexNewQueue:          &sync.Mutex{},
+		mutexReadyQueue:        &sync.Mutex{},
+		mutexExecQueue:         &sync.Mutex{},
+		mutexCPUsConectadas:    &sync.Mutex{},
 	}
 }

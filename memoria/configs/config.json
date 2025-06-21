@@ -10,5 +10,5 @@
   "swap_delay": 15000,
   "log_level": "DEBUG",
   "dump_path": "/home/utnso/dump_files/",
-  "scripts_path": "/home/utnso/scripts/"
+  "scripts_path": "/home/utnso/"
 }

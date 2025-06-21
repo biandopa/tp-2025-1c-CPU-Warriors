@@ -7,8 +7,9 @@ import (
 )
 
 type Service struct {
-	Log    *slog.Logger
-	Kernel *kernel.Kernel
+	Log            *slog.Logger
+	Kernel         *kernel.Kernel
+	Interrupciones []Interrupcion
 }
 
 func NewService(logger *slog.Logger, ipKernel string, puertoKernel int) *Service {
