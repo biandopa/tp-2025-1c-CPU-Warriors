@@ -62,12 +62,18 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 			ExecQueue:      make([]*internal.Proceso, 0),
 			ExitQueue:      make([]*internal.Proceso, 0),
 		},
-		Log:                 log,
-		Memoria:             memoria.NewMemoria(ipMemoria, puertoMemoria, log),
-		CPUsConectadas:      make([]*cpu.Cpu, 0),
-		CanalEnter:          make(chan struct{}),
-		SjfConfig:           sjfConfig,
-		LargoPlazoAlgorithm: largoPlazoAlgoritmo,
-		ShortTermAlgorithm:  cortoPlazoAlgoritmo,
+		Log:                    log,
+		Memoria:                memoria.NewMemoria(ipMemoria, puertoMemoria, log),
+		CPUsConectadas:         make([]*cpu.Cpu, 0),
+		CanalEnter:             make(chan struct{}),
+		SjfConfig:              sjfConfig,
+		LargoPlazoAlgorithm:    largoPlazoAlgoritmo,
+		ShortTermAlgorithm:     cortoPlazoAlgoritmo,
+		canalNuevoProcesoReady: make(chan *internal.Proceso, 100), // Buffer para evitar deadlocks
+		CanalNuevoProcesoNew:   make(chan *internal.Proceso, 100), // Buffer para evitar deadlocks
+		mutexNewQueue:          &sync.Mutex{},
+		mutexReadyQueue:        &sync.Mutex{},
+		mutexExecQueue:         &sync.Mutex{},
+		//mutexBlockQueue:     &sync.Mutex{},
 	}
 }
