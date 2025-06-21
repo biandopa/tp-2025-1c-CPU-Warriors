@@ -23,7 +23,7 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	// Creo un proceso
 	proceso := &internal.Proceso{
 		PCB: &internal.PCB{
-			PID:                0,
+			PID:                h.UniqueID.GetUniqueID(),
 			PC:                 0,
 			MetricasTiempo:     map[internal.Estado]*internal.EstadoTiempo{},
 			MetricasEstado:     map[internal.Estado]int{},
@@ -34,24 +34,8 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	}
 
 	go h.Planificador.PlanificadorLargoPlazo()
-	h.ejecutarPlanificadorCortoPlazo()
+	go h.Planificador.PlanificadorCortoPlazo()
 	h.Planificador.CanalNuevoProcesoNew <- proceso
-}
-
-// ejecutarPlanificadorCortoPlazo selecciona el planificador de corto plazo a utilizar y lo ejecuta como una goroutine.
-func (h *Handler) ejecutarPlanificadorCortoPlazo() {
-	switch h.Config.ReadyIngressAlgorithm {
-	case "FIFO":
-		go h.Planificador.PlanificadorCortoPlazoFIFO()
-	case "SJFSD":
-
-	case "SJFD":
-		go h.Planificador.PlanificarCortoPlazoSjfDesalojo()
-	case "PMCP":
-
-	default:
-		h.Log.Warn("Algoritmo no reconocido")
-	}
 }
 
 func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +67,7 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		// Creo un proceso hijo
 		proceso := &internal.Proceso{
 			PCB: &internal.PCB{
-				PID:            1,
+				PID:            h.UniqueID.GetUniqueID(),
 				PC:             0,
 				MetricasTiempo: map[internal.Estado]*internal.EstadoTiempo{},
 				MetricasEstado: map[internal.Estado]int{},
