@@ -67,6 +67,9 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 		log.AnyAttr("ioIdentificacionPeticion", ioIdentificacionPeticion),
 	)
 
+	//Aviso al kernel que el proceso termino su IO para que revise si esta suspendido
+	//TODO: Como accedo al proceso desde aca?
+	//go h.Planificador.ManejarFinIO(&proceso)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }

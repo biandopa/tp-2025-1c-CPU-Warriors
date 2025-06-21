@@ -19,10 +19,14 @@ type Service struct {
 	CanalEnter             chan struct{}
 	canalNuevoProcesoReady chan *internal.Proceso
 	CanalNuevoProcesoNew   chan *internal.Proceso // Canal para recibir notificaciones de nuevos procesos en NewQueue
+	CanalNuevoProcBlocked  chan *internal.Proceso
+	CanalNewProcSuspReady  chan *internal.Proceso
 	mutexNewQueue          *sync.Mutex
 	mutexReadyQueue        *sync.Mutex
 	mutexBlockQueue        *sync.Mutex
 	mutexExecQueue         *sync.Mutex
+	mutexSuspBlockQueue    *sync.Mutex
+	mutexSuspReadyQueue    *sync.Mutex
 	SjfConfig              *SjfConfig
 }
 
