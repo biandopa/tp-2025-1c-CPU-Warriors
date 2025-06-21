@@ -21,9 +21,9 @@ type Service struct {
 	CanalNuevoProcesoNew   chan *internal.Proceso // Canal para recibir notificaciones de nuevos procesos en NewQueue
 	mutexNewQueue          *sync.Mutex
 	mutexReadyQueue        *sync.Mutex
-	mutexBlockQueue        *sync.Mutex
-	mutexExecQueue         *sync.Mutex
-	SjfConfig              *SjfConfig
+	//mutexBlockQueue        *sync.Mutex
+	mutexExecQueue *sync.Mutex
+	SjfConfig      *SjfConfig
 }
 
 type Planificador struct {
