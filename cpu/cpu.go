@@ -10,18 +10,21 @@ import (
 )
 
 const (
-	configFilePath = "./configs/config.json"
+	configFilePath = "./configs/"
 )
 
 func main() {
 	mux := http.NewServeMux()
-	h := api.NewHandler(configFilePath)
 
 	//para que tome el argumento debe ingresarse asi "go run cpu.go Identificador"
 	identificadorCPU := os.Args[1]
 
+	configFile := configFilePath + identificadorCPU + ".json"
+
+	h := api.NewHandler(configFile)
+
 	h.Log.Debug("Inicializando interfaz CPU",
-		log.StringAttr("nombreCPU", identificadorCPU),
+		log.StringAttr("id", identificadorCPU),
 	)
 
 	//IO --> Kernel  (le enviará su nombre, ip y puerto)  HANDSHAKE
@@ -33,7 +36,7 @@ func main() {
 	mux.HandleFunc("POST /kernel/interrupciones", h.RecibirInterrupciones) // Kernel --> CPU
 
 	// Nota: Le pasamos por argumento el puerto para que levante muchas CPUs
-	cpuAddress := fmt.Sprintf("%s:%s", h.Config.IpCpu, identificadorCPU)
+	cpuAddress := fmt.Sprintf("%s:%s", h.Config.IpCpu, h.Config.PortCpu)
 	if err := http.ListenAndServe(cpuAddress, mux); err != nil {
 		h.Log.Error("Error starting server", log.ErrAttr(err))
 		panic(err)
