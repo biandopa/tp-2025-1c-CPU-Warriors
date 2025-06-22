@@ -20,8 +20,9 @@ type Cpu struct {
 }
 
 type ProcesoCpu struct {
-	PID int `json:"pid"`
-	PC  int `json:"pc"`
+	PID    int    `json:"pid"`
+	PC     int    `json:"pc"`
+	Motivo string `json:"motivo,omitempty"`
 }
 
 type Interrupcion struct {
@@ -41,13 +42,13 @@ func NewCpu(ip string, puerto int, id string, logger *slog.Logger) *Cpu {
 	}
 }
 
-func (c *Cpu) DispatchProcess() int {
+func (c *Cpu) DispatchProcess() (int, string) {
 	body, err := json.Marshal(*c.Proceso)
 	if err != nil {
 		c.Log.Error("Error al serializar el proceso",
 			log.ErrAttr(err),
 		)
-		return c.Proceso.PC
+		return c.Proceso.PC, ""
 	}
 
 	url := fmt.Sprintf("http://%s:%d/kernel/procesos", c.IP, c.Puerto)
@@ -72,7 +73,7 @@ func (c *Cpu) DispatchProcess() int {
 		c.Proceso.PC = newResponse.PC
 	}
 
-	return c.Proceso.PC
+	return c.Proceso.PC, newResponse.Motivo
 }
 
 func (c *Cpu) EnviarInterrupcion(tipo string, esEnmascarable bool) bool {
