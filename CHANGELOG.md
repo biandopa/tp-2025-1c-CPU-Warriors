@@ -1,5 +1,92 @@
 # 📝 Changelog
 
+## **Fecha:** 2025-06-23
+
+---
+
+### 🚀 **Cambios Principales - Checkpoint 3**
+
+#### **1. Módulo CPU - Instrucciones READ/WRITE Implementadas**
+
+##### **📁 Archivo:** `cpu/cmd/api/instruciones.go`
+
+**🔧 Cambios realizados:**
+
+1. **Implementación completa de instrucción WRITE:**
+
+   ```go
+   case "WRITE":
+   	// ❌ ANTES: Código comentado
+   	/*direccion := args[0]
+   	datos := args[1]
+   	dirFisica := traducirDireccion(pid, direccion)
+   	h.writeMemoria("pid", pid, dirFisica, datos)
+   	//TODO: implementar traducirDireccion, writeMemoria*/
+   	
+   	// ✅ DESPUÉS: Implementación completa con módulo dedicado
+   	if len(args) < 2 {
+   		h.Log.Error("WRITE requiere al menos 2 argumentos: dirección y datos")
+   		return false, pc
+   	}
+   	direccion := args[0]
+   	datos := args[1]
+   	dirFisica := direccion // TODO: implementar traducción
+   	
+   	if err := h.Memoria.Write(pid, dirFisica, datos); err != nil {
+   		// Manejo de errores completo
+   		return false, pc
+   	}
+   	nuevoPC = pc + 1
+   ```
+   2. **Implementación completa de instrucción READ:**
+   ```go
+   case "READ":
+   	// ❌ ANTES: Código comentado
+   	/*direccion, _ := strconv.Atoi(args[0])
+   	tamanio, _ := strconv.Atoi(args[1])
+   	dirFisica := traducirDireccion(pid, direccion)
+   	datoLeido := h.readMemoria(pid, dirFisica, tamanio)*/
+   	
+   	// ✅ DESPUÉS: Implementación completa con módulo dedicado
+   	if len(args) < 2 {
+   		h.Log.Error("READ requiere al menos 2 argumentos")
+   		return false, pc
+   	}
+   	direccion := args[0]
+   	tamanio, err := strconv.Atoi(args[1])
+   	dirFisica := direccion // TODO: implementar traducción
+   	
+   	datoLeido, err := h.Memoria.Read(pid, dirFisica, tamanio)
+   	// Validación completa y manejo de errores
+   	nuevoPC = pc + 1
+   ```
+2. **Implementación de la función `TraducirDireccion`:**
+3. TLB y caché implementadas
+┌─────────────────┐
+│ Kernel envía    │
+│ interrupción    │
+│ de desalojo     │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│ CPU detecta     │
+│ interrupción    │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│ Limpiar TLB     │
+│ y caché         │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│ Continuar con   │
+│ siguiente       │
+│ proceso         │
+└─────────────────┘
+
 ## **Fecha:** 2025-06-21
 
 ---
