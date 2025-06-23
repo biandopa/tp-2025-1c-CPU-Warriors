@@ -33,9 +33,11 @@ func NewHandler(configFile string) *Handler {
 	logger := log.BuildLogger(logLevel)
 
 	return &Handler{
-		Config:  configStruct,
-		Log:     logger,
-		Service: internal.NewService(logger, configStruct.IpKernel, configStruct.PortKernel),
+		Config: configStruct,
+		Log:    logger,
+		Service: internal.NewService(logger, configStruct.IpKernel, configStruct.PortKernel,
+			configStruct.TlbEntries, configStruct.CacheEntries,
+			configStruct.TlbReplacement, configStruct.CacheReplacement),
 		Memoria: memoria.NewMemoria(configStruct.IpMemory, configStruct.PortMemory, logger),
 	}
 }

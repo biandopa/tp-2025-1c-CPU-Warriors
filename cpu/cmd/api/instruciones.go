@@ -76,7 +76,7 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
-// FETCH
+// Fetch obtiene la instrucción de memoria para un proceso dado (pid) y contador de programa (pc).
 func (h *Handler) Fetch(pid int, pc int) (Instruccion, error) {
 	instruccion, err := h.Memoria.FetchInstruccion(pid, pc)
 	if err != nil {
@@ -96,15 +96,39 @@ func (h *Handler) Fetch(pid int, pc int) (Instruccion, error) {
 
 // Decode Interpreta la instrucción y sus argumentos. Además, verifica si la misma requiere de una
 // traducción de dirección lógica a física.
-func decode(instruccion Instruccion) (string, []string) {
-	//TODO: Implementar la parte de la traducción de dirección lógica a física.
+func (h *Handler) decode(instruccion Instruccion, pid int) (string, []string, error) {
 	tipo := strings.ToUpper(instruccion.Instruccion)
 	args := instruccion.Parametros
 
-	return tipo, args
+	// Verificar si la instrucción requiere traducción de direcciones
+	if tipo == "READ" || tipo == "WRITE" {
+		if len(args) > 0 {
+			// Traducir dirección lógica a física usando MMU
+			direccionLogica := args[0]
+			direccionFisica, err := h.Service.MMU.TraducirDireccion(pid, direccionLogica)
+			if err != nil {
+				h.Log.Error("Error en traducción de dirección",
+					log.ErrAttr(err),
+					log.IntAttr("pid", pid),
+					log.StringAttr("direccion_logica", direccionLogica))
+				return "", nil, err
+			}
+
+			// Reemplazar la dirección lógica con la física
+			args[0] = direccionFisica
+
+			h.Log.Debug("Dirección traducida",
+				log.IntAttr("pid", pid),
+				log.StringAttr("direccion_logica", direccionLogica),
+				log.StringAttr("direccion_fisica", direccionFisica))
+		}
+	}
+
+	return tipo, args, nil
 }
 
-// EXECUTE
+// Execute ejecuta la instrucción decodificada. Dependiendo del tipo de instrucción, puede
+// requerir interacción con la memoria, el kernel o simplemente ser una operación no operativa (NOOP).
 func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 	var (
 		nuevoPC       = pc
@@ -123,24 +147,22 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 				log.IntAttr("pc", pc))
 			return false, pc
 		}
-		direccion := args[0]
+		direccion := args[0] // Ya traducida por la MMU
 		datos := args[1]
 
-		// TODO: Por ahora usamos la dirección lógica directamente (implementar traducción)
-		dirFisica := direccion
-
-		if err := h.Memoria.Write(pid, dirFisica, datos); err != nil {
+		// Usar la MMU para escribir con caché. Si la caché no está habilitada, se escribe directamente en memoria
+		if err := h.Service.MMU.EscribirConCache(pid, direccion, datos, h.Memoria); err != nil {
 			h.Log.Error("Error al escribir en memoria",
 				log.ErrAttr(err),
 				log.IntAttr("pid", pid),
-				log.StringAttr("direccion", dirFisica),
+				log.StringAttr("direccion", direccion),
 				log.StringAttr("datos", datos))
 			return false, pc
 		}
 
 		h.Log.Debug("WRITE ejecutado exitosamente",
 			log.IntAttr("pid", pid),
-			log.StringAttr("direccion_fisica", dirFisica),
+			log.StringAttr("direccion_fisica", direccion),
 			log.StringAttr("datos", datos))
 		nuevoPC++
 
@@ -151,7 +173,8 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 				log.IntAttr("pc", pc))
 			return false, pc
 		}
-		direccion := args[0]
+
+		direccion := args[0] // Ya traducida por la MMU
 		tamanio, err := strconv.Atoi(args[1])
 		if err != nil {
 			h.Log.Error("Tamaño inválido en instrucción READ",
@@ -161,27 +184,33 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			return false, pc
 		}
 
-		// TODO: Por ahora usamos la dirección lógica directamente (implementar traducción)
-		dirFisica := direccion
-
-		datoLeido, err := h.Memoria.Read(pid, dirFisica, tamanio)
+		// Usar la MMU para leer con caché. Si la caché no está habilitada, se lee directamente en memoria
+		datoLeido, err := h.Service.MMU.LeerConCache(pid, direccion, tamanio, h.Memoria)
 		if err != nil {
 			h.Log.Error("Error al leer de memoria",
 				log.ErrAttr(err),
 				log.IntAttr("pid", pid),
-				log.StringAttr("direccion", dirFisica),
+				log.StringAttr("direccion", direccion),
 				log.IntAttr("tamanio", tamanio))
 			return false, pc
 		}
 
 		h.Log.Debug("READ ejecutado exitosamente",
 			log.IntAttr("pid", pid),
-			log.StringAttr("direccion_fisica", dirFisica),
+			log.StringAttr("direccion_fisica", direccion),
 			log.StringAttr("dato_leido", datoLeido),
 			log.IntAttr("tamanio", tamanio))
 		nuevoPC++
 
 	case "GOTO":
+		if len(args) != 1 {
+			h.Log.Error("GOTO requiere un único argumento numérico",
+				log.IntAttr("pid", pid),
+				log.IntAttr("pc", pc),
+				log.AnyAttr("args", args))
+			return false, pc
+		}
+
 		pcAtoi, err := strconv.Atoi(args[0])
 		if err != nil {
 			h.Log.Error("GOTO requiere un argumento numérico válido",
@@ -222,8 +251,9 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 	return returnControl, nuevoPC
 }
 
-// CICLO DE INSTRUCCION
-func (h *Handler) Ciclo(proceso *Proceso) int {
+// Ciclo ejecuta un ciclo de instrucciones para un proceso dado. Su retorno es un mensaje de error
+// si ocurre algún problema.
+func (h *Handler) Ciclo(proceso *Proceso) string {
 	for {
 		h.Log.Debug("Iniciando ciclo de instrucción",
 			log.IntAttr("pid", proceso.PID),
@@ -233,10 +263,14 @@ func (h *Handler) Ciclo(proceso *Proceso) int {
 		instruccion, err := h.Fetch(proceso.PID, proceso.PC)
 		if err != nil {
 			h.Log.Error("Error en fetch", log.ErrAttr(err))
-			return proceso.PC
+			return fmt.Sprintf("Error en fetch: %v", err)
 		}
 
-		tipo, args := decode(instruccion)
+		tipo, args, err := h.decode(instruccion, proceso.PID)
+		if err != nil {
+			h.Log.Error("Error en decodificación", log.ErrAttr(err))
+			return fmt.Sprintf("Error en decodificación: %v", err)
+		}
 		h.Log.Debug("Instrucción decodificada",
 			log.StringAttr("tipo", tipo),
 			log.AnyAttr("args", args))
@@ -249,6 +283,10 @@ func (h *Handler) Ciclo(proceso *Proceso) int {
 		if tipo == "EXIT" {
 			h.Log.Debug("Proceso finalizado",
 				log.IntAttr("pid", proceso.PID))
+
+			// Limpiar memoria (TLB y caché) cuando el proceso termina
+			h.Service.LimpiarMemoriaProceso(proceso.PID)
+
 			break
 		}
 
@@ -261,16 +299,25 @@ func (h *Handler) Ciclo(proceso *Proceso) int {
 
 		// Verificar interrupciones después de cada instrucción
 		if h.Service.HayInterrupciones() {
-			h.Log.Info("Interrupción detectada, saliendo del ciclo de instrucción",
+			h.Log.Debug("Interrupción detectada, saliendo del ciclo de instrucción",
 				log.IntAttr("pid", proceso.PID),
 				log.IntAttr("pc", proceso.PC),
 			)
-			return proceso.PC
+
+			// Obtener la interrupción para verificar si es de desalojo
+			interrupcion, _ := h.Service.ObtenerInterrupcion()
+			if interrupcion.Tipo == internal.InerrupcionDesalojo {
+				h.Log.Debug("Interrupción de desalojo detectada, limpiando memoria",
+					log.IntAttr("pid", proceso.PID))
+				h.Service.LimpiarMemoriaProceso(proceso.PID)
+			}
+
+			return "Interrupción detectada, proceso pausado"
 		}
 	}
 
 	h.Log.Debug("Ciclo de instrucción completado",
 		log.IntAttr("pid", proceso.PID),
 		log.IntAttr("pc", proceso.PC))
-	return proceso.PC
+	return "Proceso ejecutado exitosamente"
 }

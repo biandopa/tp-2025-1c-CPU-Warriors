@@ -4,43 +4,69 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/sisoputnfrba/tp-golang/cpu/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
+// RecibirProcesos maneja la recepción de un proceso del kernel
 func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	// Leer el cuerpo de la solicitud
-	decoder := json.NewDecoder(r.Body)
-	proceso := &Proceso{}
-
-	h.Log.Debug("Recibi el proceso")
-
-	// Guarda el valor del body en la variable paquete
-	err := decoder.Decode(&proceso)
-	if err != nil {
-		h.Log.ErrorContext(ctx, "Error al decodificar mensaje.", log.ErrAttr(err))
-		http.Error(w, "error al decodificar mensaje", http.StatusInternalServerError)
+	var proceso Proceso
+	if err := json.NewDecoder(r.Body).Decode(&proceso); err != nil {
+		h.Log.Error("Error decodificando proceso",
+			log.ErrAttr(err))
+		http.Error(w, "Error decodificando proceso", http.StatusBadRequest)
 		return
 	}
 
-	h.Log.DebugContext(ctx, "Me llego la peticion del Kernel",
-		log.AnyAttr("paquete", proceso),
-	)
+	h.Log.Info("Proceso recibido del kernel",
+		log.IntAttr("pid", proceso.PID),
+		log.IntAttr("pc", proceso.PC))
 
-	// TODO: Devolver PID y PC al Kernel luego de ejecutar
-	newPC := h.Ciclo(proceso)
+	// Ejecutar el proceso en este CPU
+	msg := h.Ciclo(&proceso)
 
-	respose := Proceso{
-		PID: proceso.PID,
-		PC:  newPC,
+	// Enviar respuesta con el nuevo PC
+	response := map[string]interface{}{
+		"pid":    proceso.PID,
+		"pc":     proceso.PC,
+		"motivo": msg,
 	}
 
-	// Conviero la estructura del proceso a un []bytes (formato en el que se envían las peticiones)
-	body, _ := json.Marshal(respose)
-
-	// Agrego el status Code 200 a la respuesta
 	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		h.Log.Error("Error codificando respuesta",
+			log.ErrAttr(err))
+		http.Error(w, "Error interno del servidor", http.StatusInternalServerError)
+		return
+	}
+}
 
-	// Envío la respuesta al cliente con un mensaje de éxito
-	_, _ = w.Write(body)
+// RecibirInterrupcion maneja la recepción de interrupciones del kernel
+func (h *Handler) RecibirInterrupcion(w http.ResponseWriter, r *http.Request) {
+	var interrupcion internal.Interrupcion
+	if err := json.NewDecoder(r.Body).Decode(&interrupcion); err != nil {
+		h.Log.Error("Error decodificando interrupción",
+			log.ErrAttr(err))
+		http.Error(w, "Error decodificando interrupción", http.StatusBadRequest)
+		return
+	}
+
+	h.Log.Info("Interrupción recibida del kernel",
+		log.IntAttr("pid", interrupcion.PID),
+		log.StringAttr("tipo", string(interrupcion.Tipo)),
+		log.AnyAttr("enmascarable", interrupcion.EsEnmascarable))
+
+	// Agregar la interrupción a la cola
+	h.Service.AgregarInterrupcion(interrupcion)
+
+	// Responder con éxito
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{"msg": "ok"}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		h.Log.Error("Error codificando respuesta de interrupción",
+			log.ErrAttr(err))
+		http.Error(w, "Error interno del servidor", http.StatusInternalServerError)
+		return
+	}
 }
