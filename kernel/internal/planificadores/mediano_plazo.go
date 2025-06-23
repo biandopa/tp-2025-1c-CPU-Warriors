@@ -116,7 +116,7 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 			log.IntAttr("PID", proceso.PCB.PID))
 
 		// Notificar planificador corto plazo
-		p.canalNuevoProcesoReady <- proceso
+		p.canalNuevoProcesoReady <- struct{}{}
 	}
 }
 
