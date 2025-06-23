@@ -6,12 +6,14 @@ import (
 	"github.com/sisoputnfrba/tp-golang/kernel/internal/planificadores"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
+	uniqueid "github.com/sisoputnfrba/tp-golang/utils/unique-id"
 )
 
 type Handler struct {
 	Log          *slog.Logger
 	Config       *Config
 	Planificador *planificadores.Service
+	UniqueID     *uniqueid.UniqueID
 }
 
 func NewHandler(configFile string) *Handler {
@@ -43,5 +45,6 @@ func NewHandler(configFile string) *Handler {
 			},
 			configStruct.SuspensionTime,
 		),
+		UniqueID: uniqueid.Init(),
 	}
 }

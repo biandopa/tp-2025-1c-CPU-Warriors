@@ -17,12 +17,14 @@ type Service struct {
 	Memoria                *memoria.Memoria
 	CPUsConectadas         []*cpu.Cpu
 	CanalEnter             chan struct{}
-	canalNuevoProcesoReady chan *internal.Proceso
+	canalNuevoProcesoReady chan struct{}
 	CanalNuevoProcesoNew   chan *internal.Proceso // Canal para recibir notificaciones de nuevos procesos en NewQueue
 	CanalNuevoProcBlocked  chan *internal.Proceso
 	CanalNewProcSuspReady  chan *internal.Proceso
 	mutexNewQueue          *sync.Mutex
 	mutexReadyQueue        *sync.Mutex
+	//mutexBlockQueue      *sync.Mutex
+	mutexCPUsConectadas    *sync.Mutex
 	mutexBlockQueue        *sync.Mutex
 	mutexExecQueue         *sync.Mutex
 	mutexSuspBlockQueue    *sync.Mutex
@@ -71,13 +73,21 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 			ExecQueue:      make([]*internal.Proceso, 0),
 			ExitQueue:      make([]*internal.Proceso, 0),
 		},
-		Log:                 log,
-		Memoria:             memoria.NewMemoria(ipMemoria, puertoMemoria, log),
-		CPUsConectadas:      make([]*cpu.Cpu, 0),
-		CanalEnter:          make(chan struct{}),
-		SjfConfig:           sjfConfig,
-		LargoPlazoAlgorithm: largoPlazoAlgoritmo,
-		ShortTermAlgorithm:  cortoPlazoAlgoritmo,
+		Log:                    log,
+		Memoria:                memoria.NewMemoria(ipMemoria, puertoMemoria, log),
+		CPUsConectadas:         make([]*cpu.Cpu, 0),
+		CanalEnter:             make(chan struct{}),
+		SjfConfig:              sjfConfig,
+		LargoPlazoAlgorithm:    largoPlazoAlgoritmo,
+		ShortTermAlgorithm:     cortoPlazoAlgoritmo,
+		canalNuevoProcesoReady: make(chan struct{}, 100),          // Buffer para evitar deadlocks
+		CanalNuevoProcesoNew:   make(chan *internal.Proceso, 100), // Buffer para evitar deadlocks
+		CanalNewProcSuspReady: make(chan *internal.Proceso, 100),
+		CanalNuevoProcBlocked: make(chan *internal.Proceso, 100),
+		mutexNewQueue:          &sync.Mutex{},
+		mutexReadyQueue:        &sync.Mutex{},
+		mutexExecQueue:         &sync.Mutex{},
+		mutexCPUsConectadas:    &sync.Mutex{},
 		MedianoPlazoConfig: &MedianoPlazoConfig{
 			SuspensionTime: suspTime,
 		},

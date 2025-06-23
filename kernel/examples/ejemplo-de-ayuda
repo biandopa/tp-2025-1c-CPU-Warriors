@@ -1,0 +1,16 @@
+Estado inicial:
+- ReadyQueue: [P1, P2, P3, P4, P5]
+- CPUs: [CPU1, CPU2] (ambas libres)
+
+1. Planificador recibe señal: <-p.canalNuevoProcesoReady
+2. Asigna P1 a CPU1, P2 a CPU2
+3. ReadyQueue: [P3, P4, P5]
+4. No hay más CPUs libres
+5. Envía señal: p.canalNuevoProcesoReady <- struct{}{}
+6. Sale del bucle interno: break
+7. Vuelve al for externo: <-p.canalNuevoProcesoReady (espera)
+
+8. CPU1 termina P1 → envía señal al canal
+9. Planificador recibe señal → procesa ReadyQueue nuevamente
+10. Asigna P3 a CPU1
+11. Continúa el ciclo...

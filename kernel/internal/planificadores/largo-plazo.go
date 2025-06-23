@@ -17,7 +17,7 @@ const (
 	PlanificadorEstadoStart = "START"
 )
 
-// PlanificadorLargoPlazoFIFO realiza las funciones correspondientes al planificador de largo plazo FIFO.
+// PlanificadorLargoPlazo realiza las funciones correspondientes al planificador de largo plazo.
 func (p *Service) PlanificadorLargoPlazo() {
 	estado := PlanificadorEstadoStop
 
@@ -48,9 +48,6 @@ func (p *Service) PlanificadorLargoPlazo() {
 			}
 
 			p.CheckearEspacioEnMemoria()
-
-			// Checkear si la cola de suspReady puede ingresar, en caso de que se vacie consultar la de NEW
-
 		}
 	}
 }
@@ -76,10 +73,9 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 		if sizeProcesoEntrante < sizeProcesoEncolado {
 
 			p.Planificador.NewQueue = append(
-				p.Planificador.NewQueue[:i+1],  // lo que viene después
-				p.Planificador.NewQueue[i:]..., // desplazamos lo que estaba en i
+				p.Planificador.NewQueue[:i],
+				append([]*internal.Proceso{proceso}, p.Planificador.NewQueue[i:]...)...,
 			)
-			p.Planificador.NewQueue[i] = proceso
 
 			yaLoAgregue = false
 			break
@@ -95,7 +91,7 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 }
 
 func (p *Service) CheckearEspacioEnMemoria() {
-
+	// Priorizamos los procesos suspendidos ready
 	for _, proceso := range p.Planificador.SuspReadyQueue {
 		if p.Memoria.ConsultarEspacio(proceso.PCB.NombreArchivo, proceso.PCB.Tamanio, proceso.PCB.PID) {
 			// Si el proceso se carga en memoria, lo muevo a la cola de ready
@@ -109,10 +105,9 @@ func (p *Service) CheckearEspacioEnMemoria() {
 			timeSusp.TiempoAcumulado = timeSusp.TiempoAcumulado + time.Since(timeSusp.TiempoInicio)
 
 			// Agrego el proceso a la cola de ready
+			p.mutexReadyQueue.Lock()
 			p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-			if len(p.canalNuevoProcesoReady) == 0 {
-				//p.canalNuevoProcesoReady <- struct{}{}
-			}
+			p.mutexReadyQueue.Unlock()
 
 			if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
 				proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
@@ -122,12 +117,18 @@ func (p *Service) CheckearEspacioEnMemoria() {
 			proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
 			p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
+
+			// Enviar señal al canal de corto plazo para procesos suspendidos
+			p.Log.Debug("Enviando señal al canal de corto plazo (SUSP.READY -> READY)",
+				log.IntAttr("pid", proceso.PCB.PID))
+			p.canalNuevoProcesoReady <- struct{}{}
+			p.Log.Debug("Señal enviada al canal de corto plazo (SUSP.READY -> READY)")
 		} else {
 			break
 		}
 	}
 
-	if len(p.Planificador.SuspReadyQueue) != 0 {
+	if len(p.Planificador.SuspReadyQueue) == 0 {
 		for _, proceso := range p.Planificador.NewQueue {
 			if p.Memoria.ConsultarEspacio(proceso.PCB.NombreArchivo, proceso.PCB.Tamanio, proceso.PCB.PID) {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
@@ -143,17 +144,28 @@ func (p *Service) CheckearEspacioEnMemoria() {
 				timeNew := proceso.PCB.MetricasTiempo[internal.EstadoNew]
 				timeNew.TiempoAcumulado = timeNew.TiempoAcumulado + time.Since(timeNew.TiempoInicio)
 
-				// Notificar al channel de nuevo proceso ready
-				p.canalNuevoProcesoReady <- proceso
-
 				if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
 					proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
 				}
+
+				// Primero agrego el proceso a la cola de ready
+				p.mutexReadyQueue.Lock()
+				p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
+				p.mutexReadyQueue.Unlock()
+
 				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 				proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
 				p.Log.Info(fmt.Sprintf("%d Pasa del estado NEW al estado READY", proceso.PCB.PID))
+
+				// Luego, envío la señal para que el planificador de corto plazo pueda ejecutar el proceso
+				p.Log.Debug("Enviando señal al canal de corto plazo",
+					log.IntAttr("pid", proceso.PCB.PID))
+				p.canalNuevoProcesoReady <- struct{}{}
+				p.Log.Debug("Señal enviada al canal de corto plazo")
 			} else {
+				p.Log.Debug("No hay espacio en memoria para el proceso",
+					log.IntAttr("pid", proceso.PCB.PID))
 				break
 			}
 		}
@@ -196,7 +208,10 @@ func (p *Service) FinalizarProceso(pid int) {
 	p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:lugarColaExec], p.Planificador.ExecQueue[lugarColaExec+1:]...)
 
 	// 4. Cambiar el estado de la CPU
-	// TODO: Preguntar el sabado :)
+	cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
+	if cpuFound != nil {
+		cpuFound.Estado = true
+	}
 
 	// 5. Cambiar el estado del proceso a EXIT
 	proceso.PCB.MetricasEstado[internal.EstadoExit]++
@@ -219,6 +234,6 @@ func (p *Service) FinalizarProceso(pid int) {
 	// 7. Liberar PCB
 	proceso.PCB = nil // Libero el PCB asociado al proceso
 
-	// 8. Le avisamos al channel de nuevo proceso ready
-	p.CheckearEspacioEnMemoria()
+	// 8. Le avisamos al channel de que puede ejecutar el algoritmo de largo plazo
+	//p.CanalNuevoProcesoNew <- struct{}{}
 }
