@@ -62,10 +62,16 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 	}
 
 	// Verifica si hay suficiente espacio
-	// Inserte función para verificar el espacio disponible
+	var espacioDisponible = h.Config.MemorySize
+	tamanioProcesoInt, _ := strconv.Atoi(tamanioProceso)
 
-	// Si no hay suficiente espacio, responde con un error
-	// Caso contrario, continúa con el procesamiento
+	if 0 < espacioDisponible-tamanioProcesoInt {
+		//POSIBLE SEMAFORO ACA!!!! IMPORTANTE
+		h.Config.MemorySize = espacioDisponible - tamanioProcesoInt
+	} else {
+		h.Log.Error("No hay espacio disponible")
+		return
+	}
 
 	// Busca el archivo en el sistema
 	file, err := os.OpenFile(h.Config.ScriptsPath+filePath, os.O_RDONLY, os.ModePerm)
@@ -110,8 +116,7 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 		h.Instrucciones[pidInt] = append(h.Instrucciones[pidInt], instruccion)
 	}
 
-	// Simulamos una consulta al espacio disponible
-	espacioDisponible := 1024 // Simulamos que hay 1024 bytes disponibles
+	//CREAR LA MEMORIA DE USUARIO
 
 	// Enviamos la respuesta al kernel
 	w.Header().Set("Content-Type", "application/json")
