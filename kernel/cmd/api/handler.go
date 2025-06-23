@@ -41,6 +41,7 @@ func NewHandler(configFile string) *Handler {
 				Alpha:           configStruct.Alpha,
 				InitialEstimate: configStruct.InitialEstimate,
 			},
+			configStruct.SuspensionTime,
 		),
 	}
 }

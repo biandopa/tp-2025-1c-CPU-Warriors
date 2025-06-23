@@ -18,7 +18,7 @@ type Usleep struct {
 func (h *Handler) EnviarPeticionAIO(tiempoSleep int, io IOIdentificacion, pid int) {
 
 	usleep := Usleep{}
-	usleep.PID = 123
+	usleep.PID = pid
 	usleep.TiempoSleep = tiempoSleep
 
 	body, err := json.Marshal(usleep)
@@ -67,9 +67,9 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 		log.AnyAttr("ioIdentificacionPeticion", ioIdentificacionPeticion),
 	)
 
+	proceso := h.Planificador.BuscarProcesoEnCola(ioIdentificacionPeticion.ProcesoID, ioIdentificacionPeticion.Cola)
 	//Aviso al kernel que el proceso termino su IO para que revise si esta suspendido
-	//TODO: Como accedo al proceso desde aca?
-	//go h.Planificador.ManejarFinIO(&proceso)
+	go h.Planificador.ManejarFinIO(proceso)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }

@@ -1,13 +1,14 @@
 package planificadores
 
 import (
+	"strings"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
-func (p *Service) SuspenderProcesoBloqueado(h *Handler) {
+func (p *Service) SuspenderProcesoBloqueado() {
 	for {
 		//La funcion espera que entre un proceso en la cola de blocked
 		proceso := <-p.CanalNuevoProcBlocked
@@ -15,7 +16,7 @@ func (p *Service) SuspenderProcesoBloqueado(h *Handler) {
 		go func() {
 			//Busco tiempo de espera para pasar a SuspendedBlocked
 			//del archivo de configuración
-			tiempoEspera := h.Config.SuspensionTime
+			tiempoEspera := p.MedianoPlazoConfig.SuspensionTime
 			//Espero que pase el tiempo determinado
 			time.Sleep(time.Duration(tiempoEspera) * time.Millisecond)
 
@@ -140,4 +141,28 @@ func quitarDeCola(cola *[]*internal.Proceso, p *internal.Proceso) {
 // TODO
 func avisarAMemoriaSwap(p *internal.Proceso) {
 
+}
+
+func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
+	colaString := strings.ToLower(cola)
+	switch colaString {
+	case "suspended_blocked":
+		for _, proc := range p.Planificador.SuspReadyQueue {
+			if proc.PCB.PID == pid {
+				return proc
+			}
+		}
+	case "blocked":
+		for _, proc := range p.Planificador.BlockQueue {
+			if proc.PCB.PID == pid {
+				return proc
+			}
+		}
+	}
+
+	p.Log.Error("Proceso no encontrado en la cola especificada",
+		log.IntAttr("PID", pid),
+		log.StringAttr("Cola", cola),
+	)
+	return nil
 }

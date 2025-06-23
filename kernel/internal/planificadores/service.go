@@ -28,6 +28,7 @@ type Service struct {
 	mutexSuspBlockQueue    *sync.Mutex
 	mutexSuspReadyQueue    *sync.Mutex
 	SjfConfig              *SjfConfig
+	MedianoPlazoConfig     *MedianoPlazoConfig
 }
 
 type Planificador struct {
@@ -52,10 +53,14 @@ type SjfConfig struct {
 	InitialEstimate int     `json:"initial_estimate"`
 }
 
+type MedianoPlazoConfig struct {
+	SuspensionTime int `json:"suspension_time"` // Tiempo de suspensión en milisegundos
+}
+
 // NewPlanificador función que sirve para crear una nueva instancia del planificador de procesos. El planificador posee
 // varias colas para gestionar los procesos en diferentes estados: New, Ready, Block, Suspended Ready, Suspended Block, Exec y Exit.
 func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlazoAlgoritmo string,
-	puertoMemoria int, sjfConfig *SjfConfig) *Service {
+	puertoMemoria int, sjfConfig *SjfConfig, suspTime int) *Service {
 	return &Service{
 		Planificador: &Planificador{
 			NewQueue:       make([]*internal.Proceso, 0),
@@ -73,5 +78,8 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		SjfConfig:           sjfConfig,
 		LargoPlazoAlgorithm: largoPlazoAlgoritmo,
 		ShortTermAlgorithm:  cortoPlazoAlgoritmo,
+		MedianoPlazoConfig: &MedianoPlazoConfig{
+			SuspensionTime: suspTime,
+		},
 	}
 }

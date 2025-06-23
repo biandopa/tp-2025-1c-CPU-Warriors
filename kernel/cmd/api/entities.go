@@ -22,8 +22,10 @@ var ioIdentificacion []IOIdentificacion
 
 // EStructura que definimos para manejar las IOs
 type IOIdentificacion struct {
-	Nombre string `json:"nombre"`
-	IP     string `json:"ip"`
-	Puerto int    `json:"puerto"`
-	Estado bool   `json:"estado"`
+	Nombre    string `json:"nombre"`
+	IP        string `json:"ip"`
+	Puerto    int    `json:"puerto"`
+	Estado    bool   `json:"estado"`
+	ProcesoID int    `json:"pid"`  // PID del proceso que está usando la IO
+	Cola      string `json:"cola"` // Cola a la que pertenece la el proceso (por ejemplo, "ready", "blocked", etc.)
 }
