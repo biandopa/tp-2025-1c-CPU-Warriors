@@ -36,7 +36,7 @@ func main() {
 	mux.HandleFunc("POST /kernel/interrupciones", h.RecibirInterrupciones) // Kernel --> CPU
 
 	// Nota: Le pasamos por argumento el puerto para que levante muchas CPUs
-	cpuAddress := fmt.Sprintf("%s:%s", h.Config.IpCpu, h.Config.PortCpu)
+	cpuAddress := fmt.Sprintf("%s:%d", h.Config.IpCpu, h.Config.PortCpu)
 	if err := http.ListenAndServe(cpuAddress, mux); err != nil {
 		h.Log.Error("Error starting server", log.ErrAttr(err))
 		panic(err)
