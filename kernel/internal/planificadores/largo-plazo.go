@@ -56,6 +56,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO(proceso *internal.Proceso) {
 
 	p.mutexNewQueue.Lock()
 	p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
+	p.Memoria.CargarProcesoEnMemoriaDeSistema(proceso.PCB.NombreArchivo, proceso.PCB.PID)
 	p.mutexNewQueue.Unlock()
 
 }
@@ -84,6 +85,7 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 
 	if yaLoAgregue {
 		p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
+		p.Memoria.CargarProcesoEnMemoriaDeSistema(proceso.PCB.NombreArchivo, proceso.PCB.PID)
 	}
 
 	p.mutexNewQueue.Unlock()
@@ -93,7 +95,7 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 func (p *Service) CheckearEspacioEnMemoria() {
 	// Priorizamos los procesos suspendidos ready
 	for _, proceso := range p.Planificador.SuspReadyQueue {
-		if p.Memoria.ConsultarEspacio(proceso.PCB.NombreArchivo, proceso.PCB.Tamanio, proceso.PCB.PID) {
+		if p.Memoria.ConsultarEspacio(proceso.PCB.Tamanio, proceso.PCB.PID) {
 			// Si el proceso se carga en memoria, lo muevo a la cola de ready
 			// y lo elimino de la cola de suspendidos ready
 
@@ -130,7 +132,7 @@ func (p *Service) CheckearEspacioEnMemoria() {
 
 	if len(p.Planificador.SuspReadyQueue) == 0 {
 		for _, proceso := range p.Planificador.NewQueue {
-			if p.Memoria.ConsultarEspacio(proceso.PCB.NombreArchivo, proceso.PCB.Tamanio, proceso.PCB.PID) {
+			if p.Memoria.ConsultarEspacio(proceso.PCB.Tamanio, proceso.PCB.PID) {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de new
 

@@ -2,7 +2,6 @@ package api
 
 import (
 	"bufio"
-	"encoding/json"
 	"net/http"
 	"os"
 	"strconv"
@@ -23,8 +22,7 @@ type EspacioDisponible struct {
 func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx = r.Context()
-		// Leemos el nombre del archivo y el tamaño del proceso de la consulta
-		filePath       = r.URL.Query().Get("archivo")
+		// Leemos el PID y el tamaño del proceso de la consulta
 		tamanioProceso = r.URL.Query().Get("tamanio-proceso")
 		pid            = r.URL.Query().Get("pid")
 	)
@@ -34,6 +32,49 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 		http.Error(w, "tamaño del proceso no proporcionado", http.StatusBadRequest)
 		return
 	}
+
+	if pid == "" {
+		h.Log.Error("PID no proporcionado")
+		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
+		return
+	}
+
+	// Verifica si hay suficiente espacio
+	var espacioDisponible = h.Config.MemorySize
+	tamanioProcesoInt, _ := strconv.Atoi(tamanioProceso)
+
+	if 0 < espacioDisponible-tamanioProcesoInt {
+		//POSIBLE SEMAFORO ACA!!!! IMPORTANTE
+		h.Config.MemorySize = espacioDisponible - tamanioProcesoInt
+	} else {
+		h.Log.Error("No hay espacio disponible")
+		return
+	}
+	//CREAR LA MEMORIA DE USUARIO
+
+	// Enviamos la respuesta al kernel
+	w.Header().Set("Content-Type", "application/json")
+	response := EspacioDisponible{
+		Mensaje: "Espacio disponible en memoria",
+		Tamaño:  espacioDisponible,
+	}
+
+	h.Log.DebugContext(ctx, "Consulta de espacio disponible respondida con éxito",
+		log.IntAttr("tamaño_disponible", espacioDisponible),
+		log.StringAttr("mensaje", response.Mensaje),
+	)
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http.Request) {
+
+	var (
+		ctx = r.Context()
+		// Leemos el nombre del archivo y el tamaño del proceso de la consulta
+		filePath = r.URL.Query().Get("archivo")
+		pid      = r.URL.Query().Get("pid")
+	)
 
 	if filePath == "" {
 		h.Log.Error("Archivo de pseudocódigo no proporcionado")
@@ -59,18 +100,6 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 
 	if h.Instrucciones[pidInt] == nil {
 		h.Instrucciones[pidInt] = make([]Instruccion, 0)
-	}
-
-	// Verifica si hay suficiente espacio
-	var espacioDisponible = h.Config.MemorySize
-	tamanioProcesoInt, _ := strconv.Atoi(tamanioProceso)
-
-	if 0 < espacioDisponible-tamanioProcesoInt {
-		//POSIBLE SEMAFORO ACA!!!! IMPORTANTE
-		h.Config.MemorySize = espacioDisponible - tamanioProcesoInt
-	} else {
-		h.Log.Error("No hay espacio disponible")
-		return
 	}
 
 	// Busca el archivo en el sistema
@@ -116,24 +145,7 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 		h.Instrucciones[pidInt] = append(h.Instrucciones[pidInt], instruccion)
 	}
 
-	//CREAR LA MEMORIA DE USUARIO
-
-	// Enviamos la respuesta al kernel
-	w.Header().Set("Content-Type", "application/json")
-	response := EspacioDisponible{
-		Mensaje: "Espacio disponible en memoria",
-		Tamaño:  espacioDisponible,
-	}
-	if err = json.NewEncoder(w).Encode(response); err != nil {
-		h.Log.ErrorContext(ctx, "Error al codificar la respuesta", log.ErrAttr(err))
-		http.Error(w, "Error al codificar la respuesta", http.StatusInternalServerError)
-		return
-	}
-
-	h.Log.DebugContext(ctx, "Consulta de espacio disponible respondida con éxito",
-		log.IntAttr("tamaño_disponible", espacioDisponible),
-		log.StringAttr("mensaje", response.Mensaje),
-	)
+	h.Log.Info("Carga de Proceso en Memoria de Sistema Exitosa")
 
 	w.WriteHeader(http.StatusOK)
 }
