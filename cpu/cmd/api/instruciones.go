@@ -101,7 +101,9 @@ func (h *Handler) Fetch(pid int, pc int) (Instruccion, error) {
 		return response, err
 	}
 
-	h.Log.Info("FETCH realizado", "pid", pid, "pc", pc)
+	//Log obligatorio: Fetch instrucción
+	//“## PID: <PID> - FETCH - Program Counter: <PROGRAM_COUNTER>”
+	h.Log.Info(fmt.Sprintf("## PID: %d - FETCH - Program Counter: %d", pid, pc))
 
 	return response, nil
 }
@@ -152,6 +154,12 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		//TODO: implementar traducirDireccion, writeMemoria
 		h.Log.Info("ESCRIBIR", pid, dirFisica, datos)
 		nuevoPC = pc + 1*/
+
+		//Log obligatorio: Lectura/Escritura Memoria
+		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+		h.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+			pid, args[0], args[1]))
+
 	case "READ":
 		/*direccion, _ := strconv.Atoi(args[0])
 		tamanio, _ := strconv.Atoi(args[1])
@@ -161,6 +169,12 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		fmt.Println(datoLeido)
 		h.Log.Info("pid", pid, "LEER", dirFisica, datoLeido)
 		nuevoPC = pc + 1*/
+
+		//Log obligatorio: Lectura/Escritura Memoria
+		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+		h.Log.Info(fmt.Sprintf("## PID: %d - Acción: LEER - Dirección Física: %s - Valor: %s",
+			pid, args[0], args[1]))
+
 	case "GOTO":
 		nuevoPC, _ = strconv.Atoi(args[0])
 
@@ -181,6 +195,10 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		h.Log.Warn("Instrucción no reconocida", log.StringAttr("tipo", tipo))
 		nuevoPC = pc + 1
 	}
+
+	// Log obligatorio: Instrucción Ejecutada
+	//“## PID: <PID> - Ejecutando: <INSTRUCCION> - <PARAMETROS>”.
+	h.Log.Info(fmt.Sprintf("## PID: %d - Ejecutando: %s - %s", pid, tipo, strings.Join(args, " ")))
 
 	return true, nuevoPC
 }

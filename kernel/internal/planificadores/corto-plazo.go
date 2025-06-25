@@ -1,6 +1,7 @@
 package planificadores
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -60,9 +61,9 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 					proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio = time.Now()
 					proceso.PCB.MetricasEstado[internal.EstadoExec]++
 
-					p.Log.Info("Proceso movido de READY a EXEC",
-						log.IntAttr("PID", proceso.PCB.PID),
-					)
+					//Log obligatorio: Cambio de estado
+					// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
+					p.Log.Info(fmt.Sprintf("%d Pasa del estado READY al estado EXEC", proceso.PCB.PID))
 
 					// Usar los valores copiados
 					cpuElegida.Proceso.PC = procesoElegido.PCB.PC
@@ -106,7 +107,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 	for {
 		<-p.canalNuevoProcesoReady // Espera una notificación
-		p.odenarColaReadySjf()
+		p.odenarColaReadySjf()     // Ordena la cola de ReadyQueue por ráfaga estimada
 
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
@@ -127,6 +128,11 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 				procesoADesalojar := p.evaluarDesalojo(procesoNuevo)
 				if procesoADesalojar != nil {
 					p.desalojarProceso(procesoADesalojar)
+
+					// Log obligatorio: Desalojo de SJF/SRT
+					//“## (<PID>) - Desalojado por algoritmo SJF/SRT”
+					p.Log.Info(fmt.Sprintf("%d - Desalojado por algoritmo SJF/SRT", procesoADesalojar.PCB.PID))
+
 					// Después del desalojo, asignar el nuevo proceso
 					cpuLiberada := p.buscarCPUPorPID(procesoADesalojar.PCB.PID)
 					if cpuLiberada != nil {
@@ -285,6 +291,10 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) {
 
 	// Devolver a ReadyQueue
 	p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
+
+	//Log obligatorio: Cambio de estado
+	// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
+	p.Log.Info(fmt.Sprintf("%d Pasa del estado EXEC al estado READY", proceso.PCB.PID))
 
 	// Actualizar métricas de Ready
 	if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {

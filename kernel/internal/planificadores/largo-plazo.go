@@ -116,6 +116,8 @@ func (p *Service) CheckearEspacioEnMemoria() {
 
 			proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
+			//Log obligatorio: Cambio de estado
+			// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
 			p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
 
 			// Enviar señal al canal de corto plazo para procesos suspendidos
@@ -156,6 +158,8 @@ func (p *Service) CheckearEspacioEnMemoria() {
 				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 				proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
+				//Log obligatorio: Cambio de estado
+				// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
 				p.Log.Info(fmt.Sprintf("%d Pasa del estado NEW al estado READY", proceso.PCB.PID))
 
 				// Luego, envío la señal para que el planificador de corto plazo pueda ejecutar el proceso
@@ -225,7 +229,17 @@ func (p *Service) FinalizarProceso(pid int) {
 	proceso.PCB.MetricasEstado[internal.EstadoExit]++
 
 	// 6. Loguear métricas (acá deberías tenerlas guardadas en el PCB)
-	p.Log.Info("Finaliza el proceso", log.IntAttr("PID", proceso.PCB.PID))
+
+	//Log obligatorio: Cambio de estado
+	// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
+	p.Log.Info(fmt.Sprintf("%d Pasa del estado EXEC al estado EXIT", proceso.PCB.PID))
+
+	//Log obligatorio: Finalización de proceso
+	//“## (<PID>) - Finaliza el proceso”
+	p.Log.Info(fmt.Sprintf("%d Finaliza el proceso", proceso.PCB.PID))
+
+	// Log obligatorio: Métricas de Estado
+	//“## (<PID>) - Métricas de estado: NEW (NEW_COUNT) (NEW_TIME), READY (READY_COUNT) (READY_TIME), …”
 	p.Log.Info("Métricas de estado",
 		log.AnyAttr("metricas_estado", proceso.PCB.MetricasEstado),
 		log.AnyAttr("metricas_tiempo", proceso.PCB.MetricasTiempo),

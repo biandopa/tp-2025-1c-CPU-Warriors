@@ -9,12 +9,14 @@ import (
 )
 
 func (h *Handler) ConexionInicialKernel(nombre string) {
+	// Estructura para enviar la identificación del IO al kernel
 	data := IOIdentificacion{
 		Nombre: nombre,
 		IP:     h.Config.IpIo,
 		Puerto: h.Config.PortIo,
 	}
 
+	// Serializar la estructura a JSON
 	body, err := json.Marshal(data)
 	if err != nil {
 		h.Log.Error("Error al serializar ioIdentificacion",
@@ -23,6 +25,7 @@ func (h *Handler) ConexionInicialKernel(nombre string) {
 		return
 	}
 
+	// Enviar la solicitud POST al kernel
 	url := fmt.Sprintf("http://%s:%d/io/conexion-inicial", h.Config.IpKernel, h.Config.PortKernel)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
