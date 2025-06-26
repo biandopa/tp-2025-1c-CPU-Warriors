@@ -10,10 +10,11 @@ import (
 type Handler struct {
 	Log              *slog.Logger
 	Config           *Config
-	EspacioContiguo  []byte
-	TablasDePaginas  map[int]map[int]byte // PID -> Pagina -> Frame ???
+	EspacioDeUsuario []byte
+	//TablasDePaginas  map[int]map[int]byte // PID -> Pagina -> Frame ???
 	MetricasProcesos map[int]*MetricasProceso
 	Instrucciones    map[int][]Instruccion
+	FrameTable       []bool
 }
 
 func NewHandler(configFile string) *Handler {
@@ -34,9 +35,10 @@ func NewHandler(configFile string) *Handler {
 	return &Handler{
 		Config:           configStruct,
 		Log:              log.BuildLogger(logLevel),
-		EspacioContiguo:  make([]byte, configStruct.MemorySize),
-		TablasDePaginas:  make(map[int]map[int]byte),
+		EspacioDeUsuario: make([]byte, configStruct.MemorySize),
+		//TablasDePaginas:  make(map[int]map[int]byte),
 		MetricasProcesos: make(map[int]*MetricasProceso),
 		Instrucciones:    make(map[int][]Instruccion),
+		FrameTable:       make([]bool, configStruct.MemorySize/configStruct.PageSize),
 	}
 }
