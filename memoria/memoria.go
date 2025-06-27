@@ -22,7 +22,10 @@ func main() {
 	mux.HandleFunc("GET /cpu/instruccion", h.EnviarInstruccion)                            // Memoria --> CPU
 	mux.HandleFunc("GET /kernel/espacio-disponible", h.ConsultarEspacioEInicializar)       // Kernel --> Memoria
 	mux.HandleFunc("/kernel/cargar-memoria-de-sistema", h.CargarProcesoEnMemoriaDeSistema) // Kernel --> Memoria
-	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso)                   //CREO SE PUEDE BORRAR OSEA HABRIA QUE HACERLO DE CERO// Kernel --> Memoria
+
+	mux.HandleFunc("/kernel/pasar-proceso-a-swap", h.PasarProcesoASwap) // Kernel --> Memoria
+
+	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso) //CREO SE PUEDE BORRAR OSEA HABRIA QUE HACERLO DE CERO// Kernel --> Memoria
 
 	memoriaAddress := fmt.Sprintf("%s:%d", h.Config.IpMemory, h.Config.PortMemory)
 	if err := http.ListenAndServe(memoriaAddress, mux); err != nil {

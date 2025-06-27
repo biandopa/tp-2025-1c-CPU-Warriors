@@ -15,6 +15,7 @@ type Handler struct {
 	MetricasProcesos map[int]*MetricasProceso
 	Instrucciones    map[int][]Instruccion
 	FrameTable       []bool
+	TablasProcesos   []*TablasProceso
 }
 
 func NewHandler(configFile string) *Handler {
@@ -40,5 +41,6 @@ func NewHandler(configFile string) *Handler {
 		MetricasProcesos: make(map[int]*MetricasProceso),
 		Instrucciones:    make(map[int][]Instruccion),
 		FrameTable:       make([]bool, configStruct.MemorySize/configStruct.PageSize),
+		TablasProcesos:   make([]*TablasProceso, 0),
 	}
 }
