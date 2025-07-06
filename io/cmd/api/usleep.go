@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -23,7 +24,9 @@ func (h *Handler) EjecutarPeticion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Log.InfoContext(ctx, "Inicio de IO",
+	//Log obligatorio: Inicio de IO
+	//“## PID: <PID> - Inicio de IO - Tiempo: <TIEMPO_IO>”
+	h.Log.Info(fmt.Sprintf("%d PID - Inicio de IO - Tiempo: %d", usleep.PID, usleep.TiempoSleep),
 		log.IntAttr("PID", usleep.PID),
 		log.IntAttr("Tiempo", usleep.TiempoSleep),
 	)
@@ -31,7 +34,9 @@ func (h *Handler) EjecutarPeticion(w http.ResponseWriter, r *http.Request) {
 	// Simula el tiempo de espera
 	time.Sleep(time.Duration(usleep.TiempoSleep) * time.Millisecond)
 
-	h.Log.InfoContext(ctx, "Fin de IO",
+	//Log obligatorio: Fin de IO
+	//“## PID: <PID> - Fin de IO”.
+	h.Log.Info(fmt.Sprintf("%d PID - Fin de IO", usleep.PID),
 		log.IntAttr("PID", usleep.PID),
 	)
 

@@ -89,7 +89,9 @@ func (h *Handler) Fetch(pid int, pc int) (Instruccion, error) {
 		Parametros:  instruccion.Parametros,
 	}
 
-	h.Log.Info("FETCH realizado", "pid", pid, "pc", pc)
+	//Log obligatorio: Fetch instrucción
+	//“## PID: <PID> - FETCH - Program Counter: <PROGRAM_COUNTER>”
+	h.Log.Info(fmt.Sprintf("## PID: %d - FETCH - Program Counter: %d", pid, pc))
 
 	return response, nil
 }
@@ -160,10 +162,11 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			return false, pc
 		}
 
-		h.Log.Debug("WRITE ejecutado exitosamente",
-			log.IntAttr("pid", pid),
-			log.StringAttr("direccion_fisica", direccion),
-			log.StringAttr("datos", datos))
+		//Log obligatorio: Lectura/Escritura Memoria
+		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+		h.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+			pid, args[0], args[1]))
+
 		nuevoPC++
 
 	case "READ":
@@ -195,11 +198,11 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			return false, pc
 		}
 
-		h.Log.Debug("READ ejecutado exitosamente",
-			log.IntAttr("pid", pid),
-			log.StringAttr("direccion_fisica", direccion),
-			log.StringAttr("dato_leido", datoLeido),
-			log.IntAttr("tamanio", tamanio))
+		//Log obligatorio: Lectura/Escritura Memoria
+		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+		h.Log.Info(fmt.Sprintf("## PID: %d - Acción: LEER - Dirección Física: %s - Valor: %s",
+			pid, args[0], args[1]))
+
 		nuevoPC++
 
 	case "GOTO":
@@ -247,6 +250,10 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		h.Log.Warn("Instrucción no reconocida", log.StringAttr("tipo", tipo))
 		nuevoPC++
 	}
+
+	// Log obligatorio: Instrucción Ejecutada
+	//“## PID: <PID> - Ejecutando: <INSTRUCCION> - <PARAMETROS>”.
+	h.Log.Info(fmt.Sprintf("## PID: %d - Ejecutando: %s - %s", pid, tipo, strings.Join(args, " ")))
 
 	return returnControl, nuevoPC
 }

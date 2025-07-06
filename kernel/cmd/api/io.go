@@ -17,10 +17,12 @@ type Usleep struct {
 // EnviarPeticionAIO Envia la peticion de usar la IO
 func (h *Handler) EnviarPeticionAIO(tiempoSleep int, io IOIdentificacion, pid int) {
 
+	// Crea la estructura de la peticion
 	usleep := Usleep{}
-	usleep.PID = 123
+	usleep.PID = pid
 	usleep.TiempoSleep = tiempoSleep
 
+	// Serializa la peticion a JSON
 	body, err := json.Marshal(usleep)
 	if err != nil {
 		h.Log.Error("Error al serializar la peticion",
@@ -29,7 +31,10 @@ func (h *Handler) EnviarPeticionAIO(tiempoSleep int, io IOIdentificacion, pid in
 		return
 	}
 
+	// Construye la URL de la peticion
 	url := fmt.Sprintf("http://%s:%d/kernel/usleep", io.IP, io.Puerto)
+
+	// Envia la peticion a la IO
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.Error("Error enviando mensaje a peticion",
@@ -38,6 +43,7 @@ func (h *Handler) EnviarPeticionAIO(tiempoSleep int, io IOIdentificacion, pid in
 		return
 	}
 
+	// Maneja la respuesta del servidor
 	if resp != nil {
 		h.Log.Debug("Respuesta del servidor",
 			log.StringAttr("status", resp.Status),
@@ -63,10 +69,15 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//TODO: Buscar en la lista de ioIdentificacion y cambiarle es status
-	h.Log.Debug("Me llego la peticion Finalizada de IO",
+	//Log obligatorio: Fin de IO
+	//Fin de IO: “## (<PID>) finalizó IO y pasa a READY”
+	h.Log.Info(fmt.Sprintf("%d finalizó IO y pasa a READY", ioIdentificacionPeticion.ProcesoID),
 		log.AnyAttr("ioIdentificacionPeticion", ioIdentificacionPeticion),
 	)
 
+	proceso := h.Planificador.BuscarProcesoEnCola(ioIdentificacionPeticion.ProcesoID, ioIdentificacionPeticion.Cola)
+	//Aviso al kernel que el proceso termino su IO para que revise si esta suspendido
+	go h.Planificador.ManejarFinIO(proceso)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }
