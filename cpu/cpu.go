@@ -17,6 +17,11 @@ func main() {
 	mux := http.NewServeMux()
 
 	//para que tome el argumento debe ingresarse asi "go run cpu.go Identificador"
+	if len(os.Args) < 2 {
+		fmt.Println("Error: Missing required argument 'Identificador'. Usage: go run cpu.go {{CPU_ID}}")
+		os.Exit(1)
+	}
+
 	identificadorCPU := os.Args[1]
 
 	configFile := configFilePath + identificadorCPU + ".json"
