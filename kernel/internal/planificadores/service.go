@@ -19,12 +19,18 @@ type Service struct {
 	CanalEnter             chan struct{}
 	canalNuevoProcesoReady chan struct{}
 	CanalNuevoProcesoNew   chan *internal.Proceso // Canal para recibir notificaciones de nuevos procesos en NewQueue
+	CanalNuevoProcBlocked  chan *internal.Proceso
+	CanalNewProcSuspReady  chan *internal.Proceso
 	mutexNewQueue          *sync.Mutex
 	mutexReadyQueue        *sync.Mutex
-	//mutexBlockQueue        *sync.Mutex
-	mutexCPUsConectadas *sync.Mutex
-	mutexExecQueue      *sync.Mutex
-	SjfConfig           *SjfConfig
+	//mutexBlockQueue      *sync.Mutex
+	mutexCPUsConectadas    *sync.Mutex
+	mutexBlockQueue        *sync.Mutex
+	mutexExecQueue         *sync.Mutex
+	mutexSuspBlockQueue    *sync.Mutex
+	mutexSuspReadyQueue    *sync.Mutex
+	SjfConfig              *SjfConfig
+	MedianoPlazoConfig     *MedianoPlazoConfig
 }
 
 type Planificador struct {
@@ -49,10 +55,14 @@ type SjfConfig struct {
 	InitialEstimate int     `json:"initial_estimate"`
 }
 
+type MedianoPlazoConfig struct {
+	SuspensionTime int `json:"suspension_time"` // Tiempo de suspensión en milisegundos
+}
+
 // NewPlanificador función que sirve para crear una nueva instancia del planificador de procesos. El planificador posee
 // varias colas para gestionar los procesos en diferentes estados: New, Ready, Block, Suspended Ready, Suspended Block, Exec y Exit.
 func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlazoAlgoritmo string,
-	puertoMemoria int, sjfConfig *SjfConfig) *Service {
+	puertoMemoria int, sjfConfig *SjfConfig, suspTime int) *Service {
 	return &Service{
 		Planificador: &Planificador{
 			NewQueue:       make([]*internal.Proceso, 0),
@@ -72,9 +82,14 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		ShortTermAlgorithm:     cortoPlazoAlgoritmo,
 		canalNuevoProcesoReady: make(chan struct{}, 100),          // Buffer para evitar deadlocks
 		CanalNuevoProcesoNew:   make(chan *internal.Proceso, 100), // Buffer para evitar deadlocks
+		CanalNewProcSuspReady: make(chan *internal.Proceso, 100),
+		CanalNuevoProcBlocked: make(chan *internal.Proceso, 100),
 		mutexNewQueue:          &sync.Mutex{},
 		mutexReadyQueue:        &sync.Mutex{},
 		mutexExecQueue:         &sync.Mutex{},
 		mutexCPUsConectadas:    &sync.Mutex{},
+		MedianoPlazoConfig: &MedianoPlazoConfig{
+			SuspensionTime: suspTime,
+		},
 	}
 }

@@ -35,6 +35,7 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 
 	go h.Planificador.PlanificadorLargoPlazo()
 	go h.Planificador.PlanificadorCortoPlazo()
+	go h.Planificador.SuspenderProcesoBloqueado() // TODO: ver la parte de
 	h.Planificador.CanalNuevoProcesoNew <- proceso
 }
 
@@ -105,7 +106,7 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 				)
 				return
 			}
-			h.EnviarPeticionAIO(timeSleep, ioInfo, syscall.PID)
+			go h.EnviarPeticionAIO(timeSleep, ioInfo, syscall.PID)
 
 			//TODO proxima entrega: mandar a block
 			return
