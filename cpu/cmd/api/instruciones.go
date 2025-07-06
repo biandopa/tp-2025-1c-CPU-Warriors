@@ -201,7 +201,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		//Log obligatorio: Lectura/Escritura Memoria
 		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
 		h.Log.Info(fmt.Sprintf("## PID: %d - Acción: LEER - Dirección Física: %s - Valor: %s",
-			pid, args[0], args[1]))
+			pid, args[0], datoLeido))
 
 		nuevoPC++
 
