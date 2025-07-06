@@ -14,9 +14,9 @@ func (p *Service) PlanificadorCortoPlazo() {
 	switch p.ShortTermAlgorithm {
 	case "FIFO":
 		go p.PlanificadorCortoPlazoFIFO()
-	case "SJFSD":
+	case "SJF":
 		go p.PlanificarCortoPlazoSjfSinDesalojo()
-	case "SJFD":
+	case "SRT":
 		go p.PlanificarCortoPlazoSjfDesalojo()
 	default:
 		p.Log.Warn("Algoritmo de corto plazo no reconocido")
