@@ -2,6 +2,7 @@ package internal
 
 import (
 	"log/slog"
+	"sync"
 
 	"github.com/sisoputnfrba/tp-golang/cpu/pkg/kernel"
 )
@@ -10,11 +11,17 @@ type Service struct {
 	Log            *slog.Logger
 	Kernel         *kernel.Kernel
 	Interrupciones []Interrupcion
+	InterruptMutex *sync.RWMutex
+	MMU            *MMU
 }
 
-func NewService(logger *slog.Logger, ipKernel string, puertoKernel int) *Service {
+func NewService(logger *slog.Logger, ipKernel string, puertoKernel, tlbEntries, cacheEntries int,
+	tlbAlgorithm, cacheAlgorithm string) *Service {
 	return &Service{
-		Log:    logger,
-		Kernel: kernel.NewKernel(ipKernel, puertoKernel, logger),
+		Log:            logger,
+		Kernel:         kernel.NewKernel(ipKernel, puertoKernel, logger),
+		Interrupciones: make([]Interrupcion, 0),
+		InterruptMutex: &sync.RWMutex{},
+		MMU:            NewMMU(tlbEntries, cacheEntries, tlbAlgorithm, cacheAlgorithm, logger),
 	}
 }

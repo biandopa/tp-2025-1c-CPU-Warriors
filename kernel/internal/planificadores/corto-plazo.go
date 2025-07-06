@@ -75,7 +75,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 						log.IntAttr("pid", proceso.PCB.PID),
 					)
 
-					newPC := cpuElegida.DispatchProcess()
+					newPC, _ := cpuElegida.DispatchProcess()
 					proceso.PCB.PC = newPC
 
 					// Marcar CPU como libre nuevamente
@@ -363,7 +363,7 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 		cpuElegida.Proceso.PC = procesoExec.PCB.PC
 
 		// Enviar proceso a la CPU
-		newPC := cpuElegida.DispatchProcess()
+		newPC, _ := cpuElegida.DispatchProcess()
 
 		procesoExec.PCB.PC = newPC
 	}(cpuAsignada, proceso)
