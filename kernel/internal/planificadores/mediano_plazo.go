@@ -1,6 +1,7 @@
 package planificadores
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -45,9 +46,9 @@ func (p *Service) SuspenderProcesoBloqueado() {
 				proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado].TiempoInicio = time.Now()
 				proceso.PCB.MetricasEstado[internal.EstadoSuspBloqueado]++
 
-				//Loggear cambio de estado
-				p.Log.Info("Proceso movido de BLCOKED a SUSP_BLOCKED",
-					log.IntAttr("PID", proceso.PCB.PID))
+				//Log obligatorio: Cambio de estado
+				// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
+				p.Log.Info(fmt.Sprintf("%d Pasa del estado BLOCKED al estado SUSP_BLOCKED", proceso.PCB.PID))
 
 				//TODO: Notificar a memoria que debe swappear
 				go avisarAMemoriaSwap(proceso)
@@ -71,6 +72,7 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 		p.mutexSuspBlockQueue.Lock()
 		quitarDeCola(&p.Planificador.SuspBlockQueue, proceso)
 		p.mutexSuspBlockQueue.Unlock()
+
 		p.mutexSuspReadyQueue.Lock()
 		p.Planificador.SuspReadyQueue = append(p.Planificador.SuspReadyQueue, proceso)
 		p.mutexSuspReadyQueue.Unlock()
@@ -87,13 +89,13 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 		proceso.PCB.MetricasTiempo[internal.EstadoSuspReady].TiempoInicio = time.Now()
 		proceso.PCB.MetricasEstado[internal.EstadoSuspReady]++
 
-		//Loggear cambio de estado
-		p.Log.Info("Proceso movido de SUSP_BLOCKED a SUSP_READY",
-			log.IntAttr("PID", proceso.PCB.PID))
+		//Log obligatorio: Cambio de estado
+		// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
+		p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP_BLOCKED al estado SUSP_READY", proceso.PCB.PID))
 
 	} else {
-		// Proceso estaba en BLOCKED → READY
-		//ESto no se si tiene que estar aca, puede ser logica repetida
+		//Proceso estaba en BLOCKED → READY
+		//Esto no se si tiene que estar aca, puede ser logica repetida
 		p.mutexBlockQueue.Lock()
 		quitarDeCola(&p.Planificador.BlockQueue, proceso)
 		p.mutexBlockQueue.Unlock()
@@ -112,8 +114,9 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 		proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 		proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
-		p.Log.Info("Proceso movido de BLOCKED a READY",
-			log.IntAttr("PID", proceso.PCB.PID))
+		//Log obligatorio: Cambio de estado
+		// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
+		p.Log.Info(fmt.Sprintf("%d Pasa del estado BLOCKED al estado READY", proceso.PCB.PID))
 
 		// Notificar planificador corto plazo
 		p.canalNuevoProcesoReady <- struct{}{}
