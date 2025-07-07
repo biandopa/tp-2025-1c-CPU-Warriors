@@ -20,7 +20,7 @@ func (p *Service) AddCpuConectada(cpuId *CpuIdentificacion) {
 		log.IntAttr("cpus_disponibles", p.CantidadDeCpusDisponibles()))
 }
 
-// BuscarCPUDisponible adquiere una CPU del pool de CPUs disponibles
+// BuscarCPUDisponible adquiere una CPU del pool de CPUs disponibles.
 // Bloquea hasta que haya una CPU disponible
 func (p *Service) BuscarCPUDisponible() *cpu.Cpu {
 	// Esperar hasta que haya una CPU disponible (acquire semáforo)

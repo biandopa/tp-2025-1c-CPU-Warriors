@@ -31,9 +31,6 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 			cpuLibre := p.BuscarCPUDisponible()
 
 			if cpuLibre != nil {
-				p.Log.Debug("CPU libre encontrada, asignando proceso",
-					log.StringAttr("cpu_id", cpuLibre.ID))
-
 				// Mover proceso de READY a EXEC
 				p.mutexReadyQueue.Lock()
 				procesoElegido := p.Planificador.ReadyQueue[0]
@@ -83,8 +80,8 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 					)
 				}(cpuLibre, procesoElegido)
 			} else {
-				p.Log.Debug("No hay CPUs libres, saliendo del bucle")
 				// No hay CPUs libres, salir del bucle
+				p.Log.Debug("No hay CPUs libres, saliendo del bucle")
 
 				break
 			}
@@ -98,8 +95,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 // más alto que debe desalojar al mismo para que pueda ser planificado el nuevo.
 func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 	for {
-		<-p.canalNuevoProcesoReady // Espera una notificación
-		p.odenarColaReadySjf()     // Ordena la cola de ReadyQueue por ráfaga estimada
+		p.odenarColaReadySjf() // Ordena la cola de ReadyQueue por ráfaga estimada
 
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
@@ -130,9 +126,9 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 					if cpuLiberada != nil {
 						p.asignarProcesoACPU(procesoNuevo, cpuLiberada)
 					}
-				}
 
-				break // Salir del bucle si no hay CPUs libres y no se puede desalojar
+					time.Sleep(100 * time.Millisecond) // Esperar un poco antes de continuar
+				}
 			}
 		}
 	}
@@ -141,7 +137,6 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 // PlanificarCortoPlazoSjfSinDesalojo planifica los procesos de corto plazo utilizando el algoritmo SJF sin desalojo.
 func (p *Service) PlanificarCortoPlazoSjfSinDesalojo() {
 	for {
-		<-p.canalNuevoProcesoReady // Espera una notificación
 		p.odenarColaReadySjf()
 
 		// Procesar todos los procesos en ReadyQueue
