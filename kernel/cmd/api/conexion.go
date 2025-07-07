@@ -10,7 +10,7 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
-// Recibe la conexion de la memoria (es unica)
+// ConexionInicialMemoria Recibe la conexion de la memoria (es unica)
 func (h *Handler) ConexionInicialMemoria(archivoNombre, tamanioProceso string) {
 	h.Log.Debug("Conexión Inicial",
 		log.StringAttr("archivo", archivoNombre),
@@ -46,7 +46,7 @@ func (h *Handler) ConexionInicialMemoria(archivoNombre, tamanioProceso string) {
 	}
 }
 
-// Recibe la lista de IOs
+// ConexionInicialIO Recibe la lista de IOs
 func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var ioInfo IOIdentificacion
@@ -75,12 +75,10 @@ func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
-// Recibe la lista de IOs
+// ConexionInicialCPU Recibe la lista de IOs
 func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	identificacionCPU := &planificadores.CpuIdentificacion{}
-
-	h.Log.DebugContext(ctx, "Me llego la conexion de un CPU??")
 
 	// Leer el cuerpo de la solicitud
 	decoder := json.NewDecoder(r.Body)
