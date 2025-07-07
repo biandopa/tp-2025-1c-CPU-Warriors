@@ -26,7 +26,7 @@ func main() {
 	mux.HandleFunc("/kernel/pasar-proceso-a-swap", h.PasarProcesoASwap) // Kernel --> Memoria
 	mux.HandleFunc("/kernel/dump-proceso", h.DumpProceso)               // Kernel --> Memoria
 
-	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso) //CREO SE PUEDE BORRAR OSEA HABRIA QUE HACERLO DE CERO// Kernel --> Memoria
+	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso) // Kernel --> Memoria
 
 	memoriaAddress := fmt.Sprintf("%s:%d", h.Config.IpMemory, h.Config.PortMemory)
 	if err := http.ListenAndServe(memoriaAddress, mux); err != nil {
