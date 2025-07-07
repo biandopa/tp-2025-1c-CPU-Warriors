@@ -24,13 +24,14 @@ type Service struct {
 	mutexNewQueue          *sync.Mutex
 	mutexReadyQueue        *sync.Mutex
 	//mutexBlockQueue      *sync.Mutex
-	mutexCPUsConectadas    *sync.Mutex
-	mutexBlockQueue        *sync.Mutex
-	mutexExecQueue         *sync.Mutex
-	mutexSuspBlockQueue    *sync.Mutex
-	mutexSuspReadyQueue    *sync.Mutex
-	SjfConfig              *SjfConfig
-	MedianoPlazoConfig     *MedianoPlazoConfig
+	mutexCPUsConectadas *sync.Mutex
+	mutexBlockQueue     *sync.Mutex
+	mutexExecQueue      *sync.Mutex
+	mutexSuspBlockQueue *sync.Mutex
+	mutexSuspReadyQueue *sync.Mutex
+	SjfConfig           *SjfConfig
+	MedianoPlazoConfig  *MedianoPlazoConfig
+	CPUSemaphore        chan struct{} // Semáforo contador para CPUs disponibles
 }
 
 type Planificador struct {
@@ -82,8 +83,8 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		ShortTermAlgorithm:     cortoPlazoAlgoritmo,
 		canalNuevoProcesoReady: make(chan struct{}, 100),          // Buffer para evitar deadlocks
 		CanalNuevoProcesoNew:   make(chan *internal.Proceso, 100), // Buffer para evitar deadlocks
-		CanalNewProcSuspReady: make(chan *internal.Proceso, 100),
-		CanalNuevoProcBlocked: make(chan *internal.Proceso, 100),
+		CanalNewProcSuspReady:  make(chan *internal.Proceso, 100),
+		CanalNuevoProcBlocked:  make(chan *internal.Proceso, 100),
 		mutexNewQueue:          &sync.Mutex{},
 		mutexReadyQueue:        &sync.Mutex{},
 		mutexExecQueue:         &sync.Mutex{},
@@ -91,5 +92,6 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		MedianoPlazoConfig: &MedianoPlazoConfig{
 			SuspensionTime: suspTime,
 		},
+		CPUSemaphore: make(chan struct{}, 100), // Inicializamos el semáforo vacío, se llenará cuando se conecten CPUs. Buffer máximo de 100 CPUs
 	}
 }

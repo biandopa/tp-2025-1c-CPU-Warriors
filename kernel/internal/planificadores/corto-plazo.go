@@ -25,14 +25,10 @@ func (p *Service) PlanificadorCortoPlazo() {
 
 func (p *Service) PlanificadorCortoPlazoFIFO() {
 	for {
-		p.Log.Debug("Planificador FIFO esperando señal del canal")
-		<-p.canalNuevoProcesoReady
-		p.Log.Debug("Planificador FIFO recibió señal, procesando ReadyQueue",
-			log.IntAttr("ready_queue_size", len(p.Planificador.ReadyQueue)))
-
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
-			cpuLibre := p.buscarCPULibre()
+			// Usar semáforo para adquirir CPU (bloqueante)
+			cpuLibre := p.BuscarCPUDisponible()
 
 			if cpuLibre != nil {
 				p.Log.Debug("CPU libre encontrada, asignando proceso",
@@ -68,7 +64,6 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 					// Usar los valores copiados
 					cpuElegida.Proceso.PC = procesoElegido.PCB.PC
 					cpuElegida.Proceso.PID = procesoElegido.PCB.PID
-					cpuElegida.Estado = false
 
 					p.Log.Debug("CPU seleccionada para proceso",
 						log.StringAttr("cpu_id", cpuElegida.ID),
@@ -78,8 +73,8 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 					newPC, _ := cpuElegida.DispatchProcess()
 					proceso.PCB.PC = newPC
 
-					// Marcar CPU como libre nuevamente
-					cpuElegida.Estado = true
+					// Liberar CPU usando semáforo
+					p.LiberarCPU(cpuElegida)
 
 					p.Log.Debug("Proceso completado en CPU",
 						log.StringAttr("cpu_id", cpuElegida.ID),
@@ -90,9 +85,6 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 			} else {
 				p.Log.Debug("No hay CPUs libres, saliendo del bucle")
 				// No hay CPUs libres, salir del bucle
-
-				// Notificar al channel para volver a ejecutar el algoritmo de corto plazo
-				p.canalNuevoProcesoReady <- struct{}{}
 
 				break
 			}
@@ -111,8 +103,8 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
-			// Buscar CPU libre
-			cpuLibre := p.buscarCPULibre()
+			// Intentar adquirir CPU libre sin bloquear
+			cpuLibre := p.IntentarBuscarCPUDisponible()
 
 			if cpuLibre != nil {
 				// Hay CPU libre, asignar el proceso con ráfaga más corta (el primero de ReadyQueue)
@@ -138,9 +130,6 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 					if cpuLiberada != nil {
 						p.asignarProcesoACPU(procesoNuevo, cpuLiberada)
 					}
-				} else {
-					// Notificar al channel para volver a ejecutar el algoritmo de corto plazo
-					p.canalNuevoProcesoReady <- struct{}{}
 				}
 
 				break // Salir del bucle si no hay CPUs libres y no se puede desalojar
@@ -157,18 +146,12 @@ func (p *Service) PlanificarCortoPlazoSjfSinDesalojo() {
 
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
-			cpuLibre := p.buscarCPULibre()
-
-			if cpuLibre != nil {
+			// Usar semáforo para adquirir CPU (bloqueante)
+			if cpuLibre := p.BuscarCPUDisponible(); cpuLibre != nil {
 				// Asignar el proceso con ráfaga más corta (el primero de ReadyQueue)
 				procesoMasCorto := p.Planificador.ReadyQueue[0]
 
 				p.asignarProcesoACPU(procesoMasCorto, cpuLibre)
-			} else {
-				// Notificar al channel para volver a ejecutar el algoritmo de corto plazo
-				p.canalNuevoProcesoReady <- struct{}{}
-
-				break // No hay CPUs libres, salir del bucle
 			}
 		}
 	}
@@ -182,19 +165,6 @@ func (p *Service) odenarColaReadySjf() {
 	sort.Slice(p.Planificador.ReadyQueue, func(i, j int) bool {
 		return p.calcularRafagaEstimada(p.Planificador.ReadyQueue[i]) < p.calcularRafagaEstimada(p.Planificador.ReadyQueue[j])
 	})
-}
-
-// buscarCPULibre encuentra una CPU que esté disponible
-func (p *Service) buscarCPULibre() *cpu.Cpu {
-	p.mutexCPUsConectadas.Lock()
-	defer p.mutexCPUsConectadas.Unlock()
-
-	for i := range p.CPUsConectadas {
-		if p.CPUsConectadas[i].Estado {
-			return p.CPUsConectadas[i]
-		}
-	}
-	return nil
 }
 
 // calcularRafagaEstimada calcula la ráfaga estimada usando la fórmula: Est(n+1) = α * R(n) + (1-α) * Est(n)
@@ -249,7 +219,7 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) {
 	cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
 	if cpuFound != nil {
 		cpuFound.EnviarInterrupcion("Desalojo", false)
-		cpuFound.Estado = true
+		//p.LiberarCPU(cpuFound)
 	}
 
 	// Actualizar métricas del proceso
@@ -334,9 +304,6 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 	proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoExec]++
 
-	// Marcar CPU como ocupada
-	cpuAsignada.Estado = false
-
 	p.Log.Debug("Proceso asignado a CPU con SJF",
 		log.IntAttr("PID", proceso.PCB.PID),
 		log.StringAttr("CPU_ID", cpuAsignada.ID),
@@ -352,5 +319,8 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 		newPC, _ := cpuElegida.DispatchProcess()
 
 		procesoExec.PCB.PC = newPC
+
+		// Liberar CPU usando semáforo
+		p.LiberarCPU(cpuElegida)
 	}(cpuAsignada, proceso)
 }
