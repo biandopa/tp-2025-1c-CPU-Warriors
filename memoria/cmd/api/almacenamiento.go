@@ -145,15 +145,21 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 	//BORRAR DE ACA PARA ABAJP ESTA AHORA PARA PROBAR LAS COSAS
 
 	if esActualizacion == false {
+		//copy(h.EspacioDeUsuario[0:], []byte("hola"))
+
 		//h.PasarProcesoASwapAuxiliar(pid)
-		copy(h.EspacioDeUsuario[0:], []byte("hola"))
 
-		//h.LeerMemoria(0, 2, 1, pid)
+		//h.LeerPagina(0, 2, 1, pid)
 
-		//h.EscribirMemoria(marco int, offset int, valorAEscribir string, pid string)
-		h.EscribirMemoria(1, 0, "ey", pid)
+		//h.EscribirPagina(marco int, offset int, valorAEscribir string, pid string)
+		//h.EscribirPagina(1, 0, "ey", pid)
 
-		h.LeerMemoria(1, 0, 5, pid)
+		//h.LeerPagina(1, 0, 5, pid)
+
+		/*h.Log.Debug("FinalizarProcesoFuncionAuxiliar",
+		log.AnyAttr("TablasProcesos", h.TablasProcesos))
+		*/
+		//h.FinalizarProcesoFuncionAuxiliar(pid)
 
 		//h.SacarProcesoDeSwap(pid)
 
@@ -504,9 +510,6 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 	h.Log.Debug("PasarProcesoASwapAuxiliar",
 		log.AnyAttr("ObtenerMarcosValidos", h.EspacioDeUsuario))
 
-	//BORRAR COPY!!!
-	copy(h.EspacioDeUsuario[0:], []byte("hola"))
-
 	h.Log.Debug("PasarProcesoASwapAuxiliar",
 		log.AnyAttr("ObtenerMarcosValidos", h.EspacioDeUsuario))
 
@@ -807,23 +810,68 @@ func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) FinalizarProcesoFuncionAuxiliar(pid string) {
-	//liberar espacio en memoria o liberar en swap
-	//sino esta en swap es que esta en memoria
+
+	pidInt, _ := strconv.Atoi(pid)
+
+	if h.ContienePIDEnSwap(pidInt) {
+		//compactar la posicion en swap y borrarlo en la lista de procesos}
+		h.eliminarOcurrencias(pidInt)
+		h.CompactarSwap()
+
+	} else {
+		procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
+		h.Log.Debug("DumpProcesoFuncionAuxiliar",
+			log.AnyAttr("procesYTablaAsociada", procesYTablaAsociada.TablasDePaginas))
+
+		marcosDelProceso := h.ObtenerMarcosDeLaTabla(procesYTablaAsociada.TablasDePaginas)
+
+		for marco := range marcosDelProceso {
+			copy(h.EspacioDeUsuario[marco*h.Config.PageSize:((marco+1)*h.Config.PageSize-1)], make([]byte, h.Config.PageSize))
+		}
+	}
+	//hasta aca el else
+	//2do borrarlo de la lista de tablas
+	h.BorrarProcesoPorPID(pid)
+	//3ero borrar las instrucciones
+
+	delete(h.Instrucciones, pidInt)
+
 }
 
-func (h *Handler) LeerMemoriaCompleta(marco int, offset int, tamanioALeer int, pid string) {
-	h.LeerMemoria(marco, 0, h.Config.PageSize, "12")
+func (h *Handler) ContienePIDEnSwap(pid int) bool {
+	for _, valor := range h.ProcesoPorPosicionSwap {
+		if valor == pid {
+			return true
+		}
+	}
+	return false
 }
 
-func (h *Handler) ActualizarMemoriaCompleta(marco int, offset int, valorAEscribir string, pid string) {
-	h.EscribirMemoria(marco, 0, valorAEscribir, "1")
+func (h *Handler) BorrarProcesoPorPID(pid string) error {
+	for i, proceso := range h.TablasProcesos {
+		if proceso.PID == pid {
+			// Borramos el elemento del slice
+			h.TablasProcesos = append(h.TablasProcesos[:i], h.TablasProcesos[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("proceso con PID %s no encontrado", pid)
 }
 
-func (h *Handler) LeerMemoria(marco int, offset int, tamanioALeer int, pid string) string {
+func (h *Handler) LeerPaginaCompleta(marco int, pid string) {
+	h.LeerPagina(marco, 0, h.Config.PageSize, pid)
+}
 
+func (h *Handler) ActualizarPaginaCompleta(marco int, valorAEscribir string, pid string) {
+	h.EscribirPagina(marco, 0, valorAEscribir, pid)
+}
+
+func (h *Handler) LeerPagina(marco int, offset int, tamanioALeer int, pid string) string {
+
+	//if tamanioALeer mayor a cero
 	lecturaMemoria := string(h.EspacioDeUsuario[((marco * h.Config.PageSize) + offset):((marco * h.Config.PageSize) + offset + tamanioALeer + 1)])
 
-	h.Log.Debug("LeerMemoria",
+	h.Log.Debug("LeerPagina",
 		log.AnyAttr("lecturaMemoria", lecturaMemoria))
 	return lecturaMemoria
 
@@ -831,11 +879,11 @@ func (h *Handler) LeerMemoria(marco int, offset int, tamanioALeer int, pid strin
 	“## PID: <PID> - <Lectura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>”*/
 }
 
-func (h *Handler) EscribirMemoria(marco int, offset int, valorAEscribir string, pid string) {
+func (h *Handler) EscribirPagina(marco int, offset int, valorAEscribir string, pid string) {
 
 	copy(h.EspacioDeUsuario[((marco*h.Config.PageSize)+offset):], []byte(valorAEscribir))
 
-	h.Log.Debug("EscribirMemoria",
+	h.Log.Debug("EscribirPagina",
 		log.AnyAttr("lecturaMemoria", h.EspacioDeUsuario))
 
 	/* HACER LOG
