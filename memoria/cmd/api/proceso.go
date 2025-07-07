@@ -1,14 +1,7 @@
 package api
 
-import (
-	"encoding/json"
-	"fmt"
-	"net/http"
-
-	"github.com/go-chi/chi/v5"
-)
-
-func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
+//BORRAR ESTE ARCHIVO
+/*func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
 	var (
 		// Leer PID del endpoint /kernel/fin-proceso/{pid}
 		pid = chi.URLParam(r, "pid")
@@ -23,4 +16,4 @@ func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResponse, _ := json.Marshal(response)
 	_, _ = w.Write(jsonResponse)
-}
+}*/

@@ -7,8 +7,10 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
@@ -140,11 +142,23 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 	//  PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>
 
 	//
-	//BORRAR ESTAS 2 DE ACA
+	//BORRAR DE ACA PARA ABAJP ESTA AHORA PARA PROBAR LAS COSAS
 
 	if esActualizacion == false {
-		h.PasarProcesoASwapAuxiliar(pid)
-		h.SacarProcesoDeSwap(pid)
+		//h.PasarProcesoASwapAuxiliar(pid)
+		copy(h.EspacioDeUsuario[0:], []byte("hola"))
+
+		//h.LeerMemoria(0, 2, 1, pid)
+
+		//h.EscribirMemoria(marco int, offset int, valorAEscribir string, pid string)
+		h.EscribirMemoria(1, 0, "ey", pid)
+
+		h.LeerMemoria(1, 0, 5, pid)
+
+		//h.SacarProcesoDeSwap(pid)
+
+		//h.DumpProcesoFuncionAuxiliar(pid)
+
 	}
 
 }
@@ -703,6 +717,130 @@ func (h *Handler) PosicionesDeProcesoEnSwap(pid int) []int {
 		}
 	}
 	return posiciones
+}
+
+func (h *Handler) DumpProceso(w http.ResponseWriter, r *http.Request) {
+
+	var (
+		//ctx = r.Context()
+		// Leemos el PID
+		pid = r.URL.Query().Get("pid")
+	)
+
+	if pid == "" {
+		h.Log.Error("PID no proporcionado")
+		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
+		return
+	}
+	/* HACER LOG
+
+	“## PID: <PID> - Memory Dump solicitado”
+	*/
+
+	h.DumpProcesoFuncionAuxiliar(pid)
+
+}
+
+func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) {
+
+	h.Log.Debug("DumpFuncionAuxiliar",
+		log.AnyAttr("pid", pid))
+
+	procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
+	h.Log.Debug("DumpProcesoFuncionAuxiliar",
+		log.AnyAttr("procesYTablaAsociada", procesYTablaAsociada.TablasDePaginas))
+
+	marcosDelProceso := h.ObtenerMarcosDeLaTabla(procesYTablaAsociada.TablasDePaginas)
+
+	h.Log.Debug("DumpProcesoFuncionAuxiliar",
+		log.AnyAttr("marcosDelProceso", marcosDelProceso))
+
+	timestamp := time.Now().Format("20060102_150405")
+	fileName := fmt.Sprintf("%s-%s.dmp", pid, timestamp)
+	fullPath := filepath.Join(h.Config.DumpPath, fileName)
+
+	// Crear el archivo
+	file, err := os.Create(fullPath)
+	if err != nil {
+		h.Log.Error("Error creando el dump")
+	}
+	defer file.Close()
+
+	pageSize := h.Config.PageSize
+
+	for _, marco := range marcosDelProceso {
+		offset := marco * pageSize
+		pagina := h.EspacioDeUsuario[offset : offset+pageSize]
+
+		_, err := file.Write(pagina)
+		if err != nil {
+			h.Log.Error("Error escribiendo el dump asociado al marco")
+		}
+	}
+
+}
+
+func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
+
+	var (
+		//ctx = r.Context()
+		// Leemos el PID
+		pid = r.URL.Query().Get("pid")
+	)
+
+	if pid == "" {
+		h.Log.Error("PID no proporcionado")
+		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
+		return
+	}
+	/* HACER LOG
+	“## PID: <PID> - Proceso Destruido - Métricas - Acc.T.Pag: <ATP>;
+	Inst.Sol.: <Inst.Sol.>;
+	SWAP: <SWAP>;
+	Mem.Prin.: <Mem.Prin.>;
+	Lec.Mem.: <Lec.Mem.>;
+	Esc.Mem.: <Esc.Mem.>”
+	*/
+
+	h.FinalizarProcesoFuncionAuxiliar(pid)
+
+}
+
+func (h *Handler) FinalizarProcesoFuncionAuxiliar(pid string) {
+	//liberar espacio en memoria o liberar en swap
+	//sino esta en swap es que esta en memoria
+}
+
+func (h *Handler) LeerMemoriaCompleta(marco int, offset int, tamanioALeer int, pid string) {
+	h.LeerMemoria(marco, 0, h.Config.PageSize, "12")
+}
+
+func (h *Handler) ActualizarMemoriaCompleta(marco int, offset int, valorAEscribir string, pid string) {
+	h.EscribirMemoria(marco, 0, valorAEscribir, "1")
+}
+
+func (h *Handler) LeerMemoria(marco int, offset int, tamanioALeer int, pid string) string {
+
+	lecturaMemoria := string(h.EspacioDeUsuario[((marco * h.Config.PageSize) + offset):((marco * h.Config.PageSize) + offset + tamanioALeer + 1)])
+
+	h.Log.Debug("LeerMemoria",
+		log.AnyAttr("lecturaMemoria", lecturaMemoria))
+	return lecturaMemoria
+
+	/* HACER LOG
+	“## PID: <PID> - <Lectura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>”*/
+}
+
+func (h *Handler) EscribirMemoria(marco int, offset int, valorAEscribir string, pid string) {
+
+	copy(h.EspacioDeUsuario[((marco*h.Config.PageSize)+offset):], []byte(valorAEscribir))
+
+	h.Log.Debug("EscribirMemoria",
+		log.AnyAttr("lecturaMemoria", h.EspacioDeUsuario))
+
+	/* HACER LOG
+	“## PID: <PID> - <Escritura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>”*/
+
 }
 
 /*
