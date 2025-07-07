@@ -134,13 +134,14 @@ func (h *Handler) decode(instruccion Instruccion, pid int) (string, []string, er
 func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 	var (
 		nuevoPC       = pc
-		returnControl bool
+		returnControl bool // Retornamos false para indicar que el CPU debe devolver el control al kernel
 	)
 
 	switch tipo {
 	case "NOOP":
 		time.Sleep(time.Duration(h.Config.CacheDelay) * time.Millisecond)
 		nuevoPC++
+		returnControl = true
 
 	case "WRITE":
 		if len(args) < 2 {
@@ -168,6 +169,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			pid, args[0], args[1]))
 
 		nuevoPC++
+		returnControl = true
 
 	case "READ":
 		if len(args) < 2 {
@@ -204,6 +206,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			pid, args[0], datoLeido))
 
 		nuevoPC++
+		returnControl = true
 
 	case "GOTO":
 		if len(args) != 1 {
@@ -223,6 +226,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			return false, pc
 		}
 		nuevoPC = pcAtoi
+		returnControl = true
 
 	case "IO", "INIT_PROC", "DUMP_MEMORY", "EXIT":
 		syscall := &internal.ProcesoSyscall{
@@ -243,7 +247,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			log.IntAttr("pc_nuevo", pc+1))
 
 		// Para syscalls, retornamos false para indicar que el CPU debe devolver el control al kernel
-		returnControl = true
+		returnControl = false
 		nuevoPC++ // Avanzamos el PC para la syscall
 
 	default:
