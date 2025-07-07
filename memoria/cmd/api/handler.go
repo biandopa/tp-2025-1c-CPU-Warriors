@@ -12,10 +12,11 @@ type Handler struct {
 	Config           *Config
 	EspacioDeUsuario []byte
 	//TablasDePaginas  map[int]map[int]byte // PID -> Pagina -> Frame ???
-	MetricasProcesos map[int]*MetricasProceso
-	Instrucciones    map[int][]Instruccion
-	FrameTable       []bool
-	TablasProcesos   []*TablasProceso
+	MetricasProcesos       map[int]*MetricasProceso
+	Instrucciones          map[int][]Instruccion
+	FrameTable             []bool
+	TablasProcesos         []*TablasProceso
+	ProcesoPorPosicionSwap []int
 }
 
 func NewHandler(configFile string) *Handler {
@@ -38,9 +39,10 @@ func NewHandler(configFile string) *Handler {
 		Log:              log.BuildLogger(logLevel),
 		EspacioDeUsuario: make([]byte, configStruct.MemorySize),
 		//TablasDePaginas:  make(map[int]map[int]byte),
-		MetricasProcesos: make(map[int]*MetricasProceso),
-		Instrucciones:    make(map[int][]Instruccion),
-		FrameTable:       make([]bool, configStruct.MemorySize/configStruct.PageSize),
-		TablasProcesos:   make([]*TablasProceso, 0),
+		MetricasProcesos:       make(map[int]*MetricasProceso),
+		Instrucciones:          make(map[int][]Instruccion),
+		FrameTable:             make([]bool, configStruct.MemorySize/configStruct.PageSize),
+		TablasProcesos:         make([]*TablasProceso, 0),
+		ProcesoPorPosicionSwap: make([]int, 0),
 	}
 }

@@ -3,6 +3,7 @@ package api
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"os"
@@ -48,7 +49,7 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 	var paginasLibres = h.ContarLibres()
 
 	if 0 < paginasLibres-paginasNecesarias {
-		h.AsignarMemoriaDeUsuario(paginasNecesarias, pid)
+		h.AsignarMemoriaDeUsuario(paginasNecesarias, pid, false)
 	} else {
 		h.Log.Error("No hay espacio disponible")
 		return
@@ -83,7 +84,7 @@ func (h *Handler) ContarLibres() int {
 	return libres
 }
 
-func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
+func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActualizacion bool) {
 
 	var FramesLibres = h.MarcosLibres(paginasAOcupar)
 
@@ -112,10 +113,20 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 
 	//AGREGAR LA TABLA a la TablasProceso
 
-	tablaProceso := &TablasProceso{
-		PID:             pid,
-		Tamanio:         paginasAOcupar * h.Config.MemorySize,
-		TablasDePaginas: tablasVacias,
+	var tablaProceso *TablasProceso
+
+	if esActualizacion {
+		for _, tp := range h.TablasProcesos {
+			if tp.PID == pid {
+				tp.TablasDePaginas = tablasVacias
+			}
+		}
+	} else {
+		tablaProceso = &TablasProceso{
+			PID:             pid,
+			Tamanio:         paginasAOcupar * h.Config.MemorySize,
+			TablasDePaginas: tablasVacias,
+		}
 	}
 
 	h.Log.Debug("tablaProceso",
@@ -129,41 +140,12 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 	//  PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>
 
 	//
-	//
+	//BORRAR ESTAS 2 DE ACA
 
-	procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
-	h.Log.Debug("procesYTablaAsociada",
-		log.AnyAttr("procesYTablaAsociada", procesYTablaAsociada.TablasDePaginas))
-
-	marcosDelProceso := h.ObtenerMarcosDeLaTabla(procesYTablaAsociada.TablasDePaginas)
-
-	copy(h.EspacioDeUsuario[0:], []byte("hola"))
-
-	h.Log.Debug("ESPACIOMemoria",
-		log.AnyAttr("ObtenerMarcosValidos", h.EspacioDeUsuario))
-
-	h.Log.Debug("ObtenerMarcosValidos",
-		log.AnyAttr("ObtenerMarcosValidos", marcosDelProceso))
-
-	//iterar la lista de amrcos un for, y por cada uno multiplicarlo por el sizepage
-
-	archivoSwap, err := os.OpenFile("/home/utnso/Desktop/tp-2025-1c-CPU-Warriors/memoria/swapfile.bin", os.O_WRONLY, 0644)
-	if err != nil {
-		panic(err)
+	if esActualizacion == false {
+		h.PasarProcesoASwapAuxiliar(pid)
+		h.SacarProcesoDeSwap(pid)
 	}
-	//PAra cerrarlo despues
-	defer archivoSwap.Close()
-
-	for marco := range marcosDelProceso {
-		err := h.escribirMarcoEnSwap(archivoSwap, marco)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	// el dato que me trae escribilro en el swap LISTO
-
-	//SAcar de memoria, eliminar PROCESOPORTABLA TAMBIEN NO LISTO
 
 }
 
@@ -171,6 +153,7 @@ func (h *Handler) escribirMarcoEnSwap(archivo *os.File, marco int) error {
 	// Calculamos la posición en bytes donde va este marco en swap.bin
 	posicion := int64(marco * h.Config.PageSize)
 
+	//La poscion exacta la saca de la lista
 	// Seek a la posición exacta
 	_, err := archivo.Seek(posicion, 0)
 	if err != nil {
@@ -492,16 +475,234 @@ func (h *Handler) PasarProcesoASwap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
+	h.PasarProcesoASwapAuxiliar(pid)
 
-	//LLAMAR A PASARASWAPFUNCIONAUXILIAR
 }
 
-func (h *Handler) PasarProcesoASwapAxiliar(pid string) {
+func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 
-	//buscar en la tabla procesoPorTabla el pid asociado
-	//pasar la data al swap
-	//borrar los datos de la memoria
+	procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
+	h.Log.Debug("PasarProcesoASwapAuxiliar",
+		log.AnyAttr("procesYTablaAsociada", procesYTablaAsociada.TablasDePaginas))
+
+	marcosDelProceso := h.ObtenerMarcosDeLaTabla(procesYTablaAsociada.TablasDePaginas)
+
+	h.Log.Debug("PasarProcesoASwapAuxiliar",
+		log.AnyAttr("ObtenerMarcosValidos", h.EspacioDeUsuario))
+
+	//BORRAR COPY!!!
+	copy(h.EspacioDeUsuario[0:], []byte("hola"))
+
+	h.Log.Debug("PasarProcesoASwapAuxiliar",
+		log.AnyAttr("ObtenerMarcosValidos", h.EspacioDeUsuario))
+
+	h.Log.Debug("PasarProcesoASwapAuxiliar",
+		log.AnyAttr("ObtenerMarcosValidos", marcosDelProceso))
+
+	//iterar la lista de marcos un for, y por cada uno multiplicarlo por el sizepage
+
+	archivoSwap, err := os.OpenFile("/home/utnso/Desktop/tp-2025-1c-CPU-Warriors/memoria/swapfile.bin", os.O_RDWR, 0644)
+	if err != nil {
+		panic(err)
+	}
+	//Para cerrarlo despues
+	defer archivoSwap.Close()
+
+	pidInt, _ := strconv.Atoi(pid)
+
+	h.Log.Debug("PasarProcesoASwapAuxiliar",
+		log.AnyAttr("ProcesoPorPosicionSwap", pidInt))
+
+	for i := 0; i < len(marcosDelProceso); i++ {
+		h.ProcesoPorPosicionSwap = append(h.ProcesoPorPosicionSwap, pidInt)
+	}
+
+	h.Log.Debug("PasarProcesoASwapAuxiliar",
+		log.AnyAttr("ProcesoPorPosicionSwap", h.ProcesoPorPosicionSwap))
+
+	for marco := range marcosDelProceso {
+		err := h.escribirMarcoEnSwap(archivoSwap, marco)
+		if err != nil {
+			panic(err)
+		}
+
+		copy(h.EspacioDeUsuario[marco*h.Config.PageSize:((marco+1)*h.Config.PageSize-1)], make([]byte, h.Config.PageSize))
+	}
+
+	h.Log.Debug("PasarProcesoASwapAuxiliar",
+		log.AnyAttr("EspacioDeUsuario", h.EspacioDeUsuario))
+
+}
+
+func (h *Handler) SacarProcesoDeSwap(pid string) {
+
+	//lista cada elemento un proceso, donde se un id, osea cada marco un id {0,0,0,0,0}
+	// proceso 1 {0,0,0,0,0,1,1,1}
+	// sale proceso 0 borrar los ceros {1,1,1}
+
+	//a nivel swap
+	// proceso 1 {0,0,0,0,0,1,1,1},
+	// sale proceso 0 borrar los ceros {1,1,1}, borrar los bits posciones del proceso * pagesize
+
+	//DESUSPENSION RECIBIMOS EL PID
+	// buscar posiciones en el swap
+
+	pidDeSwap, _ := strconv.Atoi(pid)
+
+	h.Log.Debug("SacarProcesoDeSwap",
+		log.AnyAttr("pidDeSwap", pidDeSwap))
+
+	posicionEnSwap := h.PosicionesDeProcesoEnSwap(pidDeSwap)
+
+	h.Log.Debug("SacarProcesoDeSwap",
+		log.AnyAttr("posicionEnSwap", posicionEnSwap))
+
+	h.Log.Debug("SacarProcesoDeSwap",
+		log.AnyAttr("lenPosicionEnSwap", len(posicionEnSwap)))
+
+	var paginasNecesarias = len(posicionEnSwap)
+	var paginasLibres = h.ContarLibres()
+
+	h.Log.Debug("SacarProcesoDeSwap",
+		log.AnyAttr("paginasNecesarias", paginasNecesarias))
+
+	h.Log.Debug("SacarProcesoDeSwap",
+		log.AnyAttr("paginasNecesarias", paginasLibres))
+
+	if 0 < paginasLibres-paginasNecesarias {
+		//agregar un parametro que reprsente si es actualizacion o no
+		h.AsignarMemoriaDeUsuario(paginasNecesarias, pid, true)
+	} else {
+		h.Log.Error("No hay espacio disponible")
+		return
+	}
+
+	procesYTablaAsociadaDeSwap, _ := h.BuscarProcesoPorPID(pid)
+	h.Log.Debug("SacarProcesoDeSwap",
+		log.AnyAttr("procesYTablaAsociada", procesYTablaAsociadaDeSwap.TablasDePaginas))
+
+	marcosDelProcesoDeSwap := h.ObtenerMarcosDeLaTabla(procesYTablaAsociadaDeSwap.TablasDePaginas)
+	h.Log.Debug("SacarProcesoDeSwap",
+		log.AnyAttr("marcosDelProcesoDeSwap", marcosDelProcesoDeSwap))
+
+	//ir escribiendo cada frame en memoria
+	h.CargarPaginasEnMemoriaDesdeSwap(posicionEnSwap, marcosDelProcesoDeSwap)
+	h.Log.Debug("SacarProcesoDeSwap",
+		log.AnyAttr("CargarPaginasEnMemoriaDesdeSwap", h.EspacioDeUsuario))
+
+	//compactar la posicion en swap y borrarlo en la lista de procesos}
+	h.eliminarOcurrencias(pidDeSwap)
+	h.Log.Debug("SacarProcesoDeSwap",
+		log.AnyAttr("eliminarOcurrencias", h.ProcesoPorPosicionSwap))
+
+	h.CompactarSwap()
+
+}
+
+func (h *Handler) CompactarSwap() error {
+	pageSize := h.Config.PageSize
+
+	// Abrimos el archivo en modo lectura/escritura
+	swapFile, err := os.OpenFile("/home/utnso/Desktop/tp-2025-1c-CPU-Warriors/memoria/swapfile.bin", os.O_RDWR, 0644)
+	if err != nil {
+		return fmt.Errorf("error abriendo swap.bin: %w", err)
+	}
+	defer swapFile.Close()
+
+	posDestino := 0
+	nuevaPosiciones := make([]int, 0)
+
+	for _, marco := range h.ProcesoPorPosicionSwap {
+		offset := marco * pageSize
+		buffer := make([]byte, pageSize)
+
+		// Leer el marco original
+		_, err := swapFile.ReadAt(buffer, int64(offset))
+		if err != nil && err != io.EOF {
+			return fmt.Errorf("error leyendo marco %d: %w", marco, err)
+		}
+
+		// Escribirlo en la nueva posición
+		_, err = swapFile.WriteAt(buffer, int64(posDestino))
+		if err != nil {
+			return fmt.Errorf("error escribiendo marco en pos %d: %w", posDestino/pageSize, err)
+		}
+
+		// Guardamos el nuevo marco (actualizado)
+		nuevaPosiciones = append(nuevaPosiciones, posDestino/pageSize)
+		posDestino += pageSize
+	}
+
+	// Truncar el archivo para eliminar los marcos vacíos al final
+	err = swapFile.Truncate(int64(posDestino))
+	if err != nil {
+		return fmt.Errorf("error truncando swap.bin: %w", err)
+	}
+
+	// Actualizar la lista con las posiciones compactadas
+	h.ProcesoPorPosicionSwap = nuevaPosiciones
+	return nil
+}
+
+func (h *Handler) eliminarOcurrencias(pid int) {
+	listaActualizada := make([]int, 0)
+	for _, v := range h.ProcesoPorPosicionSwap {
+		if v != pid {
+			listaActualizada = append(listaActualizada, v)
+		}
+	}
+	h.ProcesoPorPosicionSwap = listaActualizada
+}
+
+func (h *Handler) CargarPaginasEnMemoriaDesdeSwap(posicionesSwap []int, marcosDestino []int) error {
+	if len(posicionesSwap) != len(marcosDestino) {
+		return fmt.Errorf("la cantidad de posiciones y marcos no coincide")
+	}
+
+	archivoSwap, err := os.Open("/home/utnso/Desktop/tp-2025-1c-CPU-Warriors/memoria/swapfile.bin")
+	if err != nil {
+		panic(err)
+	}
+	//Para cerrarlo despues
+	defer archivoSwap.Close()
+
+	h.Log.Debug("CargarPaginasEnMemoriaDesdeSwap",
+		log.AnyAttr("entre aca", posicionesSwap))
+
+	for i, posSwap := range posicionesSwap {
+		offset := int64(posSwap * h.Config.PageSize)
+		buffer := make([]byte, h.Config.PageSize)
+
+		_, err := archivoSwap.ReadAt(buffer, offset)
+		if err != nil {
+
+			h.Log.Debug("CargarPaginasEnMemoriaDesdeSwap",
+				log.AnyAttr("err", err))
+			h.Log.Error("Tamaño del Proceso no proporcionado")
+		}
+
+		// Copiar al EspacioDeUsuario en el marco correspondiente
+		dest := marcosDestino[i] * h.Config.PageSize
+		copy(h.EspacioDeUsuario[dest:dest+h.Config.PageSize], buffer)
+
+		h.Log.Debug("CargarPaginasEnMemoriaDesdeSwap",
+			log.AnyAttr("offset", offset))
+
+		h.Log.Debug("CargarPaginasEnMemoriaDesdeSwap",
+			log.AnyAttr("buffer", buffer))
+	}
+
+	return nil
+}
+
+func (h *Handler) PosicionesDeProcesoEnSwap(pid int) []int {
+	posiciones := []int{}
+	for i, p := range h.ProcesoPorPosicionSwap {
+		if p == pid {
+			posiciones = append(posiciones, i)
+		}
+	}
+	return posiciones
 }
 
 /*
