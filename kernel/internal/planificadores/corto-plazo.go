@@ -70,7 +70,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 					cpuElegida.Proceso.PID = procesoElegido.PCB.PID
 					cpuElegida.Estado = false
 
-					p.Log.Info("CPU seleccionada para proceso",
+					p.Log.Debug("CPU seleccionada para proceso",
 						log.StringAttr("cpu_id", cpuElegida.ID),
 						log.IntAttr("pid", proceso.PCB.PID),
 					)
@@ -81,7 +81,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 					// Marcar CPU como libre nuevamente
 					cpuElegida.Estado = true
 
-					p.Log.Info("Proceso completado en CPU",
+					p.Log.Debug("Proceso completado en CPU",
 						log.StringAttr("cpu_id", cpuElegida.ID),
 						log.IntAttr("pid", proceso.PCB.PID),
 						log.IntAttr("pc_final", newPC),
@@ -182,20 +182,6 @@ func (p *Service) odenarColaReadySjf() {
 	sort.Slice(p.Planificador.ReadyQueue, func(i, j int) bool {
 		return p.calcularRafagaEstimada(p.Planificador.ReadyQueue[i]) < p.calcularRafagaEstimada(p.Planificador.ReadyQueue[j])
 	})
-	/*
-		// Insertar el nuevo proceso en la posición correcta
-		inserted := false
-		for i, proc := range p.Planificador.ReadyQueue {
-			if p.calcularRafagaEstimada(proceso) < p.calcularRafagaEstimada(proc) {
-				p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue[:i], append([]*internal.Proceso{proceso}, p.Planificador.ReadyQueue[i:]...)...)
-				inserted = true
-				break
-			}
-		}
-		if !inserted {
-			p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-		} */
-
 }
 
 // buscarCPULibre encuentra una CPU que esté disponible

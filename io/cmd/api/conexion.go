@@ -37,11 +37,11 @@ func (h *Handler) ConexionInicialKernel(nombre string) {
 	}
 
 	if resp != nil {
-		h.Log.Info("Respuesta del servidor",
+		h.Log.Debug("Respuesta del servidor",
 			slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
 			slog.Attr{Key: "body", Value: slog.StringValue(string(body))},
 		)
 	} else {
-		h.Log.Info("Respuesta del servidor: nil")
+		h.Log.Debug("Respuesta del servidor: nil")
 	}
 }

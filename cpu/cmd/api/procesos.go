@@ -18,7 +18,7 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Log.Info("Proceso recibido del kernel",
+	h.Log.Debug("Proceso recibido del kernel",
 		log.IntAttr("pid", proceso.PID),
 		log.IntAttr("pc", proceso.PC))
 
@@ -52,7 +52,7 @@ func (h *Handler) RecibirInterrupcion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Log.Info("Interrupción recibida del kernel",
+	h.Log.Debug("Interrupción recibida del kernel",
 		log.IntAttr("pid", interrupcion.PID),
 		log.StringAttr("tipo", string(interrupcion.Tipo)),
 		log.AnyAttr("enmascarable", interrupcion.EsEnmascarable))

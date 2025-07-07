@@ -51,7 +51,7 @@ func (m *Memoria) ConsultarEspacio(file, sizeProceso string, pid int) bool {
 		return false
 	}
 
-	m.Log.Info("Consulta de espacio en memoria exitosa",
+	m.Log.Debug("Consulta de espacio en memoria exitosa",
 		log.IntAttr("status_code", resp.StatusCode),
 	)
 
