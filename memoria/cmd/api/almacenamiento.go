@@ -86,6 +86,9 @@ func (h *Handler) ContarLibres() int {
 	return libres
 }
 
+// tamanioDelProcseo / sizePAge = catnidadDeMarcos
+// cantidadMarcos/PAginas
+
 func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActualizacion bool) {
 
 	var FramesLibres = h.MarcosLibres(paginasAOcupar)
@@ -145,7 +148,17 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 	//BORRAR DE ACA PARA ABAJP ESTA AHORA PARA PROBAR LAS COSAS
 
 	if esActualizacion == false {
+
 		//copy(h.EspacioDeUsuario[0:], []byte("hola"))
+
+		tabla := h.CrearTabla(h.Config.NumberOfLevels, h.Config.EntriesPerPage)
+
+		//lectura, _ := h.leerValor(tabla, []int{0, 0, 1})
+
+		h.LlenarTablaConValores(tabla, []int{1, 2, 3})
+
+		h.Log.Debug("leerValor",
+			log.AnyAttr("lectura", tabla))
 
 		//h.PasarProcesoASwapAuxiliar(pid)
 
@@ -164,6 +177,8 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 		//h.SacarProcesoDeSwap(pid)
 
 		//h.DumpProcesoFuncionAuxiliar(pid)
+
+		//h.BuscarMarcoPorPagina([]int{0, 0, 1}, pid)
 
 	}
 
@@ -891,11 +906,118 @@ func (h *Handler) EscribirPagina(marco int, offset int, valorAEscribir string, p
 
 }
 
-/*
-ejemplo de como queda en este caso : 3 niveles 2 entradas, 5 marcos necesarios
-[[{"Entradas":[0,1]}],
-	[{"Entradas":[0,1]},{"Entradas":[2, null]}],
-		[{"Entradas":[{"Marco":0},{"Marco":1}]},
-		{"Entradas":[{"Marco":2},{"Marco":3}]},
-		{"Entradas":[{"Marco":4},{"Marco":-1}]}]]
-*/
+// [0 , 0 , 1]
+func (h *Handler) BuscarMarcoPorPagina(paginas []int, pid string) int {
+
+	procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
+
+	tablasDePAginas := procesYTablaAsociada.TablasDePaginas
+	marco, _ := h.ObtenerMarcoDesdeIndices(tablasDePAginas, paginas)
+
+	h.Log.Debug("BuscarMarcoPorPagina",
+		log.AnyAttr("marco", marco))
+	return 1
+}
+
+func (h *Handler) ObtenerMarcoDesdeIndices(tablas []interface{}, indices []int) (int, error) {
+	actual := tablas[0].([]*TablaIntermedia)
+
+	siguienteNivelIdx := 0
+
+	for _, idx := range indices {
+
+		h.Log.Debug("tablaIntermedia",
+			log.AnyAttr("forEntre", "marco"))
+
+		// Accedés a una tabla específica, por ejemplo la primera o la que te interese por índice:
+		tabla := actual[siguienteNivelIdx] // ← Acá accedés a una *TablaIntermedia
+
+		// Ahora sí podés acceder a sus entradas:
+
+		//[{"Entradas":[0,1]}]
+		siguienteNivelIdx, _ = tabla.Entradas[siguienteNivelIdx].(int)
+
+		// Bajamos un nivel
+		actual = tablas[idx+1].([]*TablaIntermedia)
+
+		h.Log.Debug("ObtenerMarcoDesdeIndices",
+			log.AnyAttr("ACTUAL !!!!!!!!!", actual))
+
+		///actual = siguienteNivel
+	}
+
+	return -1, fmt.Errorf("no se pudo encontrar el marco")
+}
+
+func (h *Handler) CrearTabla(niveles int, entradasPorElemento int) interface{} {
+	if niveles <= 0 {
+		return nil
+	}
+
+	if niveles == 1 {
+		hoja := make([]int, entradasPorElemento)
+		for i := range hoja {
+			hoja[i] = -1
+		}
+		return hoja
+	}
+
+	tabla := make([]interface{}, entradasPorElemento)
+	for i := 0; i < entradasPorElemento; i++ {
+		tabla[i] = h.CrearTabla(niveles-1, entradasPorElemento)
+	}
+
+	h.Log.Debug("CrearTabla",
+		log.AnyAttr("myVar", tabla))
+
+	return tabla
+}
+
+func (h *Handler) LeerValor(tabla interface{}, indices []int) (int, bool) {
+	actual := tabla
+	for i := 0; i < len(indices); i++ {
+		switch nodo := actual.(type) {
+		case []interface{}:
+			if indices[i] < 0 || indices[i] >= len(nodo) {
+				return 0, false
+			}
+			actual = nodo[indices[i]]
+		case []int:
+			if indices[i] < 0 || indices[i] >= len(nodo) {
+				return 0, false
+			}
+			return nodo[indices[i]], true
+		default:
+			return 0, false
+		}
+	}
+	return 0, false
+}
+
+func (h *Handler) LlenarTablaConValores(tabla interface{}, valores []int) {
+	var index int
+
+	var recorrer func(nodo interface{}) interface{}
+
+	recorrer = func(nodo interface{}) interface{} {
+		switch t := nodo.(type) {
+		case []interface{}:
+			for i := range t {
+				t[i] = recorrer(t[i])
+			}
+			return t
+		case []int:
+			for i := range t {
+				if index < len(valores) {
+					t[i] = valores[index]
+					index++
+				} // si no hay más valores, se queda en -1
+			}
+			return t
+		default:
+			return t
+		}
+	}
+
+	recorrer(tabla)
+}
