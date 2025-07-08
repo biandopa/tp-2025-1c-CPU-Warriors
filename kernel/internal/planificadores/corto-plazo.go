@@ -56,7 +56,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 
 					//Log obligatorio: Cambio de estado
 					// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-					p.Log.Info(fmt.Sprintf("%d Pasa del estado READY al estado EXEC", proceso.PCB.PID))
+					p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado READY al estado EXEC", proceso.PCB.PID))
 
 					// Usar los valores copiados
 					cpuElegida.Proceso.PC = procesoElegido.PCB.PC
@@ -119,7 +119,7 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 
 					// Log obligatorio: Desalojo de SJF/SRT
 					//“## (<PID>) - Desalojado por algoritmo SJF/SRT”
-					p.Log.Info(fmt.Sprintf("%d - Desalojado por algoritmo SJF/SRT", procesoADesalojar.PCB.PID))
+					p.Log.Info(fmt.Sprintf("## (%d) - Desalojado por algoritmo SJF/SRT", procesoADesalojar.PCB.PID))
 
 					// Después del desalojo, asignar el nuevo proceso
 					cpuLiberada := p.buscarCPUPorPID(procesoADesalojar.PCB.PID)
@@ -245,7 +245,7 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) {
 
 	//Log obligatorio: Cambio de estado
 	// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-	p.Log.Info(fmt.Sprintf("%d Pasa del estado EXEC al estado READY", proceso.PCB.PID))
+	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado READY", proceso.PCB.PID))
 
 	// Actualizar métricas de Ready
 	if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {

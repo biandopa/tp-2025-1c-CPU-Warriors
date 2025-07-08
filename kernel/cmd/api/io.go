@@ -70,10 +70,8 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 
 	//TODO: Buscar en la lista de ioIdentificacion y cambiarle es status
 	//Log obligatorio: Fin de IO
-	//Fin de IO: “## (<PID>) finalizó IO y pasa a READY”
-	h.Log.Info(fmt.Sprintf("%d finalizó IO y pasa a READY", ioIdentificacionPeticion.ProcesoID),
-		log.AnyAttr("ioIdentificacionPeticion", ioIdentificacionPeticion),
-	)
+	//Fin de IO: "## (<PID>) finalizó IO y pasa a READY"
+	h.Log.Info(fmt.Sprintf("## (%d) finalizó IO y pasa a READY", ioIdentificacionPeticion.ProcesoID))
 
 	proceso := h.Planificador.BuscarProcesoEnCola(ioIdentificacionPeticion.ProcesoID, ioIdentificacionPeticion.Cola)
 	//Aviso al kernel que el proceso termino su IO para que revise si esta suspendido

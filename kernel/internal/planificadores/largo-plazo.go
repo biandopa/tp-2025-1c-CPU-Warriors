@@ -116,9 +116,8 @@ func (p *Service) CheckearEspacioEnMemoria() {
 
 			proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
-			//Log obligatorio: Cambio de estado
-			// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-			p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
+			// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+			p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
 
 			// Enviar señal al canal de corto plazo para procesos suspendidos
 			p.Log.Debug("Enviando señal al canal de corto plazo (SUSP.READY -> READY)",
@@ -158,9 +157,8 @@ func (p *Service) CheckearEspacioEnMemoria() {
 				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 				proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
-				//Log obligatorio: Cambio de estado
-				// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-				p.Log.Info(fmt.Sprintf("%d Pasa del estado NEW al estado READY", proceso.PCB.PID))
+				// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+				p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado NEW al estado READY", proceso.PCB.PID))
 
 				// Luego, envío la señal para que el planificador de corto plazo pueda ejecutar el proceso
 				p.Log.Debug("Enviando señal al canal de corto plazo",
@@ -215,6 +213,8 @@ func (p *Service) FinalizarProceso(pid int) {
 	cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
 	if cpuFound != nil {
 		cpuFound.Estado = true
+		// Informo al channel de que la CPU esta libre
+		p.CPUSemaphore <- struct{}{}
 	}
 
 	// 5. Cambiar el estado del proceso a EXIT
@@ -232,11 +232,11 @@ func (p *Service) FinalizarProceso(pid int) {
 
 	//Log obligatorio: Cambio de estado
 	// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-	p.Log.Info(fmt.Sprintf("%d Pasa del estado EXEC al estado EXIT", proceso.PCB.PID))
+	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado EXIT", proceso.PCB.PID))
 
 	//Log obligatorio: Finalización de proceso
 	//“## (<PID>) - Finaliza el proceso”
-	p.Log.Info(fmt.Sprintf("%d Finaliza el proceso", proceso.PCB.PID))
+	p.Log.Info(fmt.Sprintf("## (%d) Finaliza el proceso", proceso.PCB.PID))
 
 	// Log obligatorio: Métricas de Estado
 	//“## (<PID>) - Métricas de estado: NEW (NEW_COUNT) (NEW_TIME), READY (READY_COUNT) (READY_TIME), …”

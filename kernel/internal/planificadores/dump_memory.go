@@ -91,7 +91,7 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 	proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoBloqueado]++
 
-	p.Log.Info(fmt.Sprintf("%d Pasa del estado EXCEC al estado BLOCKED", proceso.PCB.PID))
+	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado BLOCKED", proceso.PCB.PID))
 
 	return nil
 }
@@ -133,7 +133,7 @@ func (p *Service) moverProcesoBlockedAReady(pid int) error {
 	proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
-	p.Log.Info(fmt.Sprintf("%d Pasa del estado BLOCKED al estado READY", proceso.PCB.PID))
+	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado READY", proceso.PCB.PID))
 
 	return nil
 }
@@ -173,7 +173,7 @@ func (p *Service) moverProcesoBlockedAExit(pid int) error {
 	proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoExit]++
 
-	p.Log.Info(fmt.Sprintf("%d Pasa del estado BLOCKED al estado EXIT", proceso.PCB.PID))
+	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado EXIT", proceso.PCB.PID))
 
 	return nil
 }

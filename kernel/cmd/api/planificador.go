@@ -39,8 +39,8 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	h.Planificador.CanalNuevoProcesoNew <- proceso
 
 	//Log obligatorio: Creación de proceso
-	//“## (<PID>) Se crea el proceso - Estado: NEW”
-	h.Log.Info(fmt.Sprintf("%d Se crea el proceso - Estado: NEW", proceso.PCB.PID))
+	//"## (<PID>) Se crea el proceso - Estado: NEW"
+	h.Log.Info(fmt.Sprintf("## (%d) Se crea el proceso - Estado: NEW", proceso.PCB.PID))
 }
 
 func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
@@ -61,8 +61,8 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 	)
 
 	//Log obligatorio: Syscall recibida
-	//“## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>”
-	h.Log.Info(fmt.Sprintf("%d - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
+	//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
+	h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
 
 	switch syscall.Instruccion {
 	case "INIT_PROC":
@@ -93,8 +93,8 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		mu.Unlock()
 
 		//Log obligatorio: Creación de proceso
-		//“## (<PID>) Se crea el proceso - Estado: NEW”
-		h.Log.Info(fmt.Sprintf("%d Se crea el proceso - Estado: NEW", syscall.PID))
+		//"## (<PID>) Se crea el proceso - Estado: NEW"
+		h.Log.Info(fmt.Sprintf("## (%d) Se crea el proceso - Estado: NEW", proceso.PCB.PID))
 
 	case "IO":
 		var ioInfo IOIdentificacion
@@ -128,27 +128,26 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 			//TODO proxima entrega: mandar a block
 
 			//Log obligatorio: Motivo de Bloqueo
-			//“## (<PID>) - Bloqueado por IO: <DISPOSITIVO_IO>”
-			h.Log.Info(fmt.Sprintf("%d - Bloqueado por IO: %s", syscall.PID, ioInfo.Nombre))
+			//"## (<PID>) - Bloqueado por IO: <DISPOSITIVO_IO>"
+			h.Log.Info(fmt.Sprintf("## (%d) - Bloqueado por IO: %s", syscall.PID, ioInfo.Nombre))
 
 			//Log obligatorio: Cambio de estado
-			// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-			h.Log.Info(fmt.Sprintf("%d Pasa del estado READY al estado BLOCKED", syscall.PID)) //podemos asumir que viene de READY?
+			// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+			h.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado BLOCKED", syscall.PID))
 
 			return
 
 		} else {
-
 			//TODO proxima entrega: mandar a block
 			fmt.Println("existe y no esta libre")
 
 			//Log obligatorio: Motivo de Bloqueo
-			//“## (<PID>) - Bloqueado por IO: <DISPOSITIVO_IO>”
-			h.Log.Info(fmt.Sprintf("%d - Bloqueado por IO: %s", syscall.PID, ioInfo.Nombre))
+			//"## (<PID>) - Bloqueado por IO: <DISPOSITIVO_IO>"
+			h.Log.Info(fmt.Sprintf("## (%d) - Bloqueado por IO: %s", syscall.PID, ioInfo.Nombre))
 
 			//Log obligatorio: Cambio de estado
-			// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-			h.Log.Info(fmt.Sprintf("%d Pasa del estado READY al estado BLOCKED", syscall.PID)) //podemos asumir que viene de READY?
+			// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+			h.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado BLOCKED", syscall.PID))
 
 			return
 		}

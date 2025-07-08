@@ -47,8 +47,8 @@ func (p *Service) SuspenderProcesoBloqueado() {
 				proceso.PCB.MetricasEstado[internal.EstadoSuspBloqueado]++
 
 				//Log obligatorio: Cambio de estado
-				// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-				p.Log.Info(fmt.Sprintf("%d Pasa del estado BLOCKED al estado SUSP_BLOCKED", proceso.PCB.PID))
+				// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+				p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado SUSP.BLOCKED", proceso.PCB.PID))
 
 				//TODO: Notificar a memoria que debe swappear
 				go avisarAMemoriaSwap(proceso)
@@ -90,8 +90,8 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 		proceso.PCB.MetricasEstado[internal.EstadoSuspReady]++
 
 		//Log obligatorio: Cambio de estado
-		// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-		p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP_BLOCKED al estado SUSP_READY", proceso.PCB.PID))
+		// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+		p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado SUSP.BLOCKED al estado SUSP.READY", proceso.PCB.PID))
 
 	} else {
 		//Proceso estaba en BLOCKED → READY
@@ -115,8 +115,8 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 		proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
 		//Log obligatorio: Cambio de estado
-		// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-		p.Log.Info(fmt.Sprintf("%d Pasa del estado BLOCKED al estado READY", proceso.PCB.PID))
+		// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+		p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado READY", proceso.PCB.PID))
 
 		// Notificar planificador corto plazo
 		p.canalNuevoProcesoReady <- struct{}{}
