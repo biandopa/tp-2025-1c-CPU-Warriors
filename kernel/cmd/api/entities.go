@@ -20,7 +20,10 @@ type Config struct {
 // Se usa para almacenar las IOs
 var ioIdentificacion []IOIdentificacion
 
-// EStructura que definimos para manejar las IOs
+// Cola de espera para cada dispositivo IO
+var ioWaitQueues map[string][]int // Mapea nombre de dispositivo a lista de PIDs esperando
+
+// IOIdentificacion EStructura que definimos para manejar las IOs
 type IOIdentificacion struct {
 	Nombre    string `json:"nombre"`
 	IP        string `json:"ip"`
@@ -28,4 +31,9 @@ type IOIdentificacion struct {
 	Estado    bool   `json:"estado"`
 	ProcesoID int    `json:"pid"`  // PID del proceso que está usando la IO
 	Cola      string `json:"cola"` // Cola a la que pertenece la el proceso (por ejemplo, "ready", "blocked", etc.)
+}
+
+// Inicializar las colas de espera para IO
+func init() {
+	ioWaitQueues = make(map[string][]int)
 }

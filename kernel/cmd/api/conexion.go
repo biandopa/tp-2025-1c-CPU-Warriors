@@ -75,6 +75,83 @@ func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
+// DesconexionIO maneja la desconexión de un dispositivo IO
+func (h *Handler) DesconexionIO(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var ioInfo IOIdentificacion
+
+	// Leer el cuerpo de la solicitud
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&ioInfo)
+	if err != nil {
+		h.Log.ErrorContext(ctx, "Error al decodificar ioIdentificacion para desconexión",
+			log.ErrAttr(err),
+		)
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
+		return
+	}
+
+	h.Log.DebugContext(ctx, "Desconexión de dispositivo IO",
+		log.StringAttr("dispositivo", ioInfo.Nombre),
+		log.StringAttr("ip", ioInfo.IP),
+		log.IntAttr("puerto", ioInfo.Puerto),
+	)
+
+	// Encontrar y remover el dispositivo de la lista
+	var dispositivoEncontrado *IOIdentificacion
+	for i, device := range ioIdentificacion {
+		if device.Nombre == ioInfo.Nombre && device.IP == ioInfo.IP && device.Puerto == ioInfo.Puerto {
+			dispositivoEncontrado = &device
+			// Remover el dispositivo de la lista
+			ioIdentificacion = append(ioIdentificacion[:i], ioIdentificacion[i+1:]...)
+			break
+		}
+	}
+
+	if dispositivoEncontrado != nil {
+		// Si había un proceso usando este dispositivo, enviarlo a EXIT
+		if dispositivoEncontrado.ProcesoID >= 0 {
+			h.Log.Debug(fmt.Sprintf("## (%d) - Proceso enviado a EXIT por desconexión de IO: %s",
+				dispositivoEncontrado.ProcesoID, dispositivoEncontrado.Nombre))
+			go h.Planificador.FinalizarProceso(dispositivoEncontrado.ProcesoID)
+		}
+
+		// Verificar si quedan más instancias de este tipo de dispositivo
+		tieneOtrasInstancias := false
+		for _, device := range ioIdentificacion {
+			if device.Nombre == ioInfo.Nombre {
+				tieneOtrasInstancias = true
+				break
+			}
+		}
+
+		// Si no quedan más instancias, enviar todos los procesos en espera a EXIT
+		if !tieneOtrasInstancias {
+			if queue, exists := ioWaitQueues[ioInfo.Nombre]; exists && len(queue) > 0 {
+				h.Log.Debug(fmt.Sprintf("No quedan más instancias de %s - enviando %d procesos en espera a EXIT",
+					ioInfo.Nombre, len(queue)))
+
+				for _, pid := range queue {
+					h.Log.Debug(fmt.Sprintf("## (%d) - Proceso enviado a EXIT por falta de instancias de IO: %s",
+						pid, ioInfo.Nombre))
+					go h.Planificador.FinalizarProceso(pid)
+				}
+
+				// Limpiar la cola de espera
+				delete(ioWaitQueues, ioInfo.Nombre)
+			}
+		}
+	}
+
+	h.Log.DebugContext(ctx, "Estado actual de IOs conectadas después de desconexión",
+		log.AnyAttr("IOsConectadas", ioIdentificacion),
+	)
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
+}
+
 // ConexionInicialCPU Recibe la lista de IOs
 func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
