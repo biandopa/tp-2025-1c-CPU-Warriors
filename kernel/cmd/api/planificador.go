@@ -158,9 +158,8 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		Si existe y está ocupado, se manda a Blocked. Veremos...*/
 
 	case "DUMP_MEMORY":
-		// TODO: Implementar lógica DUMP_MEMORY
-		// Nota: Este todavía no!!!!!
-		/* Esta bloquea el proceso. En caso de error se envía a exit y sino se pasa a Ready*/
+		/* Se bloquea el proceso. En caso de error, se envía a la cola de Exit. Caso contrario, se pasa a Ready*/
+		go h.Planificador.RealizarDumpMemory(syscall.PID)
 
 	case "EXIT":
 		go h.Planificador.FinalizarProceso(syscall.PID)

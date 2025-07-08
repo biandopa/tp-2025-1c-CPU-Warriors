@@ -23,15 +23,14 @@ type Service struct {
 	CanalNewProcSuspReady  chan *internal.Proceso
 	mutexNewQueue          *sync.Mutex
 	mutexReadyQueue        *sync.Mutex
-	//mutexBlockQueue      *sync.Mutex
-	mutexCPUsConectadas *sync.Mutex
-	mutexBlockQueue     *sync.Mutex
-	mutexExecQueue      *sync.Mutex
-	mutexSuspBlockQueue *sync.Mutex
-	mutexSuspReadyQueue *sync.Mutex
-	SjfConfig           *SjfConfig
-	MedianoPlazoConfig  *MedianoPlazoConfig
-	CPUSemaphore        chan struct{} // Semáforo contador para CPUs disponibles
+	mutexCPUsConectadas    *sync.Mutex
+	mutexBlockQueue        *sync.Mutex
+	mutexExecQueue         *sync.Mutex
+	mutexSuspBlockQueue    *sync.Mutex
+	mutexSuspReadyQueue    *sync.Mutex
+	SjfConfig              *SjfConfig
+	MedianoPlazoConfig     *MedianoPlazoConfig
+	CPUSemaphore           chan struct{} // Semáforo contador para CPUs disponibles
 }
 
 type Planificador struct {
@@ -87,6 +86,7 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		CanalNuevoProcBlocked:  make(chan *internal.Proceso, 100),
 		mutexNewQueue:          &sync.Mutex{},
 		mutexReadyQueue:        &sync.Mutex{},
+		mutexBlockQueue:        &sync.Mutex{},
 		mutexExecQueue:         &sync.Mutex{},
 		mutexCPUsConectadas:    &sync.Mutex{},
 		MedianoPlazoConfig: &MedianoPlazoConfig{

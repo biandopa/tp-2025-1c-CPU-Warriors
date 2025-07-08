@@ -75,3 +75,41 @@ func (m *Memoria) FinalizarProceso(pid int) (int, error) {
 
 	return status, err
 }
+
+// DumpProceso solicita a memoria realizar un dump del proceso especificado
+func (m *Memoria) DumpProceso(pid int) error {
+	url := fmt.Sprintf("http://%s:%d/kernel/dump-proceso", m.IP, m.Puerto)
+	url = fmt.Sprintf("%s?pid=%d", url, pid)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		m.Log.Error("Error al solicitar dump de proceso a memoria",
+			log.ErrAttr(err),
+			log.StringAttr("ip", m.IP),
+			log.IntAttr("puerto", m.Puerto),
+			log.IntAttr("pid", pid),
+		)
+		return err
+	}
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		m.Log.Error("Error en dump de proceso - memoria respondió con error",
+			log.StringAttr("ip", m.IP),
+			log.IntAttr("puerto", m.Puerto),
+			log.IntAttr("pid", pid),
+			log.IntAttr("status_code", resp.StatusCode),
+		)
+		return fmt.Errorf("memoria respondió con status %d", resp.StatusCode)
+	}
+
+	m.Log.Debug("Dump de proceso realizado exitosamente",
+		log.IntAttr("pid", pid),
+		log.IntAttr("status_code", resp.StatusCode),
+	)
+
+	return nil
+}
