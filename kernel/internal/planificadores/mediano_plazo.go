@@ -13,7 +13,7 @@ func (p *Service) SuspenderProcesoBloqueado() {
 	for {
 		//La funcion espera que entre un proceso en la cola de blocked
 		proceso := <-p.CanalNuevoProcBlocked
-		//TODO: Avisarle al canal cuando se bloquea un proceso
+
 		go func() {
 			//Busco tiempo de espera para pasar a SuspendedBlocked
 			//del archivo de configuración
@@ -61,7 +61,7 @@ func (p *Service) SuspenderProcesoBloqueado() {
 	}
 }
 
-// Cuando un proceso en SUSP.BLOCKED finalizo su IO, deberá pasar a
+// ManejarFinIO Cuando un proceso en SUSP.BLOCKED finalizo su IO, deberá pasar a
 // SUSP.READY y quedar a la espera de su oportunidad de pasar a READY.
 func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 
@@ -143,24 +143,75 @@ func quitarDeCola(cola *[]*internal.Proceso, p *internal.Proceso) {
 
 // TODO
 func avisarAMemoriaSwap(p *internal.Proceso) {
-
+	// Implementar comunicación con memoria para swapping
+	// Por ahora es un placeholder - se completará cuando tengamos el API de memoria
+	fmt.Printf("TODO: Notificar a memoria para swappear proceso PID: %d\n", p.PCB.PID)
+	// Aquí se debería hacer:
+	// 1. Llamar a la API de memoria para mover el proceso a SWAP
+	// 2. Actualizar las estructuras administrativas
+	// 3. Manejar posibles errores
 }
 
 func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
 	colaString := strings.ToLower(cola)
 	switch colaString {
 	case "suspended_blocked":
-		for _, proc := range p.Planificador.SuspReadyQueue {
+		p.mutexSuspBlockQueue.Lock()
+		for _, proc := range p.Planificador.SuspBlockQueue {
 			if proc.PCB.PID == pid {
+				p.mutexSuspBlockQueue.Unlock()
 				return proc
 			}
 		}
+		p.mutexSuspBlockQueue.Unlock()
 	case "blocked":
+		p.mutexBlockQueue.Lock()
 		for _, proc := range p.Planificador.BlockQueue {
 			if proc.PCB.PID == pid {
+				p.mutexBlockQueue.Unlock()
 				return proc
 			}
 		}
+		p.mutexBlockQueue.Unlock()
+	case "ready":
+		p.mutexReadyQueue.Lock()
+		for _, proc := range p.Planificador.ReadyQueue {
+			if proc.PCB.PID == pid {
+				p.mutexReadyQueue.Unlock()
+				return proc
+			}
+		}
+		p.mutexReadyQueue.Unlock()
+	case "suspended_ready":
+		p.mutexSuspReadyQueue.Lock()
+		for _, proc := range p.Planificador.SuspReadyQueue {
+			if proc.PCB.PID == pid {
+				p.mutexSuspReadyQueue.Unlock()
+				return proc
+			}
+		}
+		p.mutexSuspReadyQueue.Unlock()
+	default:
+		// Si no se especifica cola o es desconocida, buscar en todas las colas relevantes
+		// Primero en BLOCKED (más probable para procesos de IO)
+		p.mutexBlockQueue.Lock()
+		for _, proc := range p.Planificador.BlockQueue {
+			if proc.PCB.PID == pid {
+				p.mutexBlockQueue.Unlock()
+				return proc
+			}
+		}
+		p.mutexBlockQueue.Unlock()
+
+		// Luego en SUSP.BLOCKED
+		p.mutexSuspBlockQueue.Lock()
+		for _, proc := range p.Planificador.SuspBlockQueue {
+			if proc.PCB.PID == pid {
+				p.mutexSuspBlockQueue.Unlock()
+				return proc
+			}
+		}
+		p.mutexSuspBlockQueue.Unlock()
 	}
 
 	p.Log.Error("Proceso no encontrado en la cola especificada",
