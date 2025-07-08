@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -46,6 +47,7 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
+// REHACER, DEBE RECIBIR EL PC
 func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 	// Decode the request body
 	var proceso Proceso
@@ -77,6 +79,10 @@ func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no more instructions for the process", http.StatusNoContent)
 		return
 	}
+
+	/* Log obligatorio: Obtener instrucción
+	“## PID: <PID> - Obtener instrucción: <PC> - Instrucción: <INSTRUCCIÓN> <...ARGS>”*/
+	h.Log.Info(fmt.Sprintf("## PID: %d - Obtener instrucción: <PC> - Instrucción: %s", proceso.PID, h.Instrucciones[proceso.PID]))
 
 	// Leemos la primera instruccón asociada al proceso, la enviamos al cliente y la eliminamos de la lista de instrucciones
 	body, _ := json.Marshal(h.Instrucciones[proceso.PID][0])

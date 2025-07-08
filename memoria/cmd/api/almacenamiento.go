@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,7 +22,6 @@ type EspacioDisponible struct {
 // ConsultarEspacioEInicializar recibe una consulta sobre el espacio libre en memoria.
 // En caso de que haya espacio, se inicializa el proceso, se responde con un mensaje de éxito y el tamaño disponible.
 // En caso contrario, se responde con un mensaje de error.
-// Por el momento, solo responde una respuesta mockeada.
 func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx = r.Context()
@@ -86,93 +84,70 @@ func (h *Handler) ContarLibres() int {
 	return libres
 }
 
-// tamanioDelProcseo / sizePAge = catnidadDeMarcos
-// cantidadMarcos/PAginas
-
 func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActualizacion bool) {
 
 	var FramesLibres = h.MarcosLibres(paginasAOcupar)
 
-	var tablasPorNivel = h.calcularTablasPorNivel(paginasAOcupar)
+	tabla := h.CrearTabla(h.Config.NumberOfLevels, h.Config.EntriesPerPage)
 
-	var paginasPorNivel = h.calcularEntradasPorNivel(paginasAOcupar)
-
-	h.Log.Debug("AsignarMemoriaDeUsuario",
-		log.AnyAttr("FramesLibres", FramesLibres))
+	h.LlenarTablaConValores(tabla, FramesLibres)
 
 	h.Log.Debug("AsignarMemoriaDeUsuario",
-		log.AnyAttr("tablasPorNivel", tablasPorNivel))
-
-	h.Log.Debug("AsignarMemoriaDeUsuario",
-		log.AnyAttr("paginasPorNivel", paginasPorNivel))
-
-	var tablasVacias, _ = h.crearTablasMultinivel(tablasPorNivel, paginasPorNivel, h.Config.EntriesPerPage)
-
-	h.Log.Debug("AsignarMemoriaDeUsuario",
-		log.AnyAttr("tablasVacias", tablasVacias))
-
-	h.llenarTablaMultinivel(tablasVacias, FramesLibres, h.Config.EntriesPerPage)
-
-	h.Log.Debug("AsignarMemoriaDeUsuario",
-		log.AnyAttr("tablaLLena", tablasVacias))
-
-	//AGREGAR LA TABLA a la TablasProceso
+		log.AnyAttr("tabla", tabla))
 
 	var tablaProceso *TablasProceso
 
 	if esActualizacion {
 		for _, tp := range h.TablasProcesos {
 			if tp.PID == pid {
-				tp.TablasDePaginas = tablasVacias
+				tp.TablasDePaginas = tabla
 			}
 		}
 	} else {
 		tablaProceso = &TablasProceso{
 			PID:             pid,
 			Tamanio:         paginasAOcupar * h.Config.MemorySize,
-			TablasDePaginas: tablasVacias,
+			TablasDePaginas: tabla,
 		}
+		//VER ESTO!! PUEDE QUE TENGA QUE IR AFUERA
+		h.TablasProcesos = append(h.TablasProcesos, tablaProceso)
 	}
 
-	h.Log.Debug("tablaProceso",
-		log.AnyAttr("tablaProceso", tablaProceso))
+	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
+	tablaMetricas.CantidadSubidasMemoriaPrincipal++
 
-	h.TablasProcesos = append(h.TablasProcesos, tablaProceso)
-
-	h.Log.Debug("TablasProcesos",
-		log.AnyAttr("TablasProcesos", h.TablasProcesos))
-	//HACER LOG
-	//  PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>
+	//Log obligatorio: Creación de Proceso
+	//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
+	h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.MemorySize))
 
 	//
-	//BORRAR DE ACA PARA ABAJP ESTA AHORA PARA PROBAR LAS COSAS
+	//BORRAR DE ACA PARA ABAJO ESTA AHORA PARA PROBAR LAS COSAS
 
 	if esActualizacion == false {
 
-		//copy(h.EspacioDeUsuario[0:], []byte("hola"))
+		copy(h.EspacioDeUsuario[0:], []byte("hola"))
 
-		tabla := h.CrearTabla(h.Config.NumberOfLevels, h.Config.EntriesPerPage)
+		//lectura, _ := h.BuscarMarcoPorPagina(tabla, []int{0, 0, 1})
 
-		//lectura, _ := h.leerValor(tabla, []int{0, 0, 1})
-
-		h.LlenarTablaConValores(tabla, []int{1, 2, 3})
-
-		h.Log.Debug("leerValor",
-			log.AnyAttr("lectura", tabla))
+		/*h.Log.Debug("BuscarMarcoPorPagina",
+		log.AnyAttr("lectura", tabla))*/
 
 		//h.PasarProcesoASwapAuxiliar(pid)
 
 		//h.LeerPagina(0, 2, 1, pid)
 
 		//h.EscribirPagina(marco int, offset int, valorAEscribir string, pid string)
-		//h.EscribirPagina(1, 0, "ey", pid)
+		h.EscribirPagina(1, 0, "ey", pid)
 
-		//h.LeerPagina(1, 0, 5, pid)
+		h.LeerPagina(1, 0, 5, pid)
 
-		/*h.Log.Debug("FinalizarProcesoFuncionAuxiliar",
-		log.AnyAttr("TablasProcesos", h.TablasProcesos))
-		*/
+		h.Log.Debug("FinalizarProcesoFuncionAuxiliar",
+			log.AnyAttr("tablaMetricas", tablaMetricas.CantidadDeLectura))
+
 		//h.FinalizarProcesoFuncionAuxiliar(pid)
+
+		h.Log.Debug("FinalizarProcesoFuncionAuxiliar",
+			log.AnyAttr("tablaMetricas", tablaMetricas.CantidadDeEscritura))
 
 		//h.SacarProcesoDeSwap(pid)
 
@@ -211,40 +186,6 @@ func (h *Handler) escribirMarcoEnSwap(archivo *os.File, marco int) error {
 	return nil
 }
 
-func (h *Handler) ObtenerMarcosDeLaTabla(tablas []interface{}) []int {
-	marcos := []int{}
-
-	for _, nivel := range tablas {
-		switch t := nivel.(type) {
-		case []*TablaIntermedia:
-			for _, tablaInter := range t {
-				for _, entrada := range tablaInter.Entradas {
-					if entrada != nil {
-						// entrada es interface{}, puede ser *TablaIntermedia o *TablaHoja
-						switch subtabla := entrada.(type) {
-						case *TablaIntermedia:
-							marcos = append(marcos, h.ObtenerMarcosDeLaTabla([]interface{}{[]*TablaIntermedia{subtabla}})...)
-						case *TablaHoja:
-							marcos = append(marcos, h.ObtenerMarcosDeLaTabla([]interface{}{[]*TablaHoja{subtabla}})...)
-						}
-					}
-				}
-			}
-
-		case []*TablaHoja:
-			for _, tablaHoja := range t {
-				for _, entradaHoja := range tablaHoja.Entradas {
-					if entradaHoja.Marco != -1 {
-						marcos = append(marcos, entradaHoja.Marco)
-					}
-				}
-			}
-		}
-	}
-
-	return marcos
-}
-
 func (h *Handler) BuscarProcesoPorPID(pid string) (*TablasProceso, error) {
 	for _, proceso := range h.TablasProcesos {
 		if proceso.PID == pid {
@@ -254,150 +195,17 @@ func (h *Handler) BuscarProcesoPorPID(pid string) (*TablasProceso, error) {
 	return nil, fmt.Errorf("proceso con PID %s no encontrado", pid)
 }
 
-//hacer una funcion que se llame cambiarASwap
-//
-
-func (h *Handler) llenarTablaMultinivel(tablas []interface{}, marcos []int, entradasPorTabla int) error {
-	niveles := len(tablas)
-	if niveles == 0 {
-		return fmt.Errorf("no hay tablas")
-	}
-
-	tablasHoja, ok := tablas[niveles-1].([]*TablaHoja)
-	if !ok {
-		return fmt.Errorf("ultimo nivel no es tablas hoja")
-	}
-
-	idxMarco := 0
-	totalMarcos := len(marcos)
-
-	for _, tablaHoja := range tablasHoja {
-		for i := 0; i < entradasPorTabla && idxMarco < totalMarcos; i++ {
-			tablaHoja.Entradas[i] = EntradaHoja{
-				Marco: marcos[idxMarco],
-			}
-			idxMarco++
-		}
-		if idxMarco == totalMarcos {
-			break
-		}
-	}
-
-	if idxMarco < totalMarcos {
-		return fmt.Errorf("no hay suficientes entradas para asignar todos los marcos")
-	}
-	return nil
-}
-
-/*type TablasProcesos struct {
-	TablasProcesos []*TablasProceso `json:"TablasProcesos"`
-}*/
-
 type TablasProceso struct {
-	PID             string        `json:"pid"`
-	Tamanio         int           `json:"tamanio_proceso"`
-	TablasDePaginas []interface{} `json:"tabla_de_paginas"`
-}
-type EntradaTabla interface{} // puede ser tabla o marco
+	PID             string      `json:"pid"`
+	Tamanio         int         `json:"tamanio_proceso"`
+	TablasDePaginas interface{} `json:"tabla_de_paginas"`
 
-type TablaIntermedia struct {
-	Entradas []EntradaTabla
-}
-
-type EntradaHoja struct {
-	Marco int
-}
-
-type TablaHoja struct {
-	Entradas []EntradaHoja
-}
-
-func (h *Handler) crearTablasMultinivel(tablasPorNivel []int, paginasPorNivel []int, entradasPorTabla int) ([]interface{}, error) {
-	niveles := len(tablasPorNivel)
-	// Usamos []interface{} para guardar tablas de distintos tipos
-	tablas := make([]interface{}, niveles)
-
-	for nivel := 0; nivel < niveles; nivel++ {
-		cantidadTablas := tablasPorNivel[nivel]
-
-		if nivel == niveles-1 {
-			// nivel hoja → tablas hoja
-			tablasHoja := make([]*TablaHoja, cantidadTablas)
-			for i := 0; i < cantidadTablas; i++ {
-				tabla := &TablaHoja{Entradas: make([]EntradaHoja, entradasPorTabla)}
-				// Inicializar cada entrada como no asignada
-				for j := 0; j < entradasPorTabla; j++ {
-					tabla.Entradas[j] = EntradaHoja{
-						Marco: -1, // Valor que indica no asignado
-					}
-				}
-				tablasHoja[i] = tabla
-			}
-			tablas[nivel] = tablasHoja
-		} else {
-			// nivel intermedio → tablas intermedias
-			tablasIntermedias := make([]*TablaIntermedia, cantidadTablas)
-			idx := 0
-			for i := 0; i < cantidadTablas; i++ {
-				tablasIntermedias[i] = &TablaIntermedia{Entradas: make([]EntradaTabla, entradasPorTabla)}
-
-				h.Log.Debug("AsignarMemoriaDeUsuario",
-					log.AnyAttr("entradas*CAnt", (entradasPorTabla*cantidadTablas)))
-
-				//aca agregar un if para que no entre si el idx el contador es igual
-				//a la cantiddad maxima de entradas necesarias por nivel
-
-				for j := 0; j < (entradasPorTabla); j++ {
-
-					if paginasPorNivel[nivel] > idx {
-
-						h.Log.Debug("AsignarMemoriaDeUsuario",
-							log.AnyAttr("paginasPornivel", paginasPorNivel[nivel]))
-						tablasIntermedias[i].Entradas[j] = idx
-
-						h.Log.Debug("AsignarMemoriaDeUsuario",
-							log.AnyAttr("tablaNIvel", tablasIntermedias[i].Entradas[j]))
-						idx++
-					}
-				}
-			}
-			tablas[nivel] = tablasIntermedias
-
-			h.Log.Debug("AsignarMemoriaDeUsuario",
-				log.AnyAttr("tablaNIvel", tablas[nivel]))
-		}
-	}
-
-	return tablas, nil
-}
-
-func (h *Handler) calcularTablasPorNivel(paginas int) []int {
-	tablasPorNivel := make([]int, h.Config.NumberOfLevels)
-	// Nivel hoja (nivel N)
-	tablasPorNivel[h.Config.NumberOfLevels-1] = int(math.Ceil(float64(paginas) / float64(h.Config.EntriesPerPage)))
-
-	// Niveles superiores (N-1 ... 1)
-	for i := h.Config.NumberOfLevels - 2; i >= 0; i-- {
-		tablasPorNivel[i] = int(math.Ceil(float64(tablasPorNivel[i+1]) / float64(h.Config.EntriesPerPage)))
-	}
-
-	return tablasPorNivel
-}
-
-func (h *Handler) calcularEntradasPorNivel(paginas int) []int {
-	entradasPorNivel := make([]int, h.Config.NumberOfLevels)
-
-	// Nivel hoja (nivel más bajo)
-	entradasPorNivel[h.Config.NumberOfLevels-1] = paginas
-
-	// Niveles superiores
-	for i := h.Config.NumberOfLevels - 2; i >= 0; i-- {
-		// Cada tabla de este nivel apunta a la del siguiente nivel,
-		// así que necesitamos una entrada por tabla del nivel inferior
-		entradasPorNivel[i] = int(math.Ceil(float64(entradasPorNivel[i+1]) / float64(h.Config.EntriesPerPage)))
-	}
-
-	return entradasPorNivel
+	CantidadAccesosATablas           int `json:"cantidad_accesos_a_tablas"`
+	CantidadInstruccionesSolicitadas int `json:"cantidad_instrucciones_solicitadas"`
+	CantidadBajadasSwap              int `json:"cantidad_bajadas_swap"`
+	CantidadSubidasMemoriaPrincipal  int `json:"cantidad_subidas_memoria_principal"`
+	CantidadDeEscritura              int `json:"cantidad_de_escritura"`
+	CantidadDeLectura                int `json:"cantidad_de_lectura"`
 }
 
 func (h *Handler) MarcosLibres(paginasNecesarias int) []int {
@@ -523,12 +331,6 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 	marcosDelProceso := h.ObtenerMarcosDeLaTabla(procesYTablaAsociada.TablasDePaginas)
 
 	h.Log.Debug("PasarProcesoASwapAuxiliar",
-		log.AnyAttr("ObtenerMarcosValidos", h.EspacioDeUsuario))
-
-	h.Log.Debug("PasarProcesoASwapAuxiliar",
-		log.AnyAttr("ObtenerMarcosValidos", h.EspacioDeUsuario))
-
-	h.Log.Debug("PasarProcesoASwapAuxiliar",
 		log.AnyAttr("ObtenerMarcosValidos", marcosDelProceso))
 
 	//iterar la lista de marcos un for, y por cada uno multiplicarlo por el sizepage
@@ -542,15 +344,9 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 
 	pidInt, _ := strconv.Atoi(pid)
 
-	h.Log.Debug("PasarProcesoASwapAuxiliar",
-		log.AnyAttr("ProcesoPorPosicionSwap", pidInt))
-
 	for i := 0; i < len(marcosDelProceso); i++ {
 		h.ProcesoPorPosicionSwap = append(h.ProcesoPorPosicionSwap, pidInt)
 	}
-
-	h.Log.Debug("PasarProcesoASwapAuxiliar",
-		log.AnyAttr("ProcesoPorPosicionSwap", h.ProcesoPorPosicionSwap))
 
 	for marco := range marcosDelProceso {
 		err := h.escribirMarcoEnSwap(archivoSwap, marco)
@@ -560,9 +356,32 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 
 		copy(h.EspacioDeUsuario[marco*h.Config.PageSize:((marco+1)*h.Config.PageSize-1)], make([]byte, h.Config.PageSize))
 	}
+	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
+	tablaMetricas.CantidadBajadasSwap++
+}
 
-	h.Log.Debug("PasarProcesoASwapAuxiliar",
-		log.AnyAttr("EspacioDeUsuario", h.EspacioDeUsuario))
+func (h *Handler) ObtenerMarcosDeLaTabla(tabla interface{}) []int {
+
+	var marcos []int
+
+	switch t := tabla.(type) {
+	case []int:
+		// Caso hoja: extraer los marcos válidos
+		for _, marco := range t {
+			if marco != -1 {
+				marcos = append(marcos, marco)
+			}
+		}
+	case []interface{}:
+		// Caso intermedio: recorrer cada subnivel
+		for _, sub := range t {
+			marcos = append(marcos, h.ObtenerMarcosDeLaTabla(sub)...)
+		}
+	default:
+		// Tipo no reconocido (no debería ocurrir)
+	}
+
+	return marcos
 
 }
 
@@ -750,10 +569,10 @@ func (h *Handler) DumpProceso(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
 		return
 	}
-	/* HACER LOG
-
+	/*Log obligatorio: Memory Dump
 	“## PID: <PID> - Memory Dump solicitado”
 	*/
+	h.Log.Info(fmt.Sprintf("## PID: %s - Memory Dump solicitado”", pid))
 
 	h.DumpProcesoFuncionAuxiliar(pid)
 
@@ -811,14 +630,11 @@ func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
 		return
 	}
-	/* HACER LOG
+	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
+	/* Log obligatorio: Destrucción de Proceso
 	“## PID: <PID> - Proceso Destruido - Métricas - Acc.T.Pag: <ATP>;
-	Inst.Sol.: <Inst.Sol.>;
-	SWAP: <SWAP>;
-	Mem.Prin.: <Mem.Prin.>;
-	Lec.Mem.: <Lec.Mem.>;
-	Esc.Mem.: <Esc.Mem.>”
-	*/
+	Inst.Sol.: <Inst.Sol.>; SWAP: <SWAP>; Mem.Prin.: <Mem.Prin.>; Lec.Mem.: <Lec.Mem.>; Esc.Mem.: <Esc.Mem.>”*/
+	h.Log.Info(fmt.Sprintf("## PID: %s - Proceso Destruido - Métricas - Acc.T.Pag: %d; Inst.Sol.: %d; SWAP: %d; Mem.Prin.: %d; Lec.Mem.: %d; Esc.Mem.: %d", pid, tablaMetricas.CantidadAccesosATablas, tablaMetricas.CantidadInstruccionesSolicitadas, tablaMetricas.CantidadBajadasSwap, tablaMetricas.CantidadSubidasMemoriaPrincipal, tablaMetricas.CantidadDeLectura, tablaMetricas.CantidadDeEscritura))
 
 	h.FinalizarProcesoFuncionAuxiliar(pid)
 
@@ -835,7 +651,7 @@ func (h *Handler) FinalizarProcesoFuncionAuxiliar(pid string) {
 
 	} else {
 		procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
-		h.Log.Debug("DumpProcesoFuncionAuxiliar",
+		h.Log.Debug("FinalizarProcesoFuncionAuxiliar",
 			log.AnyAttr("procesYTablaAsociada", procesYTablaAsociada.TablasDePaginas))
 
 		marcosDelProceso := h.ObtenerMarcosDeLaTabla(procesYTablaAsociada.TablasDePaginas)
@@ -881,72 +697,42 @@ func (h *Handler) ActualizarPaginaCompleta(marco int, valorAEscribir string, pid
 	h.EscribirPagina(marco, 0, valorAEscribir, pid)
 }
 
+// VER EL TAMANIO A LEER XQ SI ES MAS GRANDE QUE LO QUE TENGO DEVOLVERIA CARACTERES REPRESENTANDO LA POSCION VACIA CHECKEAR
 func (h *Handler) LeerPagina(marco int, offset int, tamanioALeer int, pid string) string {
 
 	//if tamanioALeer mayor a cero
 	lecturaMemoria := string(h.EspacioDeUsuario[((marco * h.Config.PageSize) + offset):((marco * h.Config.PageSize) + offset + tamanioALeer + 1)])
 
+	lecturaMemoria = h.limpiarNulos(lecturaMemoria)
+	/* Log obligatorio: Escritura / lectura en espacio de usuario
+	“## PID: <PID> - <Lectura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>”*/
+	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d", pid, lecturaMemoria, marco+offset, tamanioALeer))
+
+	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
+	tablaMetricas.CantidadDeLectura++
+
 	h.Log.Debug("LeerPagina",
 		log.AnyAttr("lecturaMemoria", lecturaMemoria))
 	return lecturaMemoria
+}
 
-	/* HACER LOG
-	“## PID: <PID> - <Lectura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>”*/
+func (h *Handler) limpiarNulos(cadena string) string {
+	return strings.ReplaceAll(cadena, "\x00", "")
 }
 
 func (h *Handler) EscribirPagina(marco int, offset int, valorAEscribir string, pid string) {
 
-	copy(h.EspacioDeUsuario[((marco*h.Config.PageSize)+offset):], []byte(valorAEscribir))
+	copy(h.EspacioDeUsuario[((marco*h.Config.PageSize)+offset):((marco*h.Config.PageSize)+offset)+len(valorAEscribir)], []byte(valorAEscribir))
 
 	h.Log.Debug("EscribirPagina",
 		log.AnyAttr("lecturaMemoria", h.EspacioDeUsuario))
 
-	/* HACER LOG
+	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
+	tablaMetricas.CantidadDeEscritura++
+	/* Log obligatorio: Escritura / lectura en espacio de usuario
 	“## PID: <PID> - <Escritura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>”*/
+	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d", pid, valorAEscribir, marco+offset, len(valorAEscribir)))
 
-}
-
-// [0 , 0 , 1]
-func (h *Handler) BuscarMarcoPorPagina(paginas []int, pid string) int {
-
-	procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
-
-	tablasDePAginas := procesYTablaAsociada.TablasDePaginas
-	marco, _ := h.ObtenerMarcoDesdeIndices(tablasDePAginas, paginas)
-
-	h.Log.Debug("BuscarMarcoPorPagina",
-		log.AnyAttr("marco", marco))
-	return 1
-}
-
-func (h *Handler) ObtenerMarcoDesdeIndices(tablas []interface{}, indices []int) (int, error) {
-	actual := tablas[0].([]*TablaIntermedia)
-
-	siguienteNivelIdx := 0
-
-	for _, idx := range indices {
-
-		h.Log.Debug("tablaIntermedia",
-			log.AnyAttr("forEntre", "marco"))
-
-		// Accedés a una tabla específica, por ejemplo la primera o la que te interese por índice:
-		tabla := actual[siguienteNivelIdx] // ← Acá accedés a una *TablaIntermedia
-
-		// Ahora sí podés acceder a sus entradas:
-
-		//[{"Entradas":[0,1]}]
-		siguienteNivelIdx, _ = tabla.Entradas[siguienteNivelIdx].(int)
-
-		// Bajamos un nivel
-		actual = tablas[idx+1].([]*TablaIntermedia)
-
-		h.Log.Debug("ObtenerMarcoDesdeIndices",
-			log.AnyAttr("ACTUAL !!!!!!!!!", actual))
-
-		///actual = siguienteNivel
-	}
-
-	return -1, fmt.Errorf("no se pudo encontrar el marco")
 }
 
 func (h *Handler) CrearTabla(niveles int, entradasPorElemento int) interface{} {
@@ -973,8 +759,28 @@ func (h *Handler) CrearTabla(niveles int, entradasPorElemento int) interface{} {
 	return tabla
 }
 
-func (h *Handler) LeerValor(tabla interface{}, indices []int) (int, bool) {
-	actual := tabla
+func (h *Handler) AccesoATabla(w http.ResponseWriter, r *http.Request) {
+
+	var (
+		//ctx = r.Context()
+		// Leemos el PID
+		pid = r.URL.Query().Get("pid")
+	)
+
+	if pid == "" {
+		h.Log.Error("PID no proporcionado")
+		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
+		return
+	}
+	tabla, _ := h.BuscarProcesoPorPID(pid)
+	//TO DO:
+	//CORREGIR VER COMO LO PASA LA MMU
+	h.BuscarMarcoPorPagina(tabla, []int{0, 0, 1})
+
+}
+
+func (h *Handler) BuscarMarcoPorPagina(tabla *TablasProceso, indices []int) (int, bool) {
+	actual := tabla.TablasDePaginas
 	for i := 0; i < len(indices); i++ {
 		switch nodo := actual.(type) {
 		case []interface{}:
@@ -990,7 +796,9 @@ func (h *Handler) LeerValor(tabla interface{}, indices []int) (int, bool) {
 		default:
 			return 0, false
 		}
+		tabla.CantidadAccesosATablas++
 	}
+
 	return 0, false
 }
 

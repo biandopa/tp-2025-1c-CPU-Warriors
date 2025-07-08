@@ -26,6 +26,7 @@ func main() {
 	mux.HandleFunc("/kernel/pasar-proceso-a-swap", h.PasarProcesoASwap) // Kernel --> Memoria
 	mux.HandleFunc("/kernel/dump-proceso", h.DumpProceso)               // Kernel --> Memoria
 
+	mux.HandleFunc("/kernel/acceso-a-tabla", h.AccesoATabla)
 	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso) // Kernel --> Memoria
 
 	memoriaAddress := fmt.Sprintf("%s:%d", h.Config.IpMemory, h.Config.PortMemory)
