@@ -129,6 +129,4 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 		log.IntAttr("tamaño_disponible", espacioDisponible),
 		log.StringAttr("mensaje", response.Mensaje),
 	)
-
-	w.WriteHeader(http.StatusOK)
 }

@@ -1,6 +1,8 @@
 package log
 
 import (
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -8,10 +10,28 @@ import (
 
 func BuildLogger(level string) *slog.Logger {
 	ops := &slog.HandlerOptions{
-		AddSource: true,
-		Level:     getLevelByName(level),
+		//AddSource: true,
+		Level: getLevelByName(level),
 	}
-	return slog.New(slog.NewJSONHandler(os.Stderr, ops))
+
+	output := configurarLoggerOutput()
+	logger := slog.New(slog.NewJSONHandler(output, ops))
+
+	return logger
+}
+
+func configurarLoggerOutput() io.Writer {
+	workingDir, err := os.Getwd()
+	fmt.Println(workingDir)
+	logFile, err := os.OpenFile(workingDir+"/tp.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		panic(err)
+	}
+	defer func(file *os.File) {
+		_ = file.Close()
+	}(logFile)
+
+	return io.MultiWriter(os.Stdout, logFile)
 }
 
 func ErrAttr(err error) slog.Attr {
