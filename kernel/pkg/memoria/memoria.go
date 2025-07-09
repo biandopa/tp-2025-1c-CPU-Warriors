@@ -24,9 +24,9 @@ func NewMemoria(ip string, puerto int, logger *slog.Logger) *Memoria {
 	}
 }
 
-func (m *Memoria) ConsultarEspacio(file, sizeProceso string, pid int) bool {
+func (m *Memoria) ConsultarEspacio(sizeProceso string, pid int) bool {
 	url := fmt.Sprintf("http://%s:%d/kernel/espacio-disponible", m.IP, m.Puerto)
-	url = fmt.Sprintf("%s?archivo=%s&tamanio-proceso=%s&pid=%d", url, file, sizeProceso, pid)
+	url = fmt.Sprintf("%s?tamanio-proceso=%s&pid=%d", url, sizeProceso, pid)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -54,6 +54,23 @@ func (m *Memoria) ConsultarEspacio(file, sizeProceso string, pid int) bool {
 	m.Log.Debug("Consulta de espacio en memoria exitosa",
 		log.IntAttr("status_code", resp.StatusCode),
 	)
+
+	return true
+}
+
+func (m *Memoria) CargarProcesoEnMemoriaDeSistema(file string, pid int) bool {
+	url := fmt.Sprintf("http://%s:%d/kernel/cargar-memoria-de-sistema", m.IP, m.Puerto)
+	url = fmt.Sprintf("%s?archivo=%s&pid=%d", url, file, pid)
+
+	_, err := http.Get(url)
+	if err != nil {
+		m.Log.Error("Error cargar proceso en memoria de sistema",
+			log.ErrAttr(err),
+			log.StringAttr("ip", m.IP),
+			log.IntAttr("puerto", m.Puerto),
+		)
+		return false
+	}
 
 	return true
 }
