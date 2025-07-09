@@ -17,7 +17,7 @@ func main() {
 
 	// mdilauro: cambio de 2 a 3 porque el primer argumento es el nombre del programa
 	// el segundo es el archivo de configuración y el tercero es el tamaño del proceso
-	if len(os.Args) < 3 { 
+	if len(os.Args) < 3 {
 		h.Log.Error(fmt.Sprintf("Faltan %d argumentos.", len(os.Args)))
 		panic("Faltan argumentos para inicializar el módulo Kernel.")
 	}
@@ -28,6 +28,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/io/conexion-inicial", h.ConexionInicialIO)    //IO LISTA --> Kernel
+	mux.HandleFunc("/io/desconexion", h.DesconexionIO)             //IO --> Kernel (Notifica desconexión)
 	mux.HandleFunc("/cpu/conexion-inicial", h.ConexionInicialCPU)  // CPU  --> Kernel (Envia IP, puerto e ID)  HANDSHAKE
 	mux.HandleFunc("/io/peticion-finalizada", h.TerminoPeticionIO) // IO --> KERNEL (usleep)
 

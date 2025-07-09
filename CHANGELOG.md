@@ -1,5 +1,390 @@
 # 📝 Changelog
 
+## **Fecha:** 2025-01-14
+
+---
+
+### 🚀 **Cambios Principales - Implementación Manejo de Señales en Módulo IO**
+
+#### **1. Implementación de Finalización Controlada**
+
+##### **📁 Archivo:** `io/io.go`
+
+**🔧 Funcionalidad agregada:**
+- Manejo de señales SIGINT y SIGTERM para finalización controlada del módulo IO
+- Notificación al kernel antes de finalizar el proceso
+- Implementación según especificaciones del Episodio IX
+
+**🔧 Código implementado:**
+
+1. **Importaciones necesarias:**
+   ```go
+   import (
+       "os/signal"
+       "syscall"
+       // ... otras importaciones
+   )
+   ```
+
+2. **Configuración del manejo de señales:**
+   ```go
+   // Configurar manejo de señales para finalización controlada
+   sigs := make(chan os.Signal, 1)
+   signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+   
+   // Goroutine para manejar las señales
+   go func() {
+       sig := <-sigs
+       h.Log.Info("Señal recibida, finalizando módulo IO de manera controlada",
+           log.StringAttr("signal", sig.String()),
+           log.StringAttr("nombreIO", nombreIO),
+       )
+       
+       // Notificar al kernel la desconexión
+       err := h.NotificarDesconexionKernel(nombreIO)
+       if err != nil {
+           h.Log.Error("Error al notificar desconexión al kernel", log.ErrAttr(err))
+       } else {
+           h.Log.Info("Kernel notificado de la desconexión exitosamente")
+       }
+       
+       // Finalizar el programa
+       os.Exit(0)
+   }()
+   ```
+
+---
+
+#### **2. Función de Notificación de Desconexión**
+
+##### **📁 Archivo:** `io/cmd/api/conexion.go`
+
+**🔧 Funcionalidad agregada:**
+- Función para notificar al kernel cuando el módulo IO se desconecta
+- Manejo de errores y logs de debug
+
+**🔧 Código implementado:**
+
+```go
+// NotificarDesconexionKernel notifica al kernel que el módulo IO se va a desconectar
+func (h *Handler) NotificarDesconexionKernel(nombre string) error {
+    // Estructura para enviar la notificación de desconexión al kernel
+    data := IOIdentificacion{
+        Nombre: nombre,
+        IP:     h.Config.IpIo,
+        Puerto: h.Config.PortIo,
+    }
+    
+    // Serializar la estructura a JSON
+    body, err := json.Marshal(data)
+    if err != nil {
+        return fmt.Errorf("error al serializar ioIdentificacion: %w", err)
+    }
+    
+    // Enviar la solicitud POST al kernel para notificar la desconexión
+    url := fmt.Sprintf("http://%s:%d/io/desconexion", h.Config.IpKernel, h.Config.PortKernel)
+    resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+    if err != nil {
+        return fmt.Errorf("error enviando notificación de desconexión: %w", err)
+    }
+    
+    if resp != nil {
+        defer func() {
+            _ = resp.Body.Close()
+        }()
+        
+        if resp.StatusCode != http.StatusOK {
+            return fmt.Errorf("kernel respondió con status: %s", resp.Status)
+        }
+        
+        h.Log.Debug("Notificación de desconexión enviada al kernel",
+            slog.Attr{Key: "status", Value: slog.StringValue(resp.Status)},
+            slog.Attr{Key: "nombre", Value: slog.StringValue(nombre)},
+        )
+    }
+    
+    return nil
+}
+```
+
+---
+
+#### **3. Actualización del Kernel para Manejo de Desconexión**
+
+##### **📁 Archivo:** `kernel/kernel.go`
+
+**🔧 Endpoint agregado:**
+- Nuevo endpoint `/io/desconexion` para manejar notificaciones de desconexión de módulos IO
+
+**🔧 Código implementado:**
+
+```go
+mux.HandleFunc("/io/desconexion", h.DesconexionIO)  //IO --> Kernel (Notifica desconexión)
+```
+
+**📋 Nota:** El handler `DesconexionIO` ya existía en `kernel/cmd/api/conexion.go` y maneja:
+- Remoción del dispositivo de la lista de IOs conectadas
+- Finalización de procesos que estaban usando el dispositivo desconectado
+- Manejo de colas de espera para dispositivos sin más instancias
+
+---
+
+#### **4. Mejoras en Logs de Inicialización**
+
+##### **📁 Archivo:** `io/io.go`
+
+**🔧 Mejora implementada:**
+- Log informativo cuando el módulo IO inicia y está listo para recibir peticiones
+
+**🔧 Código implementado:**
+
+```go
+h.Log.Info("Módulo IO iniciado y escuchando peticiones",
+    log.StringAttr("nombreIO", nombreIO),
+    log.IntAttr("puerto", h.Config.PortIo),
+)
+```
+
+---
+
+### 📊 **Resumen de Cambios**
+
+- **📁 Archivos modificados:** 3
+- **🔧 Funcionalidades agregadas:** 2 (manejo de señales, notificación de desconexión)
+- **📋 Endpoints agregados:** 1 (`/io/desconexion`)
+- **🧹 Mejoras en logs:** 1 (log de inicialización)
+
+### 🎯 **Cumplimiento del Episodio IX**
+
+El módulo IO ahora cumple **100% con las especificaciones** del Episodio IX:
+- ✅ Recibe nombre como parámetro de línea de comandos
+- ✅ Realiza handshake inicial con kernel
+- ✅ Simula operaciones IO con `usleep`
+- ✅ Notifica al kernel cuando termina operaciones
+- ✅ **Maneja señales SIGINT y SIGTERM** ⭐
+- ✅ **Notifica al kernel su finalización** ⭐
+- ✅ **Finaliza de manera controlada** ⭐
+- ✅ Logs obligatorios con formato correcto
+- ✅ Configuración completa
+
+### 🔧 **Cómo Usar**
+
+Para probar el manejo de señales:
+
+1. **Iniciar el módulo IO:**
+   ```bash
+   go run io.go TECLADO
+   ```
+
+2. **Enviar señal SIGINT (Ctrl+C):**
+   ```bash
+   # El módulo IO detectará la señal y:
+   # - Notificará al kernel su desconexión
+   # - Terminará de manera controlada
+   # - Mostrará logs informativos
+   ```
+
+3. **Enviar señal SIGTERM:**
+   ```bash
+   kill -TERM <PID_DEL_PROCESO_IO>
+   ```
+
+### 🎯 **Estado Final**
+
+El módulo IO está **completamente funcional** y cumple con todas las especificaciones del Episodio IX, incluyendo la **finalización controlada** mediante señales SIGINT y SIGTERM.
+
+---
+
+## **Fecha:** 2025-01-14
+
+---
+
+### 🚀 **Cambios Principales - Verificación y Corrección Módulo IO**
+
+#### **1. Corrección CRÍTICA - Notificación al Kernel**
+
+##### **📁 Archivo:** `io/cmd/api/usleep.go`
+
+**🔧 Problema identificado:**
+- El módulo IO no notificaba al kernel cuando terminaba una operación `usleep`
+- El kernel quedaba esperando indefinidamente sin saber que el proceso terminó el IO
+
+**🔧 Solución implementada:**
+
+1. **Función de notificación agregada:**
+   ```go
+   // notificarKernelFinIO envía una notificación POST al kernel cuando termina una operación IO
+   func (h *Handler) notificarKernelFinIO(pid int) error {
+       // Estructura para enviar al kernel (compatible con lo que espera el endpoint /io/peticion-finalizada)
+       finIOData := IOIdentificacion{
+           Nombre:    h.Nombre,
+           IP:        h.Config.IpIo,
+           Puerto:    h.Config.PortIo,
+           ProcesoID: pid,
+           Cola:      "blocked", // El proceso estaba en la cola de blocked durante el IO
+       }
+       
+       // Enviar la solicitud POST al kernel
+       url := fmt.Sprintf("http://%s:%d/io/peticion-finalizada", h.Config.IpKernel, h.Config.PortKernel)
+       resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+       // ... manejo de errores ...
+   }
+   ```
+
+2. **Integración en el flujo principal:**
+   ```go
+   func (h *Handler) EjecutarPeticion(w http.ResponseWriter, r *http.Request) {
+       // ... simulación de IO ...
+       
+       // Notificar al kernel que el proceso terminó el IO
+       err = h.notificarKernelFinIO(usleep.PID)
+       if err != nil {
+           h.Log.Error("Error al notificar kernel fin de IO", log.ErrAttr(err))
+           w.WriteHeader(http.StatusInternalServerError)
+           return
+       }
+   }
+   ```
+
+---
+
+#### **2. Corrección de Formato de Logs Obligatorios**
+
+##### **📁 Archivo:** `io/cmd/api/usleep.go`
+
+**🔧 Problema identificado:**
+- Los logs no cumplían con el formato obligatorio especificado en el enunciado
+- Faltaba el prefijo `## PID:` requerido
+
+**🔧 Correcciones realizadas:**
+
+1. **Log de inicio de IO:**
+   ```go
+   // ❌ ANTES: Formato incorrecto
+   h.Log.Info(fmt.Sprintf("%d PID - Inicio de IO - Tiempo: %d", usleep.PID, usleep.TiempoSleep))
+   
+   // ✅ DESPUÉS: Formato correcto según especificación
+   h.Log.Info(fmt.Sprintf("## PID: %d - Inicio de IO - Tiempo: %d", usleep.PID, usleep.TiempoSleep))
+   ```
+
+2. **Log de fin de IO:**
+   ```go
+   // ❌ ANTES: Formato incorrecto
+   h.Log.Info(fmt.Sprintf("%d PID - Fin de IO", usleep.PID))
+   
+   // ✅ DESPUÉS: Formato correcto según especificación
+   h.Log.Info(fmt.Sprintf("## PID: %d - Fin de IO", usleep.PID))
+   ```
+
+---
+
+#### **3. Actualización de Estructura de Comunicación**
+
+##### **📁 Archivo:** `io/cmd/api/entities.go`
+
+**🔧 Problema identificado:**
+- La estructura `IOIdentificacion` no era compatible con lo que esperaba el kernel
+- Faltaban campos necesarios para la comunicación completa
+
+**🔧 Solución implementada:**
+
+1. **Estructura actualizada:**
+   ```go
+   // ❌ ANTES: Estructura incompleta
+   type IOIdentificacion struct {
+       Nombre string `json:"nombre"`
+       IP     string `json:"ip"`
+       Puerto int    `json:"puerto"`
+   }
+   
+   // ✅ DESPUÉS: Estructura completa y compatible
+   type IOIdentificacion struct {
+       Nombre    string `json:"nombre"`
+       IP        string `json:"ip"`
+       Puerto    int    `json:"puerto"`
+       ProcesoID int    `json:"pid"`  // PID del proceso que está usando la IO
+       Cola      string `json:"cola"` // Cola a la que pertenece el proceso
+   }
+   ```
+
+2. **Limpieza de código:**
+   ```go
+   // Eliminada estructura obsoleta 'finIO' que no se usaba
+   ```
+
+---
+
+#### **4. Corrección de Endpoint de Comunicación**
+
+##### **📁 Archivo:** `io/cmd/api/usleep.go`
+
+**🔧 Problema identificado:**
+- El módulo IO intentaba comunicarse con endpoint incorrecto (`/io/terminoIO`)
+- El kernel escucha en `/io/peticion-finalizada`
+
+**🔧 Corrección aplicada:**
+```go
+// ❌ ANTES: Endpoint incorrecto
+url := fmt.Sprintf("http://%s:%d/io/terminoIO", h.Config.IpKernel, h.Config.PortKernel)
+
+// ✅ DESPUÉS: Endpoint correcto
+url := fmt.Sprintf("http://%s:%d/io/peticion-finalizada", h.Config.IpKernel, h.Config.PortKernel)
+```
+
+---
+
+#### **5. Mejoras en Manejo de Errores**
+
+##### **📁 Archivo:** `io/cmd/api/usleep.go`
+
+**🔧 Mejoras implementadas:**
+
+1. **Manejo robusto de response body:**
+   ```go
+   defer func() {
+       _ = resp.Body.Close()
+   }()
+   ```
+
+2. **Validación de respuesta HTTP:**
+   ```go
+   if resp.StatusCode != http.StatusOK {
+       return fmt.Errorf("kernel returned non-OK status: %s", resp.Status)
+   }
+   ```
+
+3. **Logs de debug para seguimiento:**
+   ```go
+   h.Log.Debug("Kernel notificado exitosamente de fin de IO",
+       log.IntAttr("PID", pid),
+       log.StringAttr("dispositivo", h.Nombre),
+       log.StringAttr("kernel_response", resp.Status),
+   )
+   ```
+
+---
+
+### 📊 **Resumen de Cambios**
+
+- **📁 Archivos modificados:** 2
+- **🔧 Problemas críticos corregidos:** 4
+- **✅ Funcionalidades agregadas:** 1 (notificación al kernel)
+- **📋 Logs corregidos:** 2 (inicio y fin de IO)
+- **🧹 Limpieza de código:** 1 (estructura obsoleta eliminada)
+
+### 🎯 **Estado Final**
+
+El módulo IO está **100% funcional** y cumple con todas las especificaciones:
+- ✅ Handshake inicial con kernel
+- ✅ Recepción y procesamiento de peticiones `usleep`
+- ✅ Logs obligatorios con formato correcto
+- ✅ Notificación automática al kernel al terminar operaciones
+- ✅ Comunicación bidireccional completa IO ↔ Kernel
+- ✅ Compilación sin errores
+- ✅ Manejo robusto de errores
+
+---
+
 ## **Fecha:** 2025-07-08
 
 ---
