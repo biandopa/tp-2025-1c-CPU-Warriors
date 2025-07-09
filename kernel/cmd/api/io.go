@@ -54,7 +54,7 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 				// Buscar el proceso y enviarlo a IO
 				// Nota: Necesitaríamos almacenar el tiempo de IO también en la cola de espera
 				// Por simplicidad, vamos a usar un tiempo por defecto o implementar después
-				h.Log.Info("TODO: Enviar proceso en espera a IO - implementar tiempo de IO guardado")
+				h.Log.Debug("TODO: Enviar proceso en espera a IO - implementar tiempo de IO guardado")
 			}
 
 			break
@@ -65,6 +65,7 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 	//Fin de IO: "## (<PID>) finalizó IO y pasa a READY"
 	h.Log.Info(fmt.Sprintf("## (%d) finalizó IO y pasa a READY", ioIdentificacionPeticion.ProcesoID))
 
+	// Buscar el proceso y enviarlo a IO
 	proceso := h.Planificador.BuscarProcesoEnCola(ioIdentificacionPeticion.ProcesoID, ioIdentificacionPeticion.Cola)
 	//Aviso al kernel que el proceso termino su IO para que revise si esta suspendido
 	go h.Planificador.ManejarFinIO(proceso)
