@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -18,9 +19,8 @@ type rtaCPU struct {
 	Args        []string `json:"args,omitempty"`
 }
 
-// EjecutarPlanificadores envia un proceso a la Memoria
-func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
-	// Creo un proceso
+// crearProceso crea un nuevo proceso con las métricas inicializadas correctamente
+func (h *Handler) crearProceso(nombreArchivo, tamanioProceso string) *internal.Proceso {
 	proceso := &internal.Proceso{
 		PCB: &internal.PCB{
 			PID:                h.UniqueID.GetUniqueID(),
@@ -28,10 +28,27 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 			MetricasTiempo:     map[internal.Estado]*internal.EstadoTiempo{},
 			MetricasEstado:     map[internal.Estado]int{},
 			Tamanio:            tamanioProceso,
-			NombreArchivo:      archivoNombre,
+			NombreArchivo:      nombreArchivo,
 			EstimacionAnterior: float64(h.Config.InitialEstimate),
 		},
 	}
+
+	// Inicializar métricas de tiempo para estado NEW
+	proceso.PCB.MetricasTiempo[internal.EstadoNew] = &internal.EstadoTiempo{
+		TiempoInicio:    time.Now(),
+		TiempoAcumulado: 0,
+	}
+
+	// Inicializar contador de estado NEW
+	proceso.PCB.MetricasEstado[internal.EstadoNew] = 1
+
+	return proceso
+}
+
+// EjecutarPlanificadores envia un proceso a la Memoria
+func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
+	// Creo un proceso con métricas inicializadas correctamente
+	proceso := h.crearProceso(archivoNombre, tamanioProceso)
 
 	go h.Planificador.PlanificadorLargoPlazo()
 	go h.Planificador.PlanificadorCortoPlazo()
@@ -75,18 +92,8 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Creo un proceso hijo
-		proceso := &internal.Proceso{
-			PCB: &internal.PCB{
-				PID:                h.UniqueID.GetUniqueID(),
-				PC:                 0,
-				MetricasTiempo:     map[internal.Estado]*internal.EstadoTiempo{},
-				MetricasEstado:     map[internal.Estado]int{},
-				Tamanio:            syscall.Args[1],
-				NombreArchivo:      syscall.Args[0],
-				EstimacionAnterior: float64(h.Config.InitialEstimate),
-			},
-		}
+		// Creo un proceso hijo con métricas inicializadas correctamente
+		proceso := h.crearProceso(syscall.Args[0], syscall.Args[1])
 
 		mu.Lock()
 		h.Planificador.CanalNuevoProcesoNew <- proceso
