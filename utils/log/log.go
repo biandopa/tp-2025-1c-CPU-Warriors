@@ -30,9 +30,6 @@ func configurarLoggerOutput() io.Writer {
 	if err != nil {
 		panic(err)
 	}
-	defer func(file *os.File) {
-		_ = file.Close()
-	}(logFile)
 
 	return io.MultiWriter(os.Stdout, logFile)
 }
