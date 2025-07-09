@@ -617,58 +617,6 @@ func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) {
 
 }
 
-func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
-
-	var (
-		//ctx = r.Context()
-		// Leemos el PID
-		pid = r.URL.Query().Get("pid")
-	)
-
-	if pid == "" {
-		h.Log.Error("PID no proporcionado")
-		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
-		return
-	}
-	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
-	/* Log obligatorio: Destrucción de Proceso
-	“## PID: <PID> - Proceso Destruido - Métricas - Acc.T.Pag: <ATP>;
-	Inst.Sol.: <Inst.Sol.>; SWAP: <SWAP>; Mem.Prin.: <Mem.Prin.>; Lec.Mem.: <Lec.Mem.>; Esc.Mem.: <Esc.Mem.>”*/
-	h.Log.Info(fmt.Sprintf("## PID: %s - Proceso Destruido - Métricas - Acc.T.Pag: %d; Inst.Sol.: %d; SWAP: %d; Mem.Prin.: %d; Lec.Mem.: %d; Esc.Mem.: %d", pid, tablaMetricas.CantidadAccesosATablas, tablaMetricas.CantidadInstruccionesSolicitadas, tablaMetricas.CantidadBajadasSwap, tablaMetricas.CantidadSubidasMemoriaPrincipal, tablaMetricas.CantidadDeLectura, tablaMetricas.CantidadDeEscritura))
-
-	h.FinalizarProcesoFuncionAuxiliar(pid)
-
-}
-
-func (h *Handler) FinalizarProcesoFuncionAuxiliar(pid string) {
-
-	pidInt, _ := strconv.Atoi(pid)
-
-	if h.ContienePIDEnSwap(pidInt) {
-		//compactar la posicion en swap y borrarlo en la lista de procesos}
-		h.eliminarOcurrencias(pidInt)
-		h.CompactarSwap()
-
-	} else {
-		procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
-		h.Log.Debug("FinalizarProcesoFuncionAuxiliar",
-			log.AnyAttr("procesYTablaAsociada", procesYTablaAsociada.TablasDePaginas))
-
-		marcosDelProceso := h.ObtenerMarcosDeLaTabla(procesYTablaAsociada.TablasDePaginas)
-
-		for marco := range marcosDelProceso {
-			copy(h.EspacioDeUsuario[marco*h.Config.PageSize:((marco+1)*h.Config.PageSize-1)], make([]byte, h.Config.PageSize))
-		}
-	}
-	//hasta aca el else
-	//2do borrarlo de la lista de tablas
-	h.BorrarProcesoPorPID(pid)
-	//3ero borrar las instrucciones
-
-	delete(h.Instrucciones, pidInt)
-
-}
-
 func (h *Handler) ContienePIDEnSwap(pid int) bool {
 	for _, valor := range h.ProcesoPorPosicionSwap {
 		if valor == pid {
@@ -676,17 +624,6 @@ func (h *Handler) ContienePIDEnSwap(pid int) bool {
 		}
 	}
 	return false
-}
-
-func (h *Handler) BorrarProcesoPorPID(pid string) error {
-	for i, proceso := range h.TablasProcesos {
-		if proceso.PID == pid {
-			// Borramos el elemento del slice
-			h.TablasProcesos = append(h.TablasProcesos[:i], h.TablasProcesos[i+1:]...)
-			return nil
-		}
-	}
-	return fmt.Errorf("proceso con PID %s no encontrado", pid)
 }
 
 func (h *Handler) LeerPaginaCompleta(marco int, pid string) {
