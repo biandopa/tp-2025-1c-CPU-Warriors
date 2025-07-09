@@ -123,7 +123,7 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 	//
 	//BORRAR DE ACA PARA ABAJO ESTA AHORA PARA PROBAR LAS COSAS
 
-	if esActualizacion == false {
+	if !esActualizacion {
 
 		copy(h.EspacioDeUsuario[0:], []byte("hola"))
 
@@ -209,7 +209,7 @@ type TablasProceso struct {
 }
 
 func (h *Handler) MarcosLibres(paginasNecesarias int) []int {
-	libres := []int{}
+	libres := make([]int, 0)
 	for i, ocupado := range h.FrameTable {
 		if !ocupado {
 			libres = append(libres, i)
@@ -222,7 +222,6 @@ func (h *Handler) MarcosLibres(paginasNecesarias int) []int {
 }
 
 func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http.Request) {
-
 	var (
 		ctx = r.Context()
 		// Leemos el nombre del archivo y el tamaño del proceso de la consulta
@@ -305,9 +304,7 @@ func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http
 }
 
 func (h *Handler) PasarProcesoASwap(w http.ResponseWriter, r *http.Request) {
-
 	var (
-		//ctx = r.Context()
 		// Leemos el PID
 		pid = r.URL.Query().Get("pid")
 	)
@@ -323,7 +320,6 @@ func (h *Handler) PasarProcesoASwap(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
-
 	procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
 	h.Log.Debug("PasarProcesoASwapAuxiliar",
 		log.AnyAttr("procesYTablaAsociada", procesYTablaAsociada.TablasDePaginas))
@@ -340,7 +336,9 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 		panic(err)
 	}
 	//Para cerrarlo despues
-	defer archivoSwap.Close()
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(archivoSwap)
 
 	pidInt, _ := strconv.Atoi(pid)
 
@@ -361,7 +359,6 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 }
 
 func (h *Handler) ObtenerMarcosDeLaTabla(tabla interface{}) []int {
-
 	var marcos []int
 
 	switch t := tabla.(type) {
@@ -382,7 +379,6 @@ func (h *Handler) ObtenerMarcosDeLaTabla(tabla interface{}) []int {
 	}
 
 	return marcos
-
 }
 
 func (h *Handler) SacarProcesoDeSwap(pid string) {
@@ -437,7 +433,15 @@ func (h *Handler) SacarProcesoDeSwap(pid string) {
 		log.AnyAttr("marcosDelProcesoDeSwap", marcosDelProcesoDeSwap))
 
 	//ir escribiendo cada frame en memoria
-	h.CargarPaginasEnMemoriaDesdeSwap(posicionEnSwap, marcosDelProcesoDeSwap)
+	if err := h.CargarPaginasEnMemoriaDesdeSwap(posicionEnSwap, marcosDelProcesoDeSwap); err != nil {
+		h.Log.Error("Error al cargar páginas en memoria desde swap",
+			log.ErrAttr(err),
+			log.AnyAttr("posicionEnSwap", posicionEnSwap),
+			log.AnyAttr("marcosDelProcesoDeSwap", marcosDelProcesoDeSwap),
+		)
+		//http.Error(w, "error al cargar páginas en memoria desde swap", http.StatusInternalServerError)
+		return
+	}
 	h.Log.Debug("SacarProcesoDeSwap",
 		log.AnyAttr("CargarPaginasEnMemoriaDesdeSwap", h.EspacioDeUsuario))
 
@@ -446,8 +450,13 @@ func (h *Handler) SacarProcesoDeSwap(pid string) {
 	h.Log.Debug("SacarProcesoDeSwap",
 		log.AnyAttr("eliminarOcurrencias", h.ProcesoPorPosicionSwap))
 
-	h.CompactarSwap()
-
+	if err := h.CompactarSwap(); err != nil {
+		h.Log.Error("Error al compactar swap",
+			log.ErrAttr(err),
+		)
+		//http.Error(w, "error al compactar swap", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) CompactarSwap() error {
@@ -458,7 +467,9 @@ func (h *Handler) CompactarSwap() error {
 	if err != nil {
 		return fmt.Errorf("error abriendo swap.bin: %w", err)
 	}
-	defer swapFile.Close()
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(swapFile)
 
 	posDestino := 0
 	nuevaPosiciones := make([]int, 0)
@@ -515,7 +526,9 @@ func (h *Handler) CargarPaginasEnMemoriaDesdeSwap(posicionesSwap []int, marcosDe
 		panic(err)
 	}
 	//Para cerrarlo despues
-	defer archivoSwap.Close()
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(archivoSwap)
 
 	h.Log.Debug("CargarPaginasEnMemoriaDesdeSwap",
 		log.AnyAttr("entre aca", posicionesSwap))
@@ -547,7 +560,7 @@ func (h *Handler) CargarPaginasEnMemoriaDesdeSwap(posicionesSwap []int, marcosDe
 }
 
 func (h *Handler) PosicionesDeProcesoEnSwap(pid int) []int {
-	posiciones := []int{}
+	posiciones := make([]int, 0)
 	for i, p := range h.ProcesoPorPosicionSwap {
 		if p == pid {
 			posiciones = append(posiciones, i)
@@ -557,9 +570,7 @@ func (h *Handler) PosicionesDeProcesoEnSwap(pid int) []int {
 }
 
 func (h *Handler) DumpProceso(w http.ResponseWriter, r *http.Request) {
-
 	var (
-		//ctx = r.Context()
 		// Leemos el PID
 		pid = r.URL.Query().Get("pid")
 	)
@@ -574,12 +585,26 @@ func (h *Handler) DumpProceso(w http.ResponseWriter, r *http.Request) {
 	*/
 	h.Log.Info(fmt.Sprintf("## PID: %s - Memory Dump solicitado”", pid))
 
-	h.DumpProcesoFuncionAuxiliar(pid)
+	if err := h.DumpProcesoFuncionAuxiliar(pid); err != nil {
+		h.Log.Error("Error al crear el dump del proceso",
+			log.ErrAttr(err),
+			log.StringAttr("pid", pid),
+		)
+		http.Error(w, "Error al crear el dump del proceso", http.StatusInternalServerError)
+		return
+	}
 
+	h.Log.Debug("Dump del proceso creado exitosamente",
+		log.StringAttr("pid", pid),
+		log.StringAttr("dump_path", h.Config.DumpPath),
+	)
+
+	// Enviamos una respuesta exitosa
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("Dump del proceso creado exitosamente"))
 }
 
-func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) {
-
+func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) error {
 	h.Log.Debug("DumpFuncionAuxiliar",
 		log.AnyAttr("pid", pid))
 
@@ -598,10 +623,14 @@ func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) {
 
 	// Crear el archivo
 	file, err := os.Create(fullPath)
-	if err != nil {
+	if err != nil || file == nil {
 		h.Log.Error("Error creando el dump")
+		return err
 	}
-	defer file.Close()
+
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(file)
 
 	pageSize := h.Config.PageSize
 
@@ -609,12 +638,14 @@ func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) {
 		offset := marco * pageSize
 		pagina := h.EspacioDeUsuario[offset : offset+pageSize]
 
-		_, err := file.Write(pagina)
+		_, err = file.Write(pagina)
 		if err != nil {
 			h.Log.Error("Error escribiendo el dump asociado al marco")
+			return fmt.Errorf("error escribiendo el dump asociado al marco %d: %w", marco, err)
 		}
 	}
 
+	return nil
 }
 
 func (h *Handler) ContienePIDEnSwap(pid int) bool {
@@ -697,9 +728,7 @@ func (h *Handler) CrearTabla(niveles int, entradasPorElemento int) interface{} {
 }
 
 func (h *Handler) AccesoATabla(w http.ResponseWriter, r *http.Request) {
-
 	var (
-		//ctx = r.Context()
 		// Leemos el PID
 		pid = r.URL.Query().Get("pid")
 	)
