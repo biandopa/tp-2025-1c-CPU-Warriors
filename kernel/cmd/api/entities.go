@@ -34,6 +34,8 @@ type IOIdentificacion struct {
 }
 
 // Inicializar las colas de espera para IO
+// Nota: La función init() se ejecuta automáticamente cuando se importa el paquete,
+// antes de que se ejecute cualquier otra función
 func init() {
 	ioWaitQueues = make(map[string][]int)
 }

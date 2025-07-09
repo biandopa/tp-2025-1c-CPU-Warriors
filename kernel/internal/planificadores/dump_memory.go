@@ -93,6 +93,9 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado BLOCKED", proceso.PCB.PID))
 
+	// Notificar al planificador de mediano plazo
+	p.CanalNuevoProcBlocked <- proceso
+
 	return nil
 }
 

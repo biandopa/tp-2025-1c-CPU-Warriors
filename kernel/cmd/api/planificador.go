@@ -35,7 +35,7 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 
 	go h.Planificador.PlanificadorLargoPlazo()
 	go h.Planificador.PlanificadorCortoPlazo()
-	go h.Planificador.SuspenderProcesoBloqueado() // TODO: ver la parte de
+	go h.Planificador.SuspenderProcesoBloqueado()
 	h.Planificador.CanalNuevoProcesoNew <- proceso
 
 	//Log obligatorio: Creación de proceso
@@ -114,8 +114,8 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 			go h.Planificador.FinalizarProceso(syscall.PID)
 			return
 
-		} else if ioInfo.Estado {
-			//Existe y esta libre, pasar a blocked y ademas manda la señal
+		} else {
+			//Existe y está libre, pasar a blocked y además manda la señal
 			timeSleep, err := strconv.Atoi(syscall.Args[1])
 			if err != nil {
 				h.Log.Error("Error convirtiendo a int",
