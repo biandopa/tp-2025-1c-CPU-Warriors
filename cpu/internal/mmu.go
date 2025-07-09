@@ -386,9 +386,10 @@ func (m *MMU) agregarATLB(nroPagina, marco string) {
 
 // evictTLBEntry remueve una entrada de la TLB según el algoritmo configurado
 func (m *MMU) evictTLBEntry() {
-	if m.TLB.Algoritmo == "FIFO" {
+	switch m.TLB.Algoritmo {
+	case "FIFO":
 		m.evictTLBFIFO()
-	} else if m.TLB.Algoritmo == "LRU" {
+	case "LRU":
 		m.evictTLBLRU()
 	}
 }
