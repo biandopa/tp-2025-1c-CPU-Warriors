@@ -50,8 +50,8 @@ func (p *Service) SuspenderProcesoBloqueado() {
 				// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
 				p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado SUSP.BLOCKED", proceso.PCB.PID))
 
-				//TODO: Notificar a memoria que debe swappear
-				go avisarAMemoriaSwap(proceso)
+				//Notificar a memoria que debe swappear
+				go p.avisarAMemoriaSwap(proceso)
 
 				//Intentar traer procesos desde SUSP READY o NEW a memoria
 				p.CheckearEspacioEnMemoria()
@@ -140,15 +140,16 @@ func quitarDeCola(cola *[]*internal.Proceso, p *internal.Proceso) {
 	}
 }
 
-// TODO
-func avisarAMemoriaSwap(p *internal.Proceso) {
-	// Implementar comunicación con memoria para swapping
-	// Por ahora es un placeholder - se completará cuando tengamos el API de memoria
-	fmt.Printf("TODO: Notificar a memoria para swappear proceso PID: %d\n", p.PCB.PID)
-	// Aquí se debería hacer:
-	// 1. Llamar a la API de memoria para mover el proceso a SWAP
-	// 2. Actualizar las estructuras administrativas
-	// 3. Manejar posibles errores
+// avisarAMemoriaSwap notifica a memoria que debe realizar el swap del proceso
+func (p *Service) avisarAMemoriaSwap(proceso *internal.Proceso) {
+	err := p.Memoria.SwapProceso(proceso.PCB.PID)
+	if err != nil {
+		p.Log.Error("Error al notificar a memoria para swappear proceso",
+			log.ErrAttr(err),
+			log.IntAttr("pid", proceso.PCB.PID),
+		)
+		return
+	}
 }
 
 func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {

@@ -17,6 +17,8 @@ func BuildLogger(level string) *slog.Logger {
 	output := configurarLoggerOutput()
 	logger := slog.New(slog.NewJSONHandler(output, ops))
 
+	logger.Info("\n")
+
 	return logger
 }
 
@@ -25,7 +27,7 @@ func configurarLoggerOutput() io.Writer {
 	if err != nil {
 		panic(fmt.Sprintf("Error al obtener el directorio de trabajo: %v", err))
 	}
-	fmt.Println(workingDir)
+
 	logFile, err := os.OpenFile(workingDir+"/tp.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		panic(err)
