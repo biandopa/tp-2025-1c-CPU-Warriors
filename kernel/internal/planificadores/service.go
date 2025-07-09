@@ -88,6 +88,8 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		mutexReadyQueue:        &sync.Mutex{},
 		mutexBlockQueue:        &sync.Mutex{},
 		mutexExecQueue:         &sync.Mutex{},
+		mutexSuspBlockQueue:    &sync.Mutex{},
+		mutexSuspReadyQueue:    &sync.Mutex{},
 		mutexCPUsConectadas:    &sync.Mutex{},
 		MedianoPlazoConfig: &MedianoPlazoConfig{
 			SuspensionTime: suspTime,

@@ -64,7 +64,6 @@ func (p *Service) SuspenderProcesoBloqueado() {
 // ManejarFinIO Cuando un proceso en SUSP.BLOCKED finalizo su IO, deberá pasar a
 // SUSP.READY y quedar a la espera de su oportunidad de pasar a READY.
 func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
-
 	p.mutexSuspBlockQueue.Lock()
 	estabaSuspendido := estaEnCola(proceso, p.Planificador.SuspBlockQueue)
 	p.mutexSuspBlockQueue.Unlock()
