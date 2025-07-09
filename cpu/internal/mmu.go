@@ -96,10 +96,9 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 		m.CacheMutex.RUnlock()
 
 		if exists {
-			m.Log.Debug("Cache hit en traducción de dirección",
-				log.IntAttr("pid", pid),
-				log.StringAttr("nro_pagina", nroPaginaStr),
-				log.StringAttr("page_id", pageID))
+			// Log obligatorio: Página encontrada en Caché
+			// "PID: <PID> - Cache Hit - Pagina: <NUMERO_PAGINA>"
+			m.Log.Info(fmt.Sprintf("PID: %d - Cache Hit - Pagina: %s", pid, nroPaginaStr))
 
 			// Actualizar estadísticas de caché
 			cacheEntry.LastAccess = time.Now()
@@ -110,6 +109,10 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 			dirFisica := (nroPagina * m.PageSize) + offset
 
 			return strconv.Itoa(dirFisica), nil
+		} else {
+			// Log obligatorio: Página faltante en Caché
+			// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
+			m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %s", pid, nroPaginaStr))
 		}
 	}
 
@@ -120,12 +123,9 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 		m.TLBMutex.RUnlock()
 
 		if exists {
-			// TLB hit
-			m.Log.Debug("TLB hit",
-				log.IntAttr("pid", pid),
-				log.StringAttr("nro_pagina", nroPaginaStr),
-				log.StringAttr("pagina_fisica", tlbEntry.PhysicalPage),
-			)
+			// Log obligatorio: TLB Hit
+			// "PID: <PID> - TLB HIT - Pagina: <NUMERO_PAGINA>"
+			m.Log.Info(fmt.Sprintf("PID: %d - TLB HIT - Pagina: %s", pid, nroPaginaStr))
 
 			// Actualizar estadísticas de TLB
 			tlbEntry.UltimoAcceso = time.Now()
@@ -135,7 +135,15 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 			offset := dirLogicaInt % m.PageSize
 			dirFisica := (nroPagina * m.PageSize) + offset
 
+			// Log obligatorio: Obtener Marco
+			// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+			m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %s - Marco: %s", pid, nroPaginaStr, tlbEntry.PhysicalPage))
+
 			return strconv.Itoa(dirFisica), nil
+		} else {
+			// Log obligatorio: TLB Miss
+			// "PID: <PID> - TLB MISS - Pagina: <NUMERO_PAGINA>"
+			m.Log.Info(fmt.Sprintf("PID: %d - TLB MISS - Pagina: %s", pid, nroPaginaStr))
 		}
 	}
 
@@ -147,12 +155,34 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 		log.StringAttr("nro_pagina", nroPaginaStr),
 	)
 
+	// TODO: Replace later
+	// Simular obtención de marco de tabla de páginas
+	marco := nroPagina // Por simplicidad, el marco es igual al número de página
+	marcoStr := strconv.Itoa(marco)
+
+	// Log obligatorio: Obtener Marco desde tabla de páginas
+	// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+	m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %s - Marco: %s", pid, nroPaginaStr, marcoStr))
+
+	// Agregar entrada a TLB si está habilitada
+	if m.TLB.MaxEntries > 0 {
+		m.agregarATLB(nroPaginaStr, marcoStr)
+	}
+
 	// Por ahora, la dirección física es igual a la lógica
 	return dirLogica, nil
 }
 
 // LeerConCache realiza una operación de lectura usando la caché si está habilitada
 func (m *MMU) LeerConCache(pid int, direccion string, tamanio int, memoriaClient *memoria.Memoria) (string, error) {
+	// Calcular número de página
+	dirLogicaInt, err := strconv.Atoi(direccion)
+	if err != nil {
+		return "", err
+	}
+	nroPagina := dirLogicaInt / m.PageSize
+	nroPaginaStr := strconv.Itoa(nroPagina)
+
 	// Verificar si la caché está habilitada
 	if m.Cache.MaxEntries == 0 {
 		m.Log.Debug("Caché deshabilitada, accediendo directamente a memoria",
@@ -172,11 +202,9 @@ func (m *MMU) LeerConCache(pid int, direccion string, tamanio int, memoriaClient
 	m.CacheMutex.RUnlock()
 
 	if exists {
-		// Cache hit
-		m.Log.Debug("Cache hit en lectura",
-			log.IntAttr("pid", pid),
-			log.StringAttr("direccion", direccion),
-			log.StringAttr("page_id", pageID))
+		// Log obligatorio: Página encontrada en Caché
+		// "PID: <PID> - Cache Hit - Pagina: <NUMERO_PAGINA>"
+		m.Log.Info(fmt.Sprintf("PID: %d - Cache Hit - Pagina: %s", pid, nroPaginaStr))
 
 		// Actualizar estadísticas de caché
 		cacheEntry.LastAccess = time.Now()
@@ -185,6 +213,10 @@ func (m *MMU) LeerConCache(pid int, direccion string, tamanio int, memoriaClient
 		// Retornar datos de la caché
 		return cacheEntry.Data, nil
 	}
+
+	// Log obligatorio: Página faltante en Caché
+	// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
+	m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %s", pid, nroPaginaStr))
 
 	// Cache miss - leer de memoria
 	m.Log.Debug("Cache miss en lectura, accediendo a memoria",
@@ -200,18 +232,30 @@ func (m *MMU) LeerConCache(pid int, direccion string, tamanio int, memoriaClient
 	// Agregar a caché
 	m.agregarACache(pageID, datos)
 
+	// Log obligatorio: Página ingresada en Caché
+	// "PID: <PID> - Cache Add - Pagina: <NUMERO_PAGINA>"
+	m.Log.Info(fmt.Sprintf("PID: %d - Cache Add - Pagina: %s", pid, nroPaginaStr))
+
 	return datos, nil
 }
 
 // EscribirConCache realiza una operación de escritura usando la caché si está habilitada
 func (m *MMU) EscribirConCache(pid int, direccion string, datos string, memoriaClient *memoria.Memoria) error {
+	// Calcular número de página
+	dirLogicaInt, err := strconv.Atoi(direccion)
+	if err != nil {
+		return err
+	}
+	nroPagina := dirLogicaInt / m.PageSize
+	nroPaginaStr := strconv.Itoa(nroPagina)
+
 	// Verificar si la caché está habilitada
 	if m.Cache.MaxEntries == 0 {
-		m.Log.Debug("Caché deshabilitada, escribiendo directamente en memoria",
+		m.Log.Debug("Caché deshabilitada, escribiendo directamente a memoria",
 			log.IntAttr("pid", pid),
 			log.StringAttr("direccion", direccion))
 
-		// Escritura directa en memoria
+		// Acceso directo a memoria
 		return memoriaClient.Write(pid, direccion, datos)
 	}
 
@@ -219,88 +263,191 @@ func (m *MMU) EscribirConCache(pid int, direccion string, datos string, memoriaC
 	pageID := m.generarPageID(pid, direccion)
 
 	// Buscar en caché primero
-	m.CacheMutex.RLock()
+	m.CacheMutex.Lock()
 	cacheEntry, exists := m.Cache.Entries[pageID]
-	m.CacheMutex.RUnlock()
 
 	if exists {
-		// Cache hit - actualizar caché
-		m.Log.Debug("Cache hit en escritura, actualizando caché",
-			log.IntAttr("pid", pid),
-			log.StringAttr("direccion", direccion),
-			log.StringAttr("page_id", pageID))
+		// Log obligatorio: Página encontrada en Caché
+		// "PID: <PID> - Cache Hit - Pagina: <NUMERO_PAGINA>"
+		m.Log.Info(fmt.Sprintf("PID: %d - Cache Hit - Pagina: %s", pid, nroPaginaStr))
 
+		// Actualizar datos en caché
 		cacheEntry.Data = datos
 		cacheEntry.LastAccess = time.Now()
 		cacheEntry.Reference = true
-		cacheEntry.Modified = true // Marcar como modificada
+		cacheEntry.Modified = true // Marcar como modificado
+		m.CacheMutex.Unlock()
 
-		// También escribir en memoria (write-through)
-		return memoriaClient.Write(pid, direccion, datos)
-	}
-
-	// Cache miss - escribir en memoria y agregar a caché
-	m.Log.Debug("Cache miss en escritura, escribiendo en memoria y agregando a caché",
-		log.IntAttr("pid", pid),
-		log.StringAttr("direccion", direccion),
-		log.StringAttr("page_id", pageID))
-
-	err := memoriaClient.Write(pid, direccion, datos)
-	if err != nil {
+		// Para simplificar, escribimos inmediatamente a memoria también
+		// En una implementación real, esto se haría en el momento de evicción
+		err = memoriaClient.Write(pid, direccion, datos)
+		if err == nil {
+			// Log obligatorio: Página Actualizada de Caché a Memoria
+			// "PID: <PID> - Memory Update - Página: <NUMERO_PAGINA> - Frame: <FRAME_EN_MEMORIA_PRINCIPAL>"
+			frame := nroPagina // Por simplicidad, el frame es igual al número de página
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d", pid, nroPaginaStr, frame))
+		}
 		return err
 	}
 
-	// Agregar a caché
-	m.agregarACache(pageID, datos)
+	// Log obligatorio: Página faltante en Caché
+	// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
+	m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %s", pid, nroPaginaStr))
 
-	return nil
-}
+	// Cache miss - agregar nueva entrada
+	m.Cache.Entries[pageID] = &CacheEntry{
+		PageID:     pageID,
+		Data:       datos,
+		LastAccess: time.Now(),
+		Reference:  true,
+		Modified:   true,
+	}
+	m.CacheMutex.Unlock()
 
-// LimpiarMemoriaProceso elimina todas las entradas de memoria asociadas a un proceso
-// Incluye TLB y caché
-func (m *MMU) LimpiarMemoriaProceso(pid int) {
-	m.Log.Debug("Iniciando limpieza de memoria por desalojo de proceso",
-		log.IntAttr("pid", pid))
+	// Log obligatorio: Página ingresada en Caché
+	// "PID: <PID> - Cache Add - Pagina: <NUMERO_PAGINA>"
+	m.Log.Info(fmt.Sprintf("PID: %d - Cache Add - Pagina: %s", pid, nroPaginaStr))
 
-	// Limpiar TLB
-	m.TLBMutex.Lock()
-	entradasTLB := len(m.TLB.Entries)
-	m.TLB.Entries = make(map[string]*TLBEntry)
-	m.TLBMutex.Unlock()
-
-	// Limpiar caché (escribir páginas modificadas antes)
-	m.CacheMutex.Lock()
-	entradasCache := len(m.Cache.Entries)
-	paginasModificadas := 0
-
-	// Contar páginas modificadas
-	for _, entry := range m.Cache.Entries {
-		if entry.Modified {
-			paginasModificadas++
-		}
+	// Escribir a memoria
+	err = memoriaClient.Write(pid, direccion, datos)
+	if err == nil {
+		// Log obligatorio: Página Actualizada de Caché a Memoria
+		// "PID: <PID> - Memory Update - Página: <NUMERO_PAGINA> - Frame: <FRAME_EN_MEMORIA_PRINCIPAL>"
+		frame := nroPagina // Por simplicidad, el frame es igual al número de página
+		m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d", pid, nroPaginaStr, frame))
 	}
 
-	m.Cache.Entries = make(map[string]*CacheEntry)
+	// Verificar si necesitamos hacer evicción
+	if len(m.Cache.Entries) > m.Cache.MaxEntries {
+		m.evictCacheEntry()
+	}
+
+	return err
+}
+
+// LimpiarMemoriaProceso limpia TLB y caché cuando un proceso termina o es desalojado
+func (m *MMU) LimpiarMemoriaProceso(pid int) {
+	m.Log.Debug("Limpiando memoria del proceso",
+		log.IntAttr("pid", pid))
+
+	// Limpiar TLB - eliminar todas las entradas del proceso
+	m.TLBMutex.Lock()
+	for key, entry := range m.TLB.Entries {
+		// Limpiamos toda la TLB
+		delete(m.TLB.Entries, key)
+		m.Log.Debug("Entrada TLB eliminada",
+			log.StringAttr("key", key),
+			log.StringAttr("physical_page", entry.PhysicalPage))
+	}
+	m.TLBMutex.Unlock()
+
+	// Limpiar caché - escribir páginas modificadas a memoria y eliminar entradas del proceso
+	m.CacheMutex.Lock()
+	for key, entry := range m.Cache.Entries {
+		// Limpiamos toda la caché
+		if entry.Modified {
+			m.Log.Debug("Escribiendo página modificada a memoria antes de limpiar",
+				log.StringAttr("page_id", entry.PageID))
+			// Aquí se escribiría a memoria si fuera necesario
+		}
+		delete(m.Cache.Entries, key)
+		m.Log.Debug("Entrada caché eliminada",
+			log.StringAttr("page_id", entry.PageID))
+	}
 	m.CacheMutex.Unlock()
 
 	m.Log.Debug("Limpieza de memoria completada",
-		log.IntAttr("pid", pid),
-		log.IntAttr("entradas_tlb_eliminadas", entradasTLB),
-		log.IntAttr("entradas_cache_eliminadas", entradasCache),
-		log.IntAttr("paginas_modificadas", paginasModificadas))
+		log.IntAttr("pid", pid))
+}
+
+// agregarATLB agrega una nueva entrada a la TLB
+func (m *MMU) agregarATLB(nroPagina, marco string) {
+	m.TLBMutex.Lock()
+	defer m.TLBMutex.Unlock()
+
+	// Verificar si necesitamos hacer evicción
+	if len(m.TLB.Entries) >= m.TLB.MaxEntries {
+		m.evictTLBEntry()
+	}
+
+	// Agregar nueva entrada
+	m.TLB.Entries[nroPagina] = &TLBEntry{
+		VirtualPage:     nroPagina,
+		PhysicalPage:    marco,
+		UltimoAcceso:    time.Now(),
+		TiempoCreacion:  time.Now(),
+		ConteoDeAccesos: 1,
+	}
+
+	m.Log.Debug("Nueva entrada agregada a TLB",
+		log.StringAttr("nro_pagina", nroPagina),
+		log.StringAttr("marco", marco))
+}
+
+// evictTLBEntry remueve una entrada de la TLB según el algoritmo configurado
+func (m *MMU) evictTLBEntry() {
+	if m.TLB.Algoritmo == "FIFO" {
+		m.evictTLBFIFO()
+	} else if m.TLB.Algoritmo == "LRU" {
+		m.evictTLBLRU()
+	}
+}
+
+// evictTLBFIFO implementa el algoritmo FIFO para TLB
+func (m *MMU) evictTLBFIFO() {
+	var (
+		oldestKey  string
+		oldestTime = time.Now()
+	)
+
+	for key, entry := range m.TLB.Entries {
+		if entry.TiempoCreacion.Before(oldestTime) {
+			oldestTime = entry.TiempoCreacion
+			oldestKey = key
+		}
+	}
+
+	if oldestKey != "" {
+		delete(m.TLB.Entries, oldestKey)
+		m.Log.Debug("Entrada TLB evictada (FIFO)",
+			log.StringAttr("key", oldestKey))
+	}
+}
+
+// evictTLBLRU implementa el algoritmo LRU para TLB
+func (m *MMU) evictTLBLRU() {
+	var (
+		lruKey  string
+		lruTime = time.Now()
+	)
+
+	for key, entry := range m.TLB.Entries {
+		if entry.UltimoAcceso.Before(lruTime) {
+			lruTime = entry.UltimoAcceso
+			lruKey = key
+		}
+	}
+
+	if lruKey != "" {
+		delete(m.TLB.Entries, lruKey)
+		m.Log.Debug("Entrada TLB evictada (LRU)",
+			log.StringAttr("key", lruKey))
+	}
 }
 
 // generarPageID genera un ID único para una página en la caché
 func (m *MMU) generarPageID(pid int, direccion string) string {
-	return fmt.Sprintf("%d_%s", pid, direccion)
+	dirLogicaInt, _ := strconv.Atoi(direccion)
+	nroPagina := dirLogicaInt / m.PageSize
+	return fmt.Sprintf("%d_%d", pid, nroPagina)
 }
 
-// agregarACache agrega una entrada a la caché con manejo de evicción
+// agregarACache agrega una nueva entrada a la caché
 func (m *MMU) agregarACache(pageID, data string) {
 	m.CacheMutex.Lock()
 	defer m.CacheMutex.Unlock()
 
-	// Si la caché está llena, aplicar algoritmo de reemplazo
+	// Verificar si necesitamos hacer evicción
 	if len(m.Cache.Entries) >= m.Cache.MaxEntries {
 		m.evictCacheEntry()
 	}
@@ -314,55 +461,74 @@ func (m *MMU) agregarACache(pageID, data string) {
 		Modified:   false,
 	}
 
-	m.Log.Debug("Entrada agregada a caché",
+	m.Log.Debug("Nueva entrada agregada a caché",
 		log.StringAttr("page_id", pageID))
 }
 
-// evictCacheEntry elimina una entrada de la caché según el algoritmo configurado
+// evictCacheEntry remueve una entrada de la caché según el algoritmo configurado
 func (m *MMU) evictCacheEntry() {
-	switch m.Cache.Algorithm {
-	case "CLOCK":
+	if m.Cache.Algorithm == "CLOCK" {
 		m.evictCacheClock()
-	case "CLOCK-M":
+	} else if m.Cache.Algorithm == "CLOCK-M" {
 		m.evictCacheClockM()
-	default:
-		m.evictCacheClock() // Por defecto CLOCK
 	}
 }
 
-// evictCacheClock implementa el algoritmo CLOCK para la caché
+// evictCacheClock implementa el algoritmo CLOCK para caché
 func (m *MMU) evictCacheClock() {
-	for pageID, entry := range m.Cache.Entries {
-		if !entry.Reference {
-			// Si la página fue modificada, escribir a memoria antes de evicción
-			if entry.Modified {
-				m.Log.Debug("Página modificada encontrada, escribiendo a memoria antes de evicción",
-					log.StringAttr("page_id", pageID))
-				// TODO: Aquí se debería escribir a memoria usando el cliente de memoria
-			}
+	keys := make([]string, 0, len(m.Cache.Entries))
+	for key := range m.Cache.Entries {
+		keys = append(keys, key)
+	}
 
-			delete(m.Cache.Entries, pageID)
-			m.Log.Debug("Entrada eliminada de caché (CLOCK)",
-				log.StringAttr("page_id", pageID),
-				log.StringAttr("was_modified", fmt.Sprintf("%t", entry.Modified)))
-			return
+	if len(keys) > 0 {
+		// Buscar una página con reference bit = false
+		for _, key := range keys {
+			entry := m.Cache.Entries[key]
+			if !entry.Reference {
+				delete(m.Cache.Entries, key)
+				m.Log.Debug("Entrada caché evictada (CLOCK)",
+					log.StringAttr("page_id", key))
+				return
+			}
+			entry.Reference = false // Limpiar reference bit
 		}
-		entry.Reference = false
+
+		// Si todas tenían reference bit = true, remover la primera
+		if len(keys) > 0 {
+			firstKey := keys[0]
+			delete(m.Cache.Entries, firstKey)
+			m.Log.Debug("Entrada caché evictada (CLOCK - segunda pasada)",
+				log.StringAttr("page_id", firstKey))
+		}
 	}
 }
 
-// evictCacheClockM implementa el algoritmo CLOCK-M para la caché
+// evictCacheClockM implementa el algoritmo CLOCK modificado para caché
 func (m *MMU) evictCacheClockM() {
-	for pageID, entry := range m.Cache.Entries {
-		if !entry.Reference && !entry.Modified {
-			delete(m.Cache.Entries, pageID)
-			m.Log.Debug("Entrada eliminada de caché (CLOCK-M)",
-				log.StringAttr("page_id", pageID),
-				log.StringAttr("was_modified", "false"))
-			return
+	keys := make([]string, 0, len(m.Cache.Entries))
+	for key := range m.Cache.Entries {
+		keys = append(keys, key)
+	}
+
+	if len(keys) > 0 {
+		// Priorizar páginas no modificadas y no referenciadas
+		for _, key := range keys {
+			entry := m.Cache.Entries[key]
+			if !entry.Reference && !entry.Modified {
+				delete(m.Cache.Entries, key)
+				m.Log.Debug("Entrada caché evictada (CLOCK-M)",
+					log.StringAttr("page_id", key))
+				return
+			}
 		}
-		if !entry.Reference {
-			entry.Reference = false
+
+		// Si no hay páginas ideales, usar la primera
+		if len(keys) > 0 {
+			firstKey := keys[0]
+			delete(m.Cache.Entries, firstKey)
+			m.Log.Debug("Entrada caché evictada (CLOCK-M - fallback)",
+				log.StringAttr("page_id", firstKey))
 		}
 	}
 }

@@ -22,11 +22,9 @@ func (h *Handler) RecibirInterrupciones(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	//Log obligatorio: Interrupción recibida
-	//“## Llega interrupción al puerto Interrupt”
-	h.Log.DebugContext(ctx, "Recibí interrupciones del Kernel",
-		log.AnyAttr("interrupción", interrupcion),
-	)
+	// Log obligatorio: Interrupción recibida
+	// "## Llega interrupción al puerto Interrupt"
+	h.Log.Info("## Llega interrupción al puerto Interrupt")
 
 	h.Service.AgregarInterrupcion(interrupcion)
 
