@@ -123,9 +123,6 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 				)
 				return
 			}
-			go h.EnviarPeticionAIO(timeSleep, ioInfo, syscall.PID)
-
-			//TODO proxima entrega: mandar a block
 
 			//Log obligatorio: Motivo de Bloqueo
 			//"## (<PID>) - Bloqueado por IO: <DISPOSITIVO_IO>"
@@ -135,26 +132,57 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 			// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
 			h.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado BLOCKED", syscall.PID))
 
-			return
+			// Bloquear el proceso
+			err = h.Planificador.BloquearPorIO(syscall.PID)
+			if err != nil {
+				h.Log.Error("Error al bloquear proceso por IO",
+					log.ErrAttr(err),
+					log.IntAttr("pid", syscall.PID),
+				)
 
-		} else {
-			//TODO proxima entrega: mandar a block
-			fmt.Println("existe y no esta libre")
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte("{\"error\":\"error al bloquear proceso por IO\"}"))
 
-			//Log obligatorio: Motivo de Bloqueo
-			//"## (<PID>) - Bloqueado por IO: <DISPOSITIVO_IO>"
-			h.Log.Info(fmt.Sprintf("## (%d) - Bloqueado por IO: %s", syscall.PID, ioInfo.Nombre))
+				return
+			}
 
-			//Log obligatorio: Cambio de estado
-			// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
-			h.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado BLOCKED", syscall.PID))
+			// Buscar el dispositivo IO y marcarlo como ocupado. Si todas las instancias de IO con el mismo nomrbe
+			// están ocupadas, se agrega a la cola de espera
+			var encontreIoLibre bool
+			for i, ioDevice := range ioIdentificacion {
+				if ioDevice.Nombre == ioInfo.Nombre && ioDevice.Estado == true {
+					encontreIoLibre = true
+					ioIdentificacion[i].Estado = false // Ocupado
+					ioIdentificacion[i].ProcesoID = syscall.PID
+					ioIdentificacion[i].Cola = "blocked"
+
+					h.Log.Debug("Dispositivo IO marcado como ocupado",
+						log.StringAttr("dispositivo", ioInfo.Nombre),
+						log.IntAttr("proceso", syscall.PID),
+					)
+					break
+				}
+			}
+
+			// Agregar a la cola de espera del dispositivo IO
+			if ioWaitQueues[ioInfo.Nombre] == nil {
+				ioWaitQueues[ioInfo.Nombre] = make([]int, 0)
+			}
+			ioWaitQueues[ioInfo.Nombre] = append(ioWaitQueues[ioInfo.Nombre], syscall.PID)
+
+			h.Log.Debug("Proceso agregado a cola de espera IO",
+				log.StringAttr("dispositivo", ioInfo.Nombre),
+				log.IntAttr("proceso", syscall.PID),
+				log.AnyAttr("cola_espera", ioWaitQueues[ioInfo.Nombre]),
+			)
+
+			if encontreIoLibre {
+				// Enviar petición a IO de forma asíncrona
+				go h.Planificador.EnviarUsleep(ioInfo.Puerto, ioInfo.IP, syscall.PID, timeSleep)
+			}
 
 			return
 		}
-
-		//
-		/* Primero verifica que existe el IO. Si no existe, se manda a EXIT.
-		Si existe y está ocupado, se manda a Blocked. Veremos...*/
 
 	case "DUMP_MEMORY":
 		/* Se bloquea el proceso. En caso de error, se envía a la cola de Exit. Caso contrario, se pasa a Ready*/
