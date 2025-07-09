@@ -15,8 +15,7 @@ const (
 func main() {
 	h := api.NewHandler(configFilePath)
 
-	// mdilauro: cambio de 2 a 3 porque el primer argumento es el nombre del programa
-	// el segundo es el archivo de configuración y el tercero es el tamaño del proceso
+	// El primer argumento es el archivo de configuración y el segundo es el tamaño del proceso
 	if len(os.Args) < 3 {
 		h.Log.Error(fmt.Sprintf("Faltan %d argumentos.", len(os.Args)))
 		panic("Faltan argumentos para inicializar el módulo Kernel.")
