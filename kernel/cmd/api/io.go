@@ -24,7 +24,7 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 
 	// Buscar el dispositivo IO y marcarlo como libre
 	for i, ioDevice := range ioIdentificacion {
-		if ioDevice.Nombre == ioIdentificacionPeticion.Nombre && ioDevice.Estado == false {
+		if ioDevice.Nombre == ioIdentificacionPeticion.Nombre && !ioDevice.Estado {
 			// Liberar el dispositivo IO
 			ioIdentificacion[i].Estado = true
 			ioIdentificacion[i].ProcesoID = 0 // Limpiar el PID asociado

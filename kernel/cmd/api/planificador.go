@@ -150,7 +150,7 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 			// están ocupadas, se agrega a la cola de espera
 			var encontreIoLibre bool
 			for i, ioDevice := range ioIdentificacion {
-				if ioDevice.Nombre == ioInfo.Nombre && ioDevice.Estado == true {
+				if ioDevice.Nombre == ioInfo.Nombre && ioDevice.Estado {
 					encontreIoLibre = true
 					ioIdentificacion[i].Estado = false // Ocupado
 					ioIdentificacion[i].ProcesoID = syscall.PID

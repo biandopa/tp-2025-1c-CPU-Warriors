@@ -468,9 +468,10 @@ func (m *MMU) agregarACache(pageID, data string) {
 
 // evictCacheEntry remueve una entrada de la caché según el algoritmo configurado
 func (m *MMU) evictCacheEntry() {
-	if m.Cache.Algorithm == "CLOCK" {
+	switch m.Cache.Algorithm {
+	case "CLOCK":
 		m.evictCacheClock()
-	} else if m.Cache.Algorithm == "CLOCK-M" {
+	case "CLOCK-M":
 		m.evictCacheClockM()
 	}
 }
