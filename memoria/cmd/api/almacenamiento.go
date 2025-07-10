@@ -448,7 +448,7 @@ func (h *Handler) CompactarSwap() error {
 	pageSize := h.Config.PageSize
 
 	// Abrimos el archivo en modo lectura/escritura
-	swapFile, err := os.OpenFile("/home/utnso/Desktop/tp-2025-1c-CPU-Warriors/memoria/swapfile.bin", os.O_RDWR, 0644)
+	swapFile, err := os.OpenFile(h.Config.SwapfilePath, os.O_RDWR, 0644)
 	if err != nil {
 		return fmt.Errorf("error abriendo swap.bin: %w", err)
 	}
@@ -506,7 +506,7 @@ func (h *Handler) CargarPaginasEnMemoriaDesdeSwap(posicionesSwap []int, marcosDe
 		return fmt.Errorf("la cantidad de posiciones y marcos no coincide")
 	}
 
-	archivoSwap, err := os.Open("/home/utnso/Desktop/tp-2025-1c-CPU-Warriors/memoria/swapfile.bin")
+	archivoSwap, err := os.Open(h.Config.SwapfilePath)
 	if err != nil {
 		panic(err)
 	}
