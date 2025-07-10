@@ -176,6 +176,7 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 				go h.Planificador.EnviarUsleep(ioInfo.Puerto, ioInfo.IP, syscall.PID, timeSleep)
 			} else {
 				// Solo agregar a la cola de espera si NO hay dispositivo libre
+				ioWaitQueuesMutex.Lock()
 				if ioWaitQueues[ioInfo.Nombre] == nil {
 					ioWaitQueues[ioInfo.Nombre] = make([]IOWaitInfo, 0)
 				}
@@ -183,12 +184,13 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 					PID:       syscall.PID,
 					TimeSleep: timeSleep,
 				})
+				ioWaitQueuesMutex.Unlock()
 
 				h.Log.Debug("Proceso agregado a cola de espera IO (dispositivo ocupado)",
 					log.StringAttr("dispositivo", ioInfo.Nombre),
 					log.IntAttr("proceso", syscall.PID),
 					log.IntAttr("tiempo", timeSleep),
-					log.AnyAttr("cola_espera", ioWaitQueues[ioInfo.Nombre]),
+					log.IntAttr("cola_espera_size", len(ioWaitQueues[ioInfo.Nombre])),
 				)
 			}
 

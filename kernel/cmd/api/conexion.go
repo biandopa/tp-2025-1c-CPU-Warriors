@@ -115,7 +115,7 @@ func (h *Handler) DesconexionIO(w http.ResponseWriter, r *http.Request) {
 		if dispositivoEncontrado.ProcesoID > 0 {
 			h.Log.Debug(fmt.Sprintf("## (%d) - Proceso enviado a EXIT por desconexión de IO: %s",
 				dispositivoEncontrado.ProcesoID, dispositivoEncontrado.Nombre))
-			go h.Planificador.FinalizarProceso(dispositivoEncontrado.ProcesoID)
+			go h.Planificador.FinalizarProcesoEnCualquierCola(dispositivoEncontrado.ProcesoID)
 		}
 
 		// Verificar si quedan más instancias de este tipo de dispositivo
@@ -128,7 +128,9 @@ func (h *Handler) DesconexionIO(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Si no quedan más instancias, enviar todos los procesos en espera a EXIT
+		// IMPORTANTE: Hacer esto ANTES de procesar la cola para evitar enviar peticiones a dispositivos desconectados
 		if !tieneOtrasInstancias {
+			ioWaitQueuesMutex.Lock()
 			if queue, exists := ioWaitQueues[ioInfo.Nombre]; exists && len(queue) > 0 {
 				h.Log.Debug(fmt.Sprintf("No quedan más instancias de %s - enviando %d procesos en espera a EXIT",
 					ioInfo.Nombre, len(queue)))
@@ -136,12 +138,13 @@ func (h *Handler) DesconexionIO(w http.ResponseWriter, r *http.Request) {
 				for _, waitInfo := range queue {
 					h.Log.Debug(fmt.Sprintf("## (%d) - Proceso enviado a EXIT por falta de instancias de IO: %s",
 						waitInfo.PID, ioInfo.Nombre))
-					go h.Planificador.FinalizarProceso(waitInfo.PID)
+					go h.Planificador.FinalizarProcesoEnCualquierCola(waitInfo.PID)
 				}
 
-				// Limpiar la cola de espera
+				// Limpiar la cola de espera ANTES de que otros procesos intenten enviar peticiones
 				delete(ioWaitQueues, ioInfo.Nombre)
 			}
+			ioWaitQueuesMutex.Unlock()
 		}
 	}
 

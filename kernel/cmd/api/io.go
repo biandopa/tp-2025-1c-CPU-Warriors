@@ -36,6 +36,7 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 			)
 
 			// Procesar la cola de espera para este dispositivo
+			ioWaitQueuesMutex.Lock()
 			if queue, exists := ioWaitQueues[ioDevice.Nombre]; exists && len(queue) > 0 {
 				// Obtener el primer proceso en espera (FIFO)
 				nextWaitInfo := queue[0]
@@ -52,8 +53,12 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 				ioIdentificacion[i].ProcesoID = nextWaitInfo.PID
 				ioIdentificacion[i].Cola = "blocked"
 
+				ioWaitQueuesMutex.Unlock()
+
 				// Enviar petición a IO para el proceso en espera
 				go h.Planificador.EnviarUsleep(ioDevice.Puerto, ioDevice.IP, nextWaitInfo.PID, nextWaitInfo.TimeSleep)
+			} else {
+				ioWaitQueuesMutex.Unlock()
 			}
 
 			break

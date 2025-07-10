@@ -1,5 +1,7 @@
 package api
 
+import "sync"
+
 type Config struct {
 	IpMemory              string  `json:"ip_memory"`
 	PortMemory            int     `json:"port_memory"`
@@ -28,6 +30,9 @@ type IOWaitInfo struct {
 
 // Cola de espera para cada dispositivo IO
 var ioWaitQueues map[string][]IOWaitInfo // Mapea nombre de dispositivo a lista de procesos esperando
+
+// Mutex para proteger el acceso concurrente a ioWaitQueues
+var ioWaitQueuesMutex sync.RWMutex
 
 // IOIdentificacion EStructura que definimos para manejar las IOs
 type IOIdentificacion struct {
