@@ -20,8 +20,14 @@ type Config struct {
 // Se usa para almacenar las IOs
 var ioIdentificacion []IOIdentificacion
 
+// Estructura para almacenar información de procesos en espera de IO
+type IOWaitInfo struct {
+	PID       int `json:"pid"`
+	TimeSleep int `json:"time_sleep"`
+}
+
 // Cola de espera para cada dispositivo IO
-var ioWaitQueues map[string][]int // Mapea nombre de dispositivo a lista de PIDs esperando
+var ioWaitQueues map[string][]IOWaitInfo // Mapea nombre de dispositivo a lista de procesos esperando
 
 // IOIdentificacion EStructura que definimos para manejar las IOs
 type IOIdentificacion struct {
@@ -37,5 +43,5 @@ type IOIdentificacion struct {
 // Nota: La función init() se ejecuta automáticamente cuando se importa el paquete,
 // antes de que se ejecute cualquier otra función
 func init() {
-	ioWaitQueues = make(map[string][]int)
+	ioWaitQueues = make(map[string][]IOWaitInfo)
 }

@@ -177,13 +177,17 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 			} else {
 				// Solo agregar a la cola de espera si NO hay dispositivo libre
 				if ioWaitQueues[ioInfo.Nombre] == nil {
-					ioWaitQueues[ioInfo.Nombre] = make([]int, 0)
+					ioWaitQueues[ioInfo.Nombre] = make([]IOWaitInfo, 0)
 				}
-				ioWaitQueues[ioInfo.Nombre] = append(ioWaitQueues[ioInfo.Nombre], syscall.PID)
+				ioWaitQueues[ioInfo.Nombre] = append(ioWaitQueues[ioInfo.Nombre], IOWaitInfo{
+					PID:       syscall.PID,
+					TimeSleep: timeSleep,
+				})
 
 				h.Log.Debug("Proceso agregado a cola de espera IO (dispositivo ocupado)",
 					log.StringAttr("dispositivo", ioInfo.Nombre),
 					log.IntAttr("proceso", syscall.PID),
+					log.IntAttr("tiempo", timeSleep),
 					log.AnyAttr("cola_espera", ioWaitQueues[ioInfo.Nombre]),
 				)
 			}

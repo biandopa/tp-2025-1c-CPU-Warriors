@@ -38,23 +38,22 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 			// Procesar la cola de espera para este dispositivo
 			if queue, exists := ioWaitQueues[ioDevice.Nombre]; exists && len(queue) > 0 {
 				// Obtener el primer proceso en espera (FIFO)
-				nextPID := queue[0]
+				nextWaitInfo := queue[0]
 				ioWaitQueues[ioDevice.Nombre] = queue[1:] // Remover de la cola
 
 				h.Log.Debug("Procesando siguiente proceso en cola de espera IO",
 					log.StringAttr("dispositivo", ioDevice.Nombre),
-					log.IntAttr("proceso", nextPID),
+					log.IntAttr("proceso", nextWaitInfo.PID),
+					log.IntAttr("tiempo", nextWaitInfo.TimeSleep),
 				)
 
 				// Marcar el dispositivo como ocupado por el siguiente proceso
 				ioIdentificacion[i].Estado = false
-				ioIdentificacion[i].ProcesoID = nextPID
+				ioIdentificacion[i].ProcesoID = nextWaitInfo.PID
 				ioIdentificacion[i].Cola = "blocked"
 
-				// Buscar el proceso y enviarlo a IO
-				// Nota: Necesitaríamos almacenar el tiempo de IO también en la cola de espera
-				// Por simplicidad, vamos a usar un tiempo por defecto o implementar después
-				h.Log.Debug("TODO: Enviar proceso en espera a IO - implementar tiempo de IO guardado")
+				// Enviar petición a IO para el proceso en espera
+				go h.Planificador.EnviarUsleep(ioDevice.Puerto, ioDevice.IP, nextWaitInfo.PID, nextWaitInfo.TimeSleep)
 			}
 
 			break

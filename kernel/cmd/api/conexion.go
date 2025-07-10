@@ -133,10 +133,10 @@ func (h *Handler) DesconexionIO(w http.ResponseWriter, r *http.Request) {
 				h.Log.Debug(fmt.Sprintf("No quedan más instancias de %s - enviando %d procesos en espera a EXIT",
 					ioInfo.Nombre, len(queue)))
 
-				for _, pid := range queue {
+				for _, waitInfo := range queue {
 					h.Log.Debug(fmt.Sprintf("## (%d) - Proceso enviado a EXIT por falta de instancias de IO: %s",
-						pid, ioInfo.Nombre))
-					go h.Planificador.FinalizarProceso(pid)
+						waitInfo.PID, ioInfo.Nombre))
+					go h.Planificador.FinalizarProceso(waitInfo.PID)
 				}
 
 				// Limpiar la cola de espera
