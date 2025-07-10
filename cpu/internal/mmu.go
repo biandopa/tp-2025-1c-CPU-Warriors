@@ -368,7 +368,7 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 			m.Log.Debug("Escribiendo página modificada a memoria antes de limpiar",
 				log.IntAttr("page_id", entry.PageID))
 			dataToSave[entry.PageID] = map[string]interface{}{
-				"pid":  entry.PID,
+				"pid":  strconv.Itoa(entry.PID),
 				"data": entry.Data,
 			}
 		}
@@ -517,7 +517,7 @@ func (m *MMU) evictCacheClock() {
 			if !entry.Reference {
 				// Se agrega la data a almacenar
 				dataAAlmacenar[key] = map[string]interface{}{
-					"pid":  entry.PID,
+					"pid":  strconv.Itoa(entry.PID),
 					"data": entry.Data,
 				}
 				delete(m.Cache.Entries, key)
@@ -533,7 +533,7 @@ func (m *MMU) evictCacheClock() {
 			firstKey := keys[0]
 			entry := m.Cache.Entries[firstKey]
 			dataAAlmacenar[firstKey] = map[string]interface{}{
-				"pid":  entry.PID,
+				"pid":  strconv.Itoa(entry.PID),
 				"data": entry.Data,
 			}
 			delete(m.Cache.Entries, firstKey)
@@ -566,7 +566,7 @@ func (m *MMU) evictCacheClockM() {
 			if !entry.Reference && !entry.Modified {
 				// Se agrega la data a almacenar
 				dataAAlmacenar[key] = map[string]interface{}{
-					"pid":  entry.PID,
+					"pid":  strconv.Itoa(entry.PID),
 					"data": entry.Data,
 				}
 				delete(m.Cache.Entries, key)
@@ -581,7 +581,7 @@ func (m *MMU) evictCacheClockM() {
 			firstKey := keys[0]
 			entry := m.Cache.Entries[firstKey]
 			dataAAlmacenar[firstKey] = map[string]interface{}{
-				"pid":  entry.PID,
+				"pid":  strconv.Itoa(entry.PID),
 				"data": entry.Data,
 			}
 			delete(m.Cache.Entries, firstKey)
