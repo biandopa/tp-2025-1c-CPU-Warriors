@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/sisoputnfrba/tp-golang/cpu/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
@@ -18,7 +17,7 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Log.Info("Proceso recibido del kernel",
+	h.Log.Debug("Proceso recibido del kernel",
 		log.IntAttr("pid", proceso.PID),
 		log.IntAttr("pc", proceso.PC))
 
@@ -36,35 +35,6 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		h.Log.Error("Error codificando respuesta",
-			log.ErrAttr(err))
-		http.Error(w, "Error interno del servidor", http.StatusInternalServerError)
-		return
-	}
-}
-
-// RecibirInterrupcion maneja la recepción de interrupciones del kernel
-func (h *Handler) RecibirInterrupcion(w http.ResponseWriter, r *http.Request) {
-	var interrupcion internal.Interrupcion
-	if err := json.NewDecoder(r.Body).Decode(&interrupcion); err != nil {
-		h.Log.Error("Error decodificando interrupción",
-			log.ErrAttr(err))
-		http.Error(w, "Error decodificando interrupción", http.StatusBadRequest)
-		return
-	}
-
-	h.Log.Info("Interrupción recibida del kernel",
-		log.IntAttr("pid", interrupcion.PID),
-		log.StringAttr("tipo", string(interrupcion.Tipo)),
-		log.AnyAttr("enmascarable", interrupcion.EsEnmascarable))
-
-	// Agregar la interrupción a la cola
-	h.Service.AgregarInterrupcion(interrupcion)
-
-	// Responder con éxito
-	w.Header().Set("Content-Type", "application/json")
-	response := map[string]string{"msg": "ok"}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		h.Log.Error("Error codificando respuesta de interrupción",
 			log.ErrAttr(err))
 		http.Error(w, "Error interno del servidor", http.StatusInternalServerError)
 		return

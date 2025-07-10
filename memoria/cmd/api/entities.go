@@ -35,3 +35,9 @@ type Proceso struct {
 	PID int `json:"pid"`
 	PC  int `json:"pc"`
 }
+
+/*type TablasProceso struct {
+	PID             int `json:"pid"`
+	Tamanio         int `json:"tamanio_proceso"`
+	TablasDePaginas int `json:"tabla_de_paginas"`
+}*/

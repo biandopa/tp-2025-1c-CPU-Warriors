@@ -1,64 +1,82 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
-func (h *Handler) RecibirProceso(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
+
 	var (
-		ctx = r.Context()
-		// Leer tamanioProceso del queryparameter
-		tamanioProceso = r.URL.Query().Get("tamanioProceso")
+		// Leemos el PID
+		pid = r.URL.Query().Get("pid")
 	)
 
-	if tamanioProceso == "" {
-		h.Log.Error("Tamaño del Proceso no proporcionado")
-		http.Error(w, "tamaño del oroceso no proporcionado", http.StatusBadRequest)
+	if pid == "" {
+		h.Log.Error("PID no proporcionado")
+		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
 		return
 	}
+	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
+	/* Log obligatorio: Destrucción de Proceso
+	“## PID: <PID> - Proceso Destruido - Métricas - Acc.T.Pag: <ATP>;
+	Inst.Sol.: <Inst.Sol.>; SWAP: <SWAP>; Mem.Prin.: <Mem.Prin.>; Lec.Mem.: <Lec.Mem.>; Esc.Mem.: <Esc.Mem.>”*/
+	h.Log.Info(fmt.Sprintf("## PID: %s - Proceso Destruido - Métricas - Acc.T.Pag: %d; "+
+		"Inst.Sol.: %d; SWAP: %d; Mem.Prin.: %d; Lec.Mem.: %d; Esc.Mem.: %d",
+		pid, tablaMetricas.CantidadAccesosATablas, tablaMetricas.CantidadInstruccionesSolicitadas,
+		tablaMetricas.CantidadBajadasSwap, tablaMetricas.CantidadSubidasMemoriaPrincipal,
+		tablaMetricas.CantidadDeLectura, tablaMetricas.CantidadDeEscritura))
 
-	// Decode the request body
-	var peticion map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&peticion)
-	if err != nil {
-		h.Log.Error("Error decoding request body", "error", err)
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
+	h.finalizarProcesoFuncionAuxiliar(pid)
 
-	h.Log.DebugContext(ctx, "Petición recibida con éxito",
-		log.AnyAttr("peticion", peticion),
-	)
-
-	// Verifica si hay suficiente espacio
-	// Inserte función para verificar el espacio disponible
-
-	// Si no hay suficiente espacio, responde con un error
-	// Caso contrario, continúa con el procesamiento
-
-	// Respond with success
+	// Enviamos una respuesta exitosa
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("request processed successfully"))
+	_, _ = w.Write([]byte("Proceso finalizado correctamente"))
 }
 
-func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
-	var (
-		// Leer PID del endpoint /kernel/fin-proceso/{pid}
-		pid = chi.URLParam(r, "pid")
-	)
+func (h *Handler) finalizarProcesoFuncionAuxiliar(pid string) {
 
-	// Inserte función para finalizar el proceso en memoria
-	// Si no se puede finalizar, responde con un error
+	pidInt, _ := strconv.Atoi(pid)
 
-	w.WriteHeader(http.StatusOK)
-	response := map[string]string{
-		"message": fmt.Sprintf("Proceso %s finalizado con éxito", pid),
+	if h.ContienePIDEnSwap(pidInt) {
+		//compactar la posicion en swap y borrarlo en la lista de procesos}
+		h.eliminarOcurrencias(pidInt)
+		if err := h.CompactarSwap(); err != nil {
+			h.Log.Error("Error al compactar swap", log.ErrAttr(err))
+		}
+
+	} else {
+		procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
+		h.Log.Debug("FinalizarProcesoFuncionAuxiliar",
+			log.AnyAttr("procesYTablaAsociada", procesYTablaAsociada.TablasDePaginas))
+
+		marcosDelProceso := h.ObtenerMarcosDeLaTabla(procesYTablaAsociada.TablasDePaginas)
+
+		for marco := range marcosDelProceso {
+			copy(h.EspacioDeUsuario[marco*h.Config.PageSize:((marco+1)*h.Config.PageSize-1)], make([]byte, h.Config.PageSize))
+		}
 	}
-	jsonResponse, _ := json.Marshal(response)
-	_, _ = w.Write(jsonResponse)
+	//hasta aca el else
+	//2do borrarlo de la lista de tablas
+	if err := h.borrarProcesoPorPID(pid); err != nil {
+		h.Log.Error("Error al borrar el proceso por PID", log.ErrAttr(err))
+		return
+	}
+	//3ero borrar las instrucciones
+
+	delete(h.Instrucciones, pidInt)
+}
+
+func (h *Handler) borrarProcesoPorPID(pid string) error {
+	for i, proceso := range h.TablasProcesos {
+		if proceso.PID == pid {
+			// Borramos el elemento del slice
+			h.TablasProcesos = append(h.TablasProcesos[:i], h.TablasProcesos[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("proceso con PID %s no encontrado", pid)
 }

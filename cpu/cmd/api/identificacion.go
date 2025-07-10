@@ -34,11 +34,11 @@ func (h *Handler) EnviarIdentificacion(nombre string) {
 	}
 
 	if resp != nil {
-		h.Log.Info("Respuesta del servidor",
+		h.Log.Debug("Respuesta del servidor",
 			log.StringAttr("status", resp.Status),
 			log.StringAttr("body", string(body)),
 		)
 	} else {
-		h.Log.Info("Respuesta del servidor: nil")
+		h.Log.Debug("Respuesta del servidor: nil")
 	}
 }

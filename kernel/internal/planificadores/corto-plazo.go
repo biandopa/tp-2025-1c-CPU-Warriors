@@ -14,9 +14,9 @@ func (p *Service) PlanificadorCortoPlazo() {
 	switch p.ShortTermAlgorithm {
 	case "FIFO":
 		go p.PlanificadorCortoPlazoFIFO()
-	case "SJFSD":
+	case "SJF":
 		go p.PlanificarCortoPlazoSjfSinDesalojo()
-	case "SJFD":
+	case "SRT":
 		go p.PlanificarCortoPlazoSjfDesalojo()
 	default:
 		p.Log.Warn("Algoritmo de corto plazo no reconocido")
@@ -25,19 +25,12 @@ func (p *Service) PlanificadorCortoPlazo() {
 
 func (p *Service) PlanificadorCortoPlazoFIFO() {
 	for {
-		p.Log.Debug("Planificador FIFO esperando señal del canal")
-		<-p.canalNuevoProcesoReady
-		p.Log.Debug("Planificador FIFO recibió señal, procesando ReadyQueue",
-			log.IntAttr("ready_queue_size", len(p.Planificador.ReadyQueue)))
-
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
-			cpuLibre := p.buscarCPULibre()
+			// Usar semáforo para adquirir CPU (bloqueante)
+			cpuLibre := p.BuscarCPUDisponible()
 
 			if cpuLibre != nil {
-				p.Log.Debug("CPU libre encontrada, asignando proceso",
-					log.StringAttr("cpu_id", cpuLibre.ID))
-
 				// Mover proceso de READY a EXEC
 				p.mutexReadyQueue.Lock()
 				procesoElegido := p.Planificador.ReadyQueue[0]
@@ -63,14 +56,13 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 
 					//Log obligatorio: Cambio de estado
 					// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-					p.Log.Info(fmt.Sprintf("%d Pasa del estado READY al estado EXEC", proceso.PCB.PID))
+					p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado READY al estado EXEC", proceso.PCB.PID))
 
 					// Usar los valores copiados
 					cpuElegida.Proceso.PC = procesoElegido.PCB.PC
 					cpuElegida.Proceso.PID = procesoElegido.PCB.PID
-					cpuElegida.Estado = false
 
-					p.Log.Info("CPU seleccionada para proceso",
+					p.Log.Debug("CPU seleccionada para proceso",
 						log.StringAttr("cpu_id", cpuElegida.ID),
 						log.IntAttr("pid", proceso.PCB.PID),
 					)
@@ -78,21 +70,18 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 					newPC, _ := cpuElegida.DispatchProcess()
 					proceso.PCB.PC = newPC
 
-					// Marcar CPU como libre nuevamente
-					cpuElegida.Estado = true
+					// Liberar CPU usando semáforo
+					p.LiberarCPU(cpuElegida)
 
-					p.Log.Info("Proceso completado en CPU",
+					p.Log.Debug("Proceso completado en CPU",
 						log.StringAttr("cpu_id", cpuElegida.ID),
 						log.IntAttr("pid", proceso.PCB.PID),
 						log.IntAttr("pc_final", newPC),
 					)
 				}(cpuLibre, procesoElegido)
 			} else {
-				p.Log.Debug("No hay CPUs libres, saliendo del bucle")
 				// No hay CPUs libres, salir del bucle
-
-				// Notificar al channel para volver a ejecutar el algoritmo de corto plazo
-				p.canalNuevoProcesoReady <- struct{}{}
+				p.Log.Debug("No hay CPUs libres, saliendo del bucle")
 
 				break
 			}
@@ -106,13 +95,12 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 // más alto que debe desalojar al mismo para que pueda ser planificado el nuevo.
 func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 	for {
-		<-p.canalNuevoProcesoReady // Espera una notificación
-		p.odenarColaReadySjf()     // Ordena la cola de ReadyQueue por ráfaga estimada
+		p.odenarColaReadySjf() // Ordena la cola de ReadyQueue por ráfaga estimada
 
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
-			// Buscar CPU libre
-			cpuLibre := p.buscarCPULibre()
+			// Intentar adquirir CPU libre sin bloquear
+			cpuLibre := p.IntentarBuscarCPUDisponible()
 
 			if cpuLibre != nil {
 				// Hay CPU libre, asignar el proceso con ráfaga más corta (el primero de ReadyQueue)
@@ -131,19 +119,16 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 
 					// Log obligatorio: Desalojo de SJF/SRT
 					//“## (<PID>) - Desalojado por algoritmo SJF/SRT”
-					p.Log.Info(fmt.Sprintf("%d - Desalojado por algoritmo SJF/SRT", procesoADesalojar.PCB.PID))
+					p.Log.Info(fmt.Sprintf("## (%d) - Desalojado por algoritmo SJF/SRT", procesoADesalojar.PCB.PID))
 
 					// Después del desalojo, asignar el nuevo proceso
 					cpuLiberada := p.buscarCPUPorPID(procesoADesalojar.PCB.PID)
 					if cpuLiberada != nil {
 						p.asignarProcesoACPU(procesoNuevo, cpuLiberada)
 					}
-				} else {
-					// Notificar al channel para volver a ejecutar el algoritmo de corto plazo
-					p.canalNuevoProcesoReady <- struct{}{}
-				}
 
-				break // Salir del bucle si no hay CPUs libres y no se puede desalojar
+					time.Sleep(100 * time.Millisecond) // Esperar un poco antes de continuar
+				}
 			}
 		}
 	}
@@ -152,23 +137,16 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 // PlanificarCortoPlazoSjfSinDesalojo planifica los procesos de corto plazo utilizando el algoritmo SJF sin desalojo.
 func (p *Service) PlanificarCortoPlazoSjfSinDesalojo() {
 	for {
-		<-p.canalNuevoProcesoReady // Espera una notificación
 		p.odenarColaReadySjf()
 
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
-			cpuLibre := p.buscarCPULibre()
-
-			if cpuLibre != nil {
+			// Usar semáforo para adquirir CPU (bloqueante)
+			if cpuLibre := p.BuscarCPUDisponible(); cpuLibre != nil {
 				// Asignar el proceso con ráfaga más corta (el primero de ReadyQueue)
 				procesoMasCorto := p.Planificador.ReadyQueue[0]
 
 				p.asignarProcesoACPU(procesoMasCorto, cpuLibre)
-			} else {
-				// Notificar al channel para volver a ejecutar el algoritmo de corto plazo
-				p.canalNuevoProcesoReady <- struct{}{}
-
-				break // No hay CPUs libres, salir del bucle
 			}
 		}
 	}
@@ -182,33 +160,6 @@ func (p *Service) odenarColaReadySjf() {
 	sort.Slice(p.Planificador.ReadyQueue, func(i, j int) bool {
 		return p.calcularRafagaEstimada(p.Planificador.ReadyQueue[i]) < p.calcularRafagaEstimada(p.Planificador.ReadyQueue[j])
 	})
-	/*
-		// Insertar el nuevo proceso en la posición correcta
-		inserted := false
-		for i, proc := range p.Planificador.ReadyQueue {
-			if p.calcularRafagaEstimada(proceso) < p.calcularRafagaEstimada(proc) {
-				p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue[:i], append([]*internal.Proceso{proceso}, p.Planificador.ReadyQueue[i:]...)...)
-				inserted = true
-				break
-			}
-		}
-		if !inserted {
-			p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-		} */
-
-}
-
-// buscarCPULibre encuentra una CPU que esté disponible
-func (p *Service) buscarCPULibre() *cpu.Cpu {
-	p.mutexCPUsConectadas.Lock()
-	defer p.mutexCPUsConectadas.Unlock()
-
-	for i := range p.CPUsConectadas {
-		if p.CPUsConectadas[i].Estado {
-			return p.CPUsConectadas[i]
-		}
-	}
-	return nil
 }
 
 // calcularRafagaEstimada calcula la ráfaga estimada usando la fórmula: Est(n+1) = α * R(n) + (1-α) * Est(n)
@@ -263,7 +214,7 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) {
 	cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
 	if cpuFound != nil {
 		cpuFound.EnviarInterrupcion("Desalojo", false)
-		cpuFound.Estado = true
+		//p.LiberarCPU(cpuFound)
 	}
 
 	// Actualizar métricas del proceso
@@ -294,7 +245,7 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) {
 
 	//Log obligatorio: Cambio de estado
 	// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-	p.Log.Info(fmt.Sprintf("%d Pasa del estado EXEC al estado READY", proceso.PCB.PID))
+	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado READY", proceso.PCB.PID))
 
 	// Actualizar métricas de Ready
 	if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
@@ -348,9 +299,6 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 	proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoExec]++
 
-	// Marcar CPU como ocupada
-	cpuAsignada.Estado = false
-
 	p.Log.Debug("Proceso asignado a CPU con SJF",
 		log.IntAttr("PID", proceso.PCB.PID),
 		log.StringAttr("CPU_ID", cpuAsignada.ID),
@@ -366,5 +314,8 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 		newPC, _ := cpuElegida.DispatchProcess()
 
 		procesoExec.PCB.PC = newPC
+
+		// Liberar CPU usando semáforo
+		p.LiberarCPU(cpuElegida)
 	}(cpuAsignada, proceso)
 }

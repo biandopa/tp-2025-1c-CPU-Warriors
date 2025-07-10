@@ -56,6 +56,7 @@ func (p *Service) PlanificadorLargoPlazoFIFO(proceso *internal.Proceso) {
 
 	p.mutexNewQueue.Lock()
 	p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
+	p.Memoria.CargarProcesoEnMemoriaDeSistema(proceso.PCB.NombreArchivo, proceso.PCB.PID)
 	p.mutexNewQueue.Unlock()
 
 }
@@ -84,6 +85,7 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 
 	if yaLoAgregue {
 		p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
+		p.Memoria.CargarProcesoEnMemoriaDeSistema(proceso.PCB.NombreArchivo, proceso.PCB.PID)
 	}
 
 	p.mutexNewQueue.Unlock()
@@ -93,7 +95,7 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 func (p *Service) CheckearEspacioEnMemoria() {
 	// Priorizamos los procesos suspendidos ready
 	for _, proceso := range p.Planificador.SuspReadyQueue {
-		if p.Memoria.ConsultarEspacio(proceso.PCB.NombreArchivo, proceso.PCB.Tamanio, proceso.PCB.PID) {
+		if p.Memoria.ConsultarEspacio(proceso.PCB.Tamanio, proceso.PCB.PID) {
 			// Si el proceso se carga en memoria, lo muevo a la cola de ready
 			// y lo elimino de la cola de suspendidos ready
 
@@ -116,9 +118,8 @@ func (p *Service) CheckearEspacioEnMemoria() {
 
 			proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
-			//Log obligatorio: Cambio de estado
-			// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-			p.Log.Info(fmt.Sprintf("%d Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
+			// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+			p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
 
 			// Enviar señal al canal de corto plazo para procesos suspendidos
 			p.Log.Debug("Enviando señal al canal de corto plazo (SUSP.READY -> READY)",
@@ -132,7 +133,7 @@ func (p *Service) CheckearEspacioEnMemoria() {
 
 	if len(p.Planificador.SuspReadyQueue) == 0 {
 		for _, proceso := range p.Planificador.NewQueue {
-			if p.Memoria.ConsultarEspacio(proceso.PCB.NombreArchivo, proceso.PCB.Tamanio, proceso.PCB.PID) {
+			if p.Memoria.ConsultarEspacio(proceso.PCB.Tamanio, proceso.PCB.PID) {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de new
 
@@ -158,9 +159,8 @@ func (p *Service) CheckearEspacioEnMemoria() {
 				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 				proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
-				//Log obligatorio: Cambio de estado
-				// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-				p.Log.Info(fmt.Sprintf("%d Pasa del estado NEW al estado READY", proceso.PCB.PID))
+				// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+				p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado NEW al estado READY", proceso.PCB.PID))
 
 				// Luego, envío la señal para que el planificador de corto plazo pueda ejecutar el proceso
 				p.Log.Debug("Enviando señal al canal de corto plazo",
@@ -215,6 +215,8 @@ func (p *Service) FinalizarProceso(pid int) {
 	cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
 	if cpuFound != nil {
 		cpuFound.Estado = true
+		// Informo al channel de que la CPU esta libre
+		p.CPUSemaphore <- struct{}{}
 	}
 
 	// 5. Cambiar el estado del proceso a EXIT
@@ -232,11 +234,11 @@ func (p *Service) FinalizarProceso(pid int) {
 
 	//Log obligatorio: Cambio de estado
 	// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
-	p.Log.Info(fmt.Sprintf("%d Pasa del estado EXEC al estado EXIT", proceso.PCB.PID))
+	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado EXIT", proceso.PCB.PID))
 
 	//Log obligatorio: Finalización de proceso
 	//“## (<PID>) - Finaliza el proceso”
-	p.Log.Info(fmt.Sprintf("%d Finaliza el proceso", proceso.PCB.PID))
+	p.Log.Info(fmt.Sprintf("## (%d) Finaliza el proceso", proceso.PCB.PID))
 
 	// Log obligatorio: Métricas de Estado
 	//“## (<PID>) - Métricas de estado: NEW (NEW_COUNT) (NEW_TIME), READY (READY_COUNT) (READY_TIME), …”
@@ -248,6 +250,9 @@ func (p *Service) FinalizarProceso(pid int) {
 	// 7. Liberar PCB
 	proceso.PCB = nil // Libero el PCB asociado al proceso
 
-	// 8. Le avisamos al channel de que puede ejecutar el algoritmo de largo plazo
+	// 8. Checkear si hay procesos suspendidos que puedan volver a memoria
+	p.CheckearEspacioEnMemoria()
+
+	// 9. Le avisamos al channel de que puede ejecutar el algoritmo de largo plazo
 	//p.CanalNuevoProcesoNew <- struct{}{}
 }
