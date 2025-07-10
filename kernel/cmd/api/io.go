@@ -27,8 +27,8 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 		if ioDevice.Nombre == ioIdentificacionPeticion.Nombre && !ioDevice.Estado {
 			// Liberar el dispositivo IO
 			ioIdentificacion[i].Estado = true
-			ioIdentificacion[i].ProcesoID = 0 // Limpiar el PID asociado
-			ioIdentificacion[i].Cola = ""     // Limpiar la cola asociada
+			ioIdentificacion[i].ProcesoID = -1 // Limpiar el PID asociado (usar -1 para indicar sin proceso)
+			ioIdentificacion[i].Cola = ""      // Limpiar la cola asociada
 
 			h.Log.Debug("Dispositivo IO liberado",
 				log.StringAttr("dispositivo", ioDevice.Nombre),

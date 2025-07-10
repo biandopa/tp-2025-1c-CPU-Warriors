@@ -65,6 +65,7 @@ func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ioInfo.Estado = true
+	ioInfo.ProcesoID = -1 // Inicializar sin proceso asignado
 	ioIdentificacion = append(ioIdentificacion, ioInfo)
 
 	h.Log.DebugContext(ctx, "Lista de IOs conectadas",
@@ -111,7 +112,7 @@ func (h *Handler) DesconexionIO(w http.ResponseWriter, r *http.Request) {
 
 	if dispositivoEncontrado != nil {
 		// Si había un proceso usando este dispositivo, enviarlo a EXIT
-		if dispositivoEncontrado.ProcesoID >= 0 {
+		if dispositivoEncontrado.ProcesoID > 0 {
 			h.Log.Debug(fmt.Sprintf("## (%d) - Proceso enviado a EXIT por desconexión de IO: %s",
 				dispositivoEncontrado.ProcesoID, dispositivoEncontrado.Nombre))
 			go h.Planificador.FinalizarProceso(dispositivoEncontrado.ProcesoID)
