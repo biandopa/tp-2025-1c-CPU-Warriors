@@ -153,7 +153,7 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Buscar el dispositivo IO y marcarlo como ocupado. Si todas las instancias de IO con el mismo nomrbe
+			// Buscar el dispositivo IO y marcarlo como ocupado. Si todas las instancias de IO con el mismo nombre
 			// están ocupadas, se agrega a la cola de espera
 			var encontreIoLibre bool
 			for i, ioDevice := range ioIdentificacion {
@@ -171,21 +171,21 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// Agregar a la cola de espera del dispositivo IO
-			if ioWaitQueues[ioInfo.Nombre] == nil {
-				ioWaitQueues[ioInfo.Nombre] = make([]int, 0)
-			}
-			ioWaitQueues[ioInfo.Nombre] = append(ioWaitQueues[ioInfo.Nombre], syscall.PID)
-
-			h.Log.Debug("Proceso agregado a cola de espera IO",
-				log.StringAttr("dispositivo", ioInfo.Nombre),
-				log.IntAttr("proceso", syscall.PID),
-				log.AnyAttr("cola_espera", ioWaitQueues[ioInfo.Nombre]),
-			)
-
 			if encontreIoLibre {
 				// Enviar petición a IO de forma asíncrona
 				go h.Planificador.EnviarUsleep(ioInfo.Puerto, ioInfo.IP, syscall.PID, timeSleep)
+			} else {
+				// Solo agregar a la cola de espera si NO hay dispositivo libre
+				if ioWaitQueues[ioInfo.Nombre] == nil {
+					ioWaitQueues[ioInfo.Nombre] = make([]int, 0)
+				}
+				ioWaitQueues[ioInfo.Nombre] = append(ioWaitQueues[ioInfo.Nombre], syscall.PID)
+
+				h.Log.Debug("Proceso agregado a cola de espera IO (dispositivo ocupado)",
+					log.StringAttr("dispositivo", ioInfo.Nombre),
+					log.IntAttr("proceso", syscall.PID),
+					log.AnyAttr("cola_espera", ioWaitQueues[ioInfo.Nombre]),
+				)
 			}
 
 			return
