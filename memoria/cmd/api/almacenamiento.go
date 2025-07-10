@@ -566,9 +566,9 @@ func (h *Handler) DumpProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	/*Log obligatorio: Memory Dump
-	“## PID: <PID> - Memory Dump solicitado”
+	"## PID: <PID> - Memory Dump solicitado"
 	*/
-	h.Log.Info(fmt.Sprintf("## PID: %s - Memory Dump solicitado”", pid))
+	h.Log.Info(fmt.Sprintf("## PID: %s - Memory Dump solicitado", pid))
 
 	if err := h.DumpProcesoFuncionAuxiliar(pid); err != nil {
 		h.Log.Error("Error al crear el dump del proceso",
@@ -593,14 +593,44 @@ func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) error {
 	h.Log.Debug("DumpFuncionAuxiliar",
 		log.AnyAttr("pid", pid))
 
-	procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
+	// Verificar que el proceso existe
+	procesYTablaAsociada, err := h.BuscarProcesoPorPID(pid)
+	if err != nil {
+		h.Log.Error("Error al buscar proceso por PID",
+			log.StringAttr("pid", pid),
+			log.ErrAttr(err))
+		return fmt.Errorf("proceso no encontrado: %w", err)
+	}
+
 	h.Log.Debug("DumpProcesoFuncionAuxiliar",
 		log.AnyAttr("procesYTablaAsociada", procesYTablaAsociada.TablasDePaginas))
+
+	// Verificar que la tabla de páginas no es nil
+	if procesYTablaAsociada.TablasDePaginas == nil {
+		h.Log.Error("Tabla de páginas es nil",
+			log.StringAttr("pid", pid))
+		return fmt.Errorf("tabla de páginas es nil para proceso %s", pid)
+	}
 
 	marcosDelProceso := h.ObtenerMarcosDeLaTabla(procesYTablaAsociada.TablasDePaginas)
 
 	h.Log.Debug("DumpProcesoFuncionAuxiliar",
 		log.AnyAttr("marcosDelProceso", marcosDelProceso))
+
+	// Verificar que hay marcos válidos
+	if len(marcosDelProceso) == 0 {
+		h.Log.Error("No hay marcos válidos para el proceso",
+			log.StringAttr("pid", pid))
+		return fmt.Errorf("no hay marcos válidos para proceso %s", pid)
+	}
+
+	// Crear el directorio si no existe
+	if err := os.MkdirAll(h.Config.DumpPath, 0755); err != nil {
+		h.Log.Error("Error creando directorio de dump",
+			log.StringAttr("dump_path", h.Config.DumpPath),
+			log.ErrAttr(err))
+		return fmt.Errorf("error creando directorio de dump: %w", err)
+	}
 
 	timestamp := time.Now().Format("20060102_150405")
 	fileName := fmt.Sprintf("%s-%s.dmp", pid, timestamp)
@@ -608,27 +638,57 @@ func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) error {
 
 	// Crear el archivo
 	file, err := os.Create(fullPath)
-	if err != nil || file == nil {
-		h.Log.Error("Error creando el dump")
-		return err
+	if err != nil {
+		h.Log.Error("Error creando archivo de dump",
+			log.StringAttr("fullPath", fullPath),
+			log.ErrAttr(err))
+		return fmt.Errorf("error creando archivo de dump: %w", err)
 	}
 
 	defer func(f *os.File) {
-		_ = f.Close()
+		if err := f.Close(); err != nil {
+			h.Log.Error("Error cerrando archivo de dump",
+				log.StringAttr("fullPath", fullPath),
+				log.ErrAttr(err))
+		}
 	}(file)
 
 	pageSize := h.Config.PageSize
 
 	for _, marco := range marcosDelProceso {
+		// Verificar que el marco es válido
+		if marco < 0 || marco >= len(h.EspacioDeUsuario)/pageSize {
+			h.Log.Error("Marco inválido detectado",
+				log.IntAttr("marco", marco),
+				log.IntAttr("max_marcos", len(h.EspacioDeUsuario)/pageSize))
+			continue
+		}
+
 		offset := marco * pageSize
+		// Verificar que no excedemos el límite del espacio de usuario
+		if offset+pageSize > len(h.EspacioDeUsuario) {
+			h.Log.Error("Offset excede el espacio de usuario",
+				log.IntAttr("offset", offset),
+				log.IntAttr("pageSize", pageSize),
+				log.IntAttr("espacioDeUsuario", len(h.EspacioDeUsuario)))
+			continue
+		}
+
 		pagina := h.EspacioDeUsuario[offset : offset+pageSize]
 
 		_, err = file.Write(pagina)
 		if err != nil {
-			h.Log.Error("Error escribiendo el dump asociado al marco")
+			h.Log.Error("Error escribiendo el dump asociado al marco",
+				log.IntAttr("marco", marco),
+				log.ErrAttr(err))
 			return fmt.Errorf("error escribiendo el dump asociado al marco %d: %w", marco, err)
 		}
 	}
+
+	h.Log.Info("Dump del proceso creado exitosamente",
+		log.StringAttr("pid", pid),
+		log.StringAttr("archivo", fullPath),
+		log.IntAttr("marcos_procesados", len(marcosDelProceso)))
 
 	return nil
 }
