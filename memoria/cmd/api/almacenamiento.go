@@ -811,7 +811,7 @@ func (h *Handler) AccesoATabla(w http.ResponseWriter, r *http.Request) {
 // Recibe el PID del proceso y la página a buscar como parámetros.
 func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 	var (
-		// Leemos el PID y la página de la consulta
+		// Leemos el PID y la página/dirección lógica de la consulta
 		pid    = r.URL.Query().Get("pid")
 		pagina = r.URL.Query().Get("pagina")
 	)
@@ -821,13 +821,28 @@ func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
 		return
 	}
-	if pagina == "" {
-		h.Log.Error("Página no proporcionada")
-		http.Error(w, "Página no proporcionada", http.StatusBadRequest)
+
+	var paginaInt int
+	var err error
+
+	// Determinar si se proporcionó página o dirección lógica
+	if pagina != "" {
+		paginaInt, err = strconv.Atoi(pagina)
+		if err != nil {
+			h.Log.Error("Página inválida", log.StringAttr("pagina", pagina))
+			http.Error(w, "página inválida", http.StatusBadRequest)
+			return
+		}
+	}
+
+	tablaProceso, err := h.BuscarProcesoPorPID(pid)
+	if err != nil {
+		h.Log.Error("Error al buscar proceso por PID",
+			log.StringAttr("pid", pid),
+			log.ErrAttr(err))
+		http.Error(w, "proceso no encontrado", http.StatusNotFound)
 		return
 	}
-	paginaInt, _ := strconv.Atoi(pagina)
-	tablaProceso, _ := h.BuscarProcesoPorPID(pid)
 
 	frame, found := buscarMarcoPorPaginaAux(tablaProceso, []int{paginaInt})
 	if !found {
@@ -838,11 +853,18 @@ func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error al buscar marco por página", http.StatusInternalServerError)
 		return
 	}
-	frameString := strconv.Itoa(frame)
 
-	// Devolvemos un status 200 OK y el marco encontrado
+	// Devolver respuesta en formato JSON compatible con CPU
+	response := map[string]interface{}{
+		"pagina": paginaInt,
+		"frame":  frame,
+		"offset": 0, // El offset no se calcula aquí, se hace en el CPU
+	}
+
+	responseBytes, _ := json.Marshal(response)
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(frameString))
+	_, _ = w.Write(responseBytes)
 }
 
 func buscarMarcoPorPaginaAux(tabla *TablasProceso, indices []int) (int, bool) {

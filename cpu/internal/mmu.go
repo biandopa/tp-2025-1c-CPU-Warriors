@@ -171,7 +171,7 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 	)
 
 	// Obtención de marco de tabla de páginas
-	response, err := m.Memoria.BuscarFrame(dirLogicaInt, pid)
+	response, err := m.Memoria.BuscarFrame(nroPagina, pid)
 	if err != nil {
 		m.Log.Error("Error al buscar marco en tabla de páginas",
 			log.ErrAttr(err),
