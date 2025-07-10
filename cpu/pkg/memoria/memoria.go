@@ -46,6 +46,17 @@ type Instruccion struct {
 	Parametros  []string `json:"parametros"`
 }
 
+type DirInfoResponse struct {
+	Pagina int `json:"pagina"`
+	Frame  int `json:"frame"`
+	Offset int `json:"offset"`
+}
+
+type PageConfig struct {
+	PageSize int `json:"page_size"`
+	Entries  int `json:"entries_per_page"`
+}
+
 // NewMemoria crea una nueva instancia del cliente de memoria
 func NewMemoria(ip string, puerto int, logger *slog.Logger) *Memoria {
 	return &Memoria{
@@ -74,7 +85,7 @@ func (m *Memoria) Write(pid int, direccion string, datos string) error {
 		return fmt.Errorf("error al serializar petición WRITE: %w", err)
 	}
 
-	url := fmt.Sprintf("http://%s:%d/cpu/acceso", m.IP, m.Puerto)
+	url := fmt.Sprintf("http://%s:%d/cpu/escritura", m.IP, m.Puerto)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		m.Log.Error("Error enviando petición WRITE a memoria",
@@ -142,7 +153,7 @@ func (m *Memoria) Read(pid int, direccion string, tamanio int) (string, error) {
 		return "", fmt.Errorf("error al serializar petición READ: %w", err)
 	}
 
-	url := fmt.Sprintf("http://%s:%d/cpu/acceso", m.IP, m.Puerto)
+	url := fmt.Sprintf("http://%s:%d/cpu/lectura", m.IP, m.Puerto)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		m.Log.Error("Error enviando petición read a memoria",
@@ -249,4 +260,111 @@ func (m *Memoria) FetchInstruccion(pid int, pc int) (Instruccion, error) {
 	)
 
 	return instruccion, nil
+}
+
+func (m *Memoria) BuscarFrame(dirLogica, pid int) (DirInfoResponse, error) {
+	url := fmt.Sprintf("http://%s:%d/kernel/pagina-a-frame?dir-logica=%d&pid=%d",
+		m.IP, m.Puerto, dirLogica, pid)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		m.Log.Error("Error al buscar marco por página",
+			log.ErrAttr(err),
+			log.StringAttr("ip", m.IP),
+			log.IntAttr("puerto", m.Puerto),
+			log.IntAttr("pid", pid),
+		)
+		return DirInfoResponse{}, err
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		m.Log.Error("Memoria respondió con error al buscar marco",
+			log.StringAttr("status", resp.Status),
+			log.IntAttr("status_code", resp.StatusCode),
+		)
+		return DirInfoResponse{}, fmt.Errorf("memoria respondió con error: %s", resp.Status)
+	}
+
+	var response DirInfoResponse
+	if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		m.Log.Error("Error al decodificar respuesta de marco",
+			log.ErrAttr(err),
+		)
+		return response, fmt.Errorf("error al decodificar respuesta: %w", err)
+	}
+
+	return response, nil
+}
+
+func (m *Memoria) ConsultarPageSize() (PageConfig, error) {
+	var info PageConfig
+	url := fmt.Sprintf("http://%s:%d//cpu/page-size-y-entries", m.IP, m.Puerto)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		m.Log.Error("Error al consultar espacio disponible",
+			log.ErrAttr(err),
+			log.StringAttr("ip", m.IP),
+			log.IntAttr("puerto", m.Puerto),
+		)
+		return info, err
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		m.Log.Error("Memoria respondió con error al consultar espacio",
+			log.StringAttr("status", resp.Status),
+			log.IntAttr("status_code", resp.StatusCode),
+		)
+		return info, fmt.Errorf("memoria respondió con error: %s", resp.Status)
+	}
+
+	if err = json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		m.Log.Error("Error al decodificar tamaño de página",
+			log.ErrAttr(err),
+		)
+		return info, fmt.Errorf("error al decodificar respuesta: %w", err)
+	}
+
+	return info, nil
+}
+
+func (m *Memoria) GuardarPagsEnMemoria(info map[string]map[string]interface{}) error {
+	url := fmt.Sprintf("http://%s:%d//cpu/actualizar-pag-completa", m.IP, m.Puerto)
+
+	body := new(bytes.Buffer)
+	if err := json.NewEncoder(body).Encode(info); err != nil {
+		m.Log.Error("Error al serializar información para guardar en memoria",
+			log.ErrAttr(err),
+		)
+		return fmt.Errorf("error al serializar información: %w", err)
+	}
+
+	resp, err := http.Post(url, "application/json", body)
+	if err != nil {
+		m.Log.Error("Error al consultar espacio disponible",
+			log.ErrAttr(err),
+			log.StringAttr("ip", m.IP),
+			log.IntAttr("puerto", m.Puerto),
+		)
+		return err
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		m.Log.Error("Memoria respondió con error al guardar información",
+			log.StringAttr("status", resp.Status),
+			log.IntAttr("status_code", resp.StatusCode),
+		)
+		return fmt.Errorf("memoria respondió con error: %s", resp.Status)
+	}
+
+	return nil
 }

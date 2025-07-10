@@ -13,25 +13,27 @@ import (
 
 // MMU representa la unidad de gestión de memoria
 type MMU struct {
-	TLB        *TLB
-	Cache      *Cache
-	Log        *slog.Logger
-	PageSize   int
-	TLBMutex   *sync.RWMutex
-	CacheMutex *sync.RWMutex
+	TLB            *TLB
+	Cache          *Cache
+	Log            *slog.Logger
+	PageSize       int
+	CantEntriesMem int
+	TLBMutex       *sync.RWMutex
+	CacheMutex     *sync.RWMutex
+	Memoria        *memoria.Memoria
 }
 
 // TLB representa la Translation Lookaside Buffer
 type TLB struct {
-	Entries    map[string]*TLBEntry
+	Entries    map[int]*TLBEntry
 	MaxEntries int
 	Algoritmo  string // "FIFO" o "LRU"
 }
 
 // TLBEntry representa una entrada en la TLB
 type TLBEntry struct {
-	VirtualPage     string
-	PhysicalPage    string
+	Page            int
+	Frame           int
 	UltimoAcceso    time.Time
 	TiempoCreacion  time.Time // Para algoritmo FIFO
 	ConteoDeAccesos int
@@ -47,18 +49,28 @@ type Cache struct {
 
 // CacheEntry representa una entrada en la caché
 type CacheEntry struct {
+	PID        int // PID del proceso
 	PageID     string
-	Data       string
+	Data       string // Eso se pasa a memoria
 	LastAccess time.Time
 	Reference  bool // Para algoritmo CLOCK
 	Modified   bool // Para algoritmo CLOCK-M
 }
 
 // NewMMU crea una nueva instancia de MMU
-func NewMMU(tlbEntries, cacheEntries int, tlbAlgoritmo, cacheAlgoritmo string, logger *slog.Logger) *MMU {
+func NewMMU(tlbEntries, cacheEntries int, tlbAlgoritmo, cacheAlgoritmo string, logger *slog.Logger, memoria *memoria.Memoria) *MMU {
+	// Consultar a memoria la cantidad de entradas y el tamaño de página
+	info, err := memoria.ConsultarPageSize()
+	if err != nil {
+		logger.Error("Error al consultar información de memoria",
+			log.ErrAttr(err),
+		)
+		panic(err)
+	}
+
 	return &MMU{
 		TLB: &TLB{
-			Entries:    make(map[string]*TLBEntry),
+			Entries:    make(map[int]*TLBEntry),
 			MaxEntries: tlbEntries,
 			Algoritmo:  tlbAlgoritmo,
 		},
@@ -68,16 +80,18 @@ func NewMMU(tlbEntries, cacheEntries int, tlbAlgoritmo, cacheAlgoritmo string, l
 			Algorithm:  cacheAlgoritmo,
 			Clock:      0,
 		},
-		Log:        logger,
-		PageSize:   64, // Tamaño de página por defecto
-		TLBMutex:   &sync.RWMutex{},
-		CacheMutex: &sync.RWMutex{},
+		Log:            logger,
+		TLBMutex:       &sync.RWMutex{},
+		CacheMutex:     &sync.RWMutex{},
+		PageSize:       info.PageSize,
+		CantEntriesMem: info.Entries,
+		Memoria:        memoria,
 	}
 }
 
 // TraducirDireccion traduce una dirección lógica a física
 // Sigue el orden: Caché → TLB → Tabla de páginas
-func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
+func (m *MMU) TraducirDireccion(pid int, dirLogica string, mem *memoria.Memoria) (string, error) {
 	// Convertir dirección lógica a número
 	dirLogicaInt, err := strconv.Atoi(dirLogica)
 	if err != nil {
@@ -86,46 +100,17 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 
 	// Calcular número de página virtual
 	nroPagina := dirLogicaInt / m.PageSize
-	nroPaginaStr := strconv.Itoa(nroPagina)
 
-	// 1. PRIMERO: Verificar caché de páginas (si está habilitada)
-	if m.Cache.MaxEntries > 0 {
-		pageID := m.generarPageID(pid, dirLogica)
-		m.CacheMutex.RLock()
-		cacheEntry, exists := m.Cache.Entries[pageID]
-		m.CacheMutex.RUnlock()
-
-		if exists {
-			// Log obligatorio: Página encontrada en Caché
-			// "PID: <PID> - Cache Hit - Pagina: <NUMERO_PAGINA>"
-			m.Log.Info(fmt.Sprintf("PID: %d - Cache Hit - Pagina: %s", pid, nroPaginaStr))
-
-			// Actualizar estadísticas de caché
-			cacheEntry.LastAccess = time.Now()
-			cacheEntry.Reference = true
-
-			// Calcular offset y dirección física
-			offset := dirLogicaInt % m.PageSize
-			dirFisica := (nroPagina * m.PageSize) + offset
-
-			return strconv.Itoa(dirFisica), nil
-		} else {
-			// Log obligatorio: Página faltante en Caché
-			// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
-			m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %s", pid, nroPaginaStr))
-		}
-	}
-
-	// 2. SEGUNDO: Verificar TLB (si está habilitada)
+	// 1. Primero: Verificar TLB (si está habilitada)
 	if m.TLB.MaxEntries > 0 {
 		m.TLBMutex.RLock()
-		tlbEntry, exists := m.TLB.Entries[nroPaginaStr]
+		tlbEntry, exists := m.TLB.Entries[nroPagina]
 		m.TLBMutex.RUnlock()
 
 		if exists {
 			// Log obligatorio: TLB Hit
 			// "PID: <PID> - TLB HIT - Pagina: <NUMERO_PAGINA>"
-			m.Log.Info(fmt.Sprintf("PID: %d - TLB HIT - Pagina: %s", pid, nroPaginaStr))
+			m.Log.Info(fmt.Sprintf("PID: %d - TLB HIT - Pagina: %d", pid, nroPagina))
 
 			// Actualizar estadísticas de TLB
 			tlbEntry.UltimoAcceso = time.Now()
@@ -133,54 +118,61 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 
 			// Calcular offset (desplazamiento) y dirección física
 			offset := dirLogicaInt % m.PageSize
-			dirFisica := (nroPagina * m.PageSize) + offset
+			dirFisica := (tlbEntry.Frame * m.PageSize) + offset
 
 			// Log obligatorio: Obtener Marco
 			// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
-			m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %s - Marco: %s", pid, nroPaginaStr, tlbEntry.PhysicalPage))
+			m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d", pid, nroPagina, tlbEntry.Frame))
 
 			return strconv.Itoa(dirFisica), nil
 		} else {
 			// Log obligatorio: TLB Miss
 			// "PID: <PID> - TLB MISS - Pagina: <NUMERO_PAGINA>"
-			m.Log.Info(fmt.Sprintf("PID: %d - TLB MISS - Pagina: %s", pid, nroPaginaStr))
+			m.Log.Info(fmt.Sprintf("PID: %d - TLB MISS - Pagina: %d", pid, nroPagina))
 		}
 	}
 
-	// 3. TERCERO: Consultar tabla de páginas en memoria
-	// TLB miss - por ahora usamos traducción directa
-	// TODO: Implementar tabla de páginas real consultando a Memoria
+	// 2. Segundo: Consultar tabla de páginas en memoria
 	m.Log.Debug("TLB miss, usando traducción directa",
 		log.IntAttr("pid", pid),
-		log.StringAttr("nro_pagina", nroPaginaStr),
+		log.IntAttr("pagina", nroPagina),
 	)
 
-	// TODO: Replace later
-	// Simular obtención de marco de tabla de páginas
-	marco := nroPagina // Por simplicidad, el marco es igual al número de página
-	marcoStr := strconv.Itoa(marco)
+	// Obtención de marco de tabla de páginas
+	response, err := mem.BuscarFrame(dirLogicaInt, pid)
+	if err != nil {
+		m.Log.Error("Error al buscar marco en tabla de páginas",
+			log.ErrAttr(err),
+			log.IntAttr("pid", pid),
+		)
+		return "", err
+	}
+	frame := response.Frame
+	offset := response.Offset
 
 	// Log obligatorio: Obtener Marco desde tabla de páginas
 	// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
-	m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %s - Marco: %s", pid, nroPaginaStr, marcoStr))
+	m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d", pid, nroPagina, frame))
 
 	// Agregar entrada a TLB si está habilitada
 	if m.TLB.MaxEntries > 0 {
-		m.agregarATLB(nroPaginaStr, marcoStr)
+		m.agregarATLB(nroPagina, frame)
 	}
 
-	// Por ahora, la dirección física es igual a la lógica
-	return dirLogica, nil
+	// Calcular dirección física
+	dirFisica := (frame * m.PageSize) + offset
+
+	return strconv.Itoa(dirFisica), nil
 }
 
 // LeerConCache realiza una operación de lectura usando la caché si está habilitada
-func (m *MMU) LeerConCache(pid int, direccion string, tamanio int, memoriaClient *memoria.Memoria) (string, error) {
+func (m *MMU) LeerConCache(pid int, direccion string, tamanio int) (string, error) {
 	// Calcular número de página
-	dirLogicaInt, err := strconv.Atoi(direccion)
+	dirFisicaInt, err := strconv.Atoi(direccion)
 	if err != nil {
 		return "", err
 	}
-	nroPagina := dirLogicaInt / m.PageSize
+	nroPagina := dirFisicaInt / m.PageSize
 	nroPaginaStr := strconv.Itoa(nroPagina)
 
 	// Verificar si la caché está habilitada
@@ -190,7 +182,7 @@ func (m *MMU) LeerConCache(pid int, direccion string, tamanio int, memoriaClient
 			log.StringAttr("direccion", direccion))
 
 		// Acceso directo a memoria
-		return memoriaClient.Read(pid, direccion, tamanio)
+		return m.Memoria.Read(pid, direccion, tamanio)
 	}
 
 	// Generar ID de página para la caché
@@ -224,7 +216,7 @@ func (m *MMU) LeerConCache(pid int, direccion string, tamanio int, memoriaClient
 		log.StringAttr("direccion", direccion),
 		log.StringAttr("page_id", pageID))
 
-	datos, err := memoriaClient.Read(pid, direccion, tamanio)
+	datos, err := m.Memoria.Read(pid, direccion, tamanio)
 	if err != nil {
 		return "", err
 	}
@@ -239,14 +231,15 @@ func (m *MMU) LeerConCache(pid int, direccion string, tamanio int, memoriaClient
 	return datos, nil
 }
 
+// TODO: revisar
 // EscribirConCache realiza una operación de escritura usando la caché si está habilitada
-func (m *MMU) EscribirConCache(pid int, direccion string, datos string, memoriaClient *memoria.Memoria) error {
+func (m *MMU) EscribirConCache(pid int, direccion, datos string) error {
 	// Calcular número de página
-	dirLogicaInt, err := strconv.Atoi(direccion)
+	dirFisicaInt, err := strconv.Atoi(direccion)
 	if err != nil {
 		return err
 	}
-	nroPagina := dirLogicaInt / m.PageSize
+	nroPagina := dirFisicaInt / m.PageSize
 	nroPaginaStr := strconv.Itoa(nroPagina)
 
 	// Verificar si la caché está habilitada
@@ -256,7 +249,7 @@ func (m *MMU) EscribirConCache(pid int, direccion string, datos string, memoriaC
 			log.StringAttr("direccion", direccion))
 
 		// Acceso directo a memoria
-		return memoriaClient.Write(pid, direccion, datos)
+		return m.Memoria.Write(pid, direccion, datos)
 	}
 
 	// Generar ID de página para la caché
@@ -278,15 +271,6 @@ func (m *MMU) EscribirConCache(pid int, direccion string, datos string, memoriaC
 		cacheEntry.Modified = true // Marcar como modificado
 		m.CacheMutex.Unlock()
 
-		// Para simplificar, escribimos inmediatamente a memoria también
-		// En una implementación real, esto se haría en el momento de evicción
-		err = memoriaClient.Write(pid, direccion, datos)
-		if err == nil {
-			// Log obligatorio: Página Actualizada de Caché a Memoria
-			// "PID: <PID> - Memory Update - Página: <NUMERO_PAGINA> - Frame: <FRAME_EN_MEMORIA_PRINCIPAL>"
-			frame := nroPagina // Por simplicidad, el frame es igual al número de página
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d", pid, nroPaginaStr, frame))
-		}
 		return err
 	}
 
@@ -308,14 +292,14 @@ func (m *MMU) EscribirConCache(pid int, direccion string, datos string, memoriaC
 	// "PID: <PID> - Cache Add - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Add - Pagina: %s", pid, nroPaginaStr))
 
-	// Escribir a memoria
-	err = memoriaClient.Write(pid, direccion, datos)
+	/*// Escribir a memoria
+	err = m.Memoria.Write(pid, direccion, datos)
 	if err == nil {
 		// Log obligatorio: Página Actualizada de Caché a Memoria
 		// "PID: <PID> - Memory Update - Página: <NUMERO_PAGINA> - Frame: <FRAME_EN_MEMORIA_PRINCIPAL>"
 		frame := nroPagina // Por simplicidad, el frame es igual al número de página
 		m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d", pid, nroPaginaStr, frame))
-	}
+	}*/
 
 	// Verificar si necesitamos hacer evicción
 	if len(m.Cache.Entries) > m.Cache.MaxEntries {
@@ -325,6 +309,7 @@ func (m *MMU) EscribirConCache(pid int, direccion string, datos string, memoriaC
 	return err
 }
 
+// TODO: Agregar escritura en memoria de lo almacenado en caché (Usar lo de página completa)
 // LimpiarMemoriaProceso limpia TLB y caché cuando un proceso termina o es desalojado
 func (m *MMU) LimpiarMemoriaProceso(pid int) {
 	m.Log.Debug("Limpiando memoria del proceso",
@@ -336,8 +321,8 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 		// Limpiamos toda la TLB
 		delete(m.TLB.Entries, key)
 		m.Log.Debug("Entrada TLB eliminada",
-			log.StringAttr("key", key),
-			log.StringAttr("physical_page", entry.PhysicalPage))
+			log.IntAttr("key", key),
+			log.IntAttr("frame", entry.Frame))
 	}
 	m.TLBMutex.Unlock()
 
@@ -361,7 +346,7 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 }
 
 // agregarATLB agrega una nueva entrada a la TLB
-func (m *MMU) agregarATLB(nroPagina, marco string) {
+func (m *MMU) agregarATLB(nroPagina, marco int) {
 	m.TLBMutex.Lock()
 	defer m.TLBMutex.Unlock()
 
@@ -372,16 +357,16 @@ func (m *MMU) agregarATLB(nroPagina, marco string) {
 
 	// Agregar nueva entrada
 	m.TLB.Entries[nroPagina] = &TLBEntry{
-		VirtualPage:     nroPagina,
-		PhysicalPage:    marco,
+		Page:            nroPagina,
+		Frame:           marco,
 		UltimoAcceso:    time.Now(),
 		TiempoCreacion:  time.Now(),
 		ConteoDeAccesos: 1,
 	}
 
 	m.Log.Debug("Nueva entrada agregada a TLB",
-		log.StringAttr("nro_pagina", nroPagina),
-		log.StringAttr("marco", marco))
+		log.IntAttr("pagina", nroPagina),
+		log.IntAttr("marco", marco))
 }
 
 // evictTLBEntry remueve una entrada de la TLB según el algoritmo configurado
@@ -397,7 +382,7 @@ func (m *MMU) evictTLBEntry() {
 // evictTLBFIFO implementa el algoritmo FIFO para TLB
 func (m *MMU) evictTLBFIFO() {
 	var (
-		oldestKey  string
+		oldestKey  int
 		oldestTime = time.Now()
 	)
 
@@ -408,17 +393,17 @@ func (m *MMU) evictTLBFIFO() {
 		}
 	}
 
-	if oldestKey != "" {
+	if oldestKey >= 0 {
 		delete(m.TLB.Entries, oldestKey)
 		m.Log.Debug("Entrada TLB evictada (FIFO)",
-			log.StringAttr("key", oldestKey))
+			log.IntAttr("key", oldestKey))
 	}
 }
 
 // evictTLBLRU implementa el algoritmo LRU para TLB
 func (m *MMU) evictTLBLRU() {
 	var (
-		lruKey  string
+		lruKey  int
 		lruTime = time.Now()
 	)
 
@@ -429,10 +414,10 @@ func (m *MMU) evictTLBLRU() {
 		}
 	}
 
-	if lruKey != "" {
+	if lruKey >= 0 {
 		delete(m.TLB.Entries, lruKey)
 		m.Log.Debug("Entrada TLB evictada (LRU)",
-			log.StringAttr("key", lruKey))
+			log.IntAttr("key", lruKey))
 	}
 }
 
@@ -483,11 +468,17 @@ func (m *MMU) evictCacheClock() {
 		keys = append(keys, key)
 	}
 
+	dataAAlmacenar := map[string]map[string]interface{}{}
 	if len(keys) > 0 {
 		// Buscar una página con reference bit = false
 		for _, key := range keys {
 			entry := m.Cache.Entries[key]
 			if !entry.Reference {
+				// Se agrega la data a almacenar
+				dataAAlmacenar[key] = map[string]interface{}{
+					"pid":  entry.PID,
+					"data": entry.Data,
+				}
 				delete(m.Cache.Entries, key)
 				m.Log.Debug("Entrada caché evictada (CLOCK)",
 					log.StringAttr("page_id", key))
@@ -499,11 +490,24 @@ func (m *MMU) evictCacheClock() {
 		// Si todas tenían reference bit = true, remover la primera
 		if len(keys) > 0 {
 			firstKey := keys[0]
+			entry := m.Cache.Entries[firstKey]
+			dataAAlmacenar[firstKey] = map[string]interface{}{
+				"pid":  entry.PID,
+				"data": entry.Data,
+			}
 			delete(m.Cache.Entries, firstKey)
 			m.Log.Debug("Entrada caché evictada (CLOCK - segunda pasada)",
 				log.StringAttr("page_id", firstKey))
 		}
 	}
+	// Enviar información a memoria
+	go func() {
+		if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
+			m.Log.Error("Error al guardar páginas en memoria",
+				log.ErrAttr(err),
+			)
+		}
+	}()
 }
 
 // evictCacheClockM implementa el algoritmo CLOCK modificado para caché
@@ -513,11 +517,17 @@ func (m *MMU) evictCacheClockM() {
 		keys = append(keys, key)
 	}
 
+	dataAAlmacenar := map[string]map[string]interface{}{}
 	if len(keys) > 0 {
 		// Priorizar páginas no modificadas y no referenciadas
 		for _, key := range keys {
 			entry := m.Cache.Entries[key]
 			if !entry.Reference && !entry.Modified {
+				// Se agrega la data a almacenar
+				dataAAlmacenar[key] = map[string]interface{}{
+					"pid":  entry.PID,
+					"data": entry.Data,
+				}
 				delete(m.Cache.Entries, key)
 				m.Log.Debug("Entrada caché evictada (CLOCK-M)",
 					log.StringAttr("page_id", key))
@@ -528,9 +538,23 @@ func (m *MMU) evictCacheClockM() {
 		// Si no hay páginas ideales, usar la primera
 		if len(keys) > 0 {
 			firstKey := keys[0]
+			entry := m.Cache.Entries[firstKey]
+			dataAAlmacenar[firstKey] = map[string]interface{}{
+				"pid":  entry.PID,
+				"data": entry.Data,
+			}
 			delete(m.Cache.Entries, firstKey)
 			m.Log.Debug("Entrada caché evictada (CLOCK-M - fallback)",
 				log.StringAttr("page_id", firstKey))
 		}
 	}
+
+	// Enviar información a memoria
+	go func() {
+		if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
+			m.Log.Error("Error al guardar páginas en memoria",
+				log.ErrAttr(err),
+			)
+		}
+	}()
 }

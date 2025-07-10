@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,19 @@ import (
 type EspacioDisponible struct {
 	Mensaje string `json:"mensaje"`
 	Tamaño  int    `json:"tamaño"`
+}
+
+type LecturaEscrituraBody struct {
+	PID            string `json:"pid"`
+	Frame          int    `json:"frame"`
+	Offset         int    `json:"offset"`
+	Tamanio        int    `json:"tamanio"`
+	ValorAEscribir string `json:"valor_a_escribir,omitempty"`
+}
+
+type CacheData struct {
+	PID  string `json:"pid"`
+	Data string `json:"data"`
 }
 
 // ConsultarEspacioEInicializar recibe una consulta sobre el espacio libre en memoria.
@@ -120,43 +134,6 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 	//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
 	h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.MemorySize))
 
-	//
-	//BORRAR DE ACA PARA ABAJO ESTA AHORA PARA PROBAR LAS COSAS
-
-	if !esActualizacion {
-
-		copy(h.EspacioDeUsuario[0:], []byte("hola"))
-
-		//lectura, _ := h.BuscarMarcoPorPagina(tabla, []int{0, 0, 1})
-
-		/*h.Log.Debug("BuscarMarcoPorPagina",
-		log.AnyAttr("lectura", tabla))*/
-
-		//h.PasarProcesoASwapAuxiliar(pid)
-
-		//h.LeerPagina(0, 2, 1, pid)
-
-		//h.EscribirPagina(marco int, offset int, valorAEscribir string, pid string)
-		h.EscribirPagina(1, 0, "ey", pid)
-
-		h.LeerPagina(1, 0, 5, pid)
-
-		h.Log.Debug("FinalizarProcesoFuncionAuxiliar",
-			log.AnyAttr("tablaMetricas", tablaMetricas.CantidadDeLectura))
-
-		//h.FinalizarProcesoFuncionAuxiliar(pid)
-
-		h.Log.Debug("FinalizarProcesoFuncionAuxiliar",
-			log.AnyAttr("tablaMetricas", tablaMetricas.CantidadDeEscritura))
-
-		//h.SacarProcesoDeSwap(pid)
-
-		//h.DumpProcesoFuncionAuxiliar(pid)
-
-		//h.BuscarMarcoPorPagina([]int{0, 0, 1}, pid)
-
-	}
-
 }
 
 func (h *Handler) escribirMarcoEnSwap(archivo *os.File, marco int) error {
@@ -221,6 +198,7 @@ func (h *Handler) MarcosLibres(paginasNecesarias int) []int {
 	return libres
 }
 
+// TODO: A revisar!!
 func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx = r.Context()
@@ -315,8 +293,11 @@ func (h *Handler) PasarProcesoASwap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	time.Sleep(time.Duration(h.Config.SwapDelay))
 	h.PasarProcesoASwapAuxiliar(pid)
 
+	// Devolvemos una respuesta exitosa
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
@@ -381,18 +362,17 @@ func (h *Handler) ObtenerMarcosDeLaTabla(tabla interface{}) []int {
 	return marcos
 }
 
-func (h *Handler) SacarProcesoDeSwap(pid string) {
+func (h *Handler) SacarProcesoDeSwap(w http.ResponseWriter, r *http.Request) {
+	var (
+		// Leemos el PID
+		pid = r.URL.Query().Get("pid")
+	)
 
-	//lista cada elemento un proceso, donde se un id, osea cada marco un id {0,0,0,0,0}
-	// proceso 1 {0,0,0,0,0,1,1,1}
-	// sale proceso 0 borrar los ceros {1,1,1}
-
-	//a nivel swap
-	// proceso 1 {0,0,0,0,0,1,1,1},
-	// sale proceso 0 borrar los ceros {1,1,1}, borrar los bits posciones del proceso * pagesize
-
-	//DESUSPENSION RECIBIMOS EL PID
-	// buscar posiciones en el swap
+	if pid == "" {
+		h.Log.Error("PID no proporcionado")
+		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
+		return
+	}
 
 	pidDeSwap, _ := strconv.Atoi(pid)
 
@@ -439,7 +419,7 @@ func (h *Handler) SacarProcesoDeSwap(pid string) {
 			log.AnyAttr("posicionEnSwap", posicionEnSwap),
 			log.AnyAttr("marcosDelProcesoDeSwap", marcosDelProcesoDeSwap),
 		)
-		//http.Error(w, "error al cargar páginas en memoria desde swap", http.StatusInternalServerError)
+		http.Error(w, "error al cargar páginas en memoria desde swap", http.StatusInternalServerError)
 		return
 	}
 	h.Log.Debug("SacarProcesoDeSwap",
@@ -454,9 +434,14 @@ func (h *Handler) SacarProcesoDeSwap(pid string) {
 		h.Log.Error("Error al compactar swap",
 			log.ErrAttr(err),
 		)
-		//http.Error(w, "error al compactar swap", http.StatusInternalServerError)
+		http.Error(w, "error al compactar swap", http.StatusInternalServerError)
 		return
 	}
+	time.Sleep(time.Duration(h.Config.SwapDelay))
+
+	// Devolvemos una respuesta exitosa
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("OK"))
 }
 
 func (h *Handler) CompactarSwap() error {
@@ -657,50 +642,127 @@ func (h *Handler) ContienePIDEnSwap(pid int) bool {
 	return false
 }
 
-func (h *Handler) LeerPaginaCompleta(marco int, pid string) {
+/*func (h *Handler) LeerPaginaCompleta(marco int, pid string) {
 	h.LeerPagina(marco, 0, h.Config.PageSize, pid)
-}
+}*/
 
-func (h *Handler) ActualizarPaginaCompleta(marco int, valorAEscribir string, pid string) {
-	h.EscribirPagina(marco, 0, valorAEscribir, pid)
+func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Request) {
+	var (
+		body map[string]CacheData // La key es el índice de la página, el valor es un CacheData con PID y Data
+	)
+
+	// Leo el cuerpo de la solicitud y guardo el valor del body en la variable
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		h.Log.Error("Error al decodificar interrupción",
+			log.ErrAttr(err))
+		http.Error(w, "error al decodificar mensaje", http.StatusInternalServerError)
+		return
+	}
+
+	// TODO: Checkear si está bien implementada
+	for i := 0; i < len(body); i++ {
+		cacheData := body[strconv.Itoa(i)]
+		pid := cacheData.PID
+		data := cacheData.Data
+
+		h.Log.Debug("ActualizarPaginaCompleta",
+			log.AnyAttr("pid", pid),
+			log.AnyAttr("data", data))
+
+		tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
+		tablaMetricas.CantidadDeEscritura++
+
+		copy(h.EspacioDeUsuario[i*h.Config.PageSize:((i+1)*h.Config.PageSize)-1], data)
+
+		h.Log.Debug(fmt.Sprintf("## PID: %s - Actualización de página completa - Dir. Física: %d - Tamaño: %d",
+			pid, i*h.Config.PageSize, len(data)))
+	}
+
+	// Enviamos una respuesta exitosa
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{Ok}`))
 }
 
 // VER EL TAMANIO A LEER XQ SI ES MAS GRANDE QUE LO QUE TENGO DEVOLVERIA CARACTERES REPRESENTANDO LA POSCION VACIA CHECKEAR
-func (h *Handler) LeerPagina(marco int, offset int, tamanioALeer int, pid string) string {
+func (h *Handler) LeerPagina(w http.ResponseWriter, r *http.Request) {
+	var (
+		ctx     = r.Context()
+		lectura = LecturaEscrituraBody{}
+	)
+	// Leo el cuerpo de la solicitud y guardo el valor del body en la variable
+	if err := json.NewDecoder(r.Body).Decode(&lectura); err != nil {
+		h.Log.ErrorContext(ctx, "Error al decodificar interrupción",
+			log.ErrAttr(err))
+		http.Error(w, "error al decodificar mensaje", http.StatusInternalServerError)
+		return
+	}
 
 	//if tamanioALeer mayor a cero
-	lecturaMemoria := string(h.EspacioDeUsuario[((marco * h.Config.PageSize) + offset):((marco * h.Config.PageSize) + offset + tamanioALeer + 1)])
+	lecturaMemoria := string(
+		h.EspacioDeUsuario[((lectura.Frame * h.Config.PageSize) + lectura.Offset):((lectura.Frame * h.Config.PageSize) + lectura.Offset + lectura.Tamanio + 1)])
 
 	lecturaMemoria = h.limpiarNulos(lecturaMemoria)
 	/* Log obligatorio: Escritura / lectura en espacio de usuario
 	“## PID: <PID> - <Lectura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>”*/
-	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d", pid, lecturaMemoria, marco+offset, tamanioALeer))
+	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
+		lectura.PID, lecturaMemoria, lectura.Frame+lectura.Offset, lectura.Tamanio))
 
-	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
+	tablaMetricas, _ := h.BuscarProcesoPorPID(lectura.PID)
 	tablaMetricas.CantidadDeLectura++
 
 	h.Log.Debug("LeerPagina",
 		log.AnyAttr("lecturaMemoria", lecturaMemoria))
-	return lecturaMemoria
+
+	time.Sleep(time.Duration(h.Config.MemoryDelay))
+
+	// Enviamos la respuesta al cliente con el contenido leído
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{
+		"contenido": lecturaMemoria,
+	}
+
+	responseBody, _ := json.Marshal(response)
+	// Agrego el status Code 200 a la respuesta
+	w.WriteHeader(http.StatusOK)
+	// Envío la respuesta al cliente
+	_, _ = w.Write(responseBody)
 }
 
 func (h *Handler) limpiarNulos(cadena string) string {
 	return strings.ReplaceAll(cadena, "\x00", "")
 }
 
-func (h *Handler) EscribirPagina(marco int, offset int, valorAEscribir string, pid string) {
+func (h *Handler) EscribirPagina(w http.ResponseWriter, r *http.Request) {
+	var (
+		ctx       = r.Context()
+		escritura = LecturaEscrituraBody{}
+	)
+	// Leo el cuerpo de la solicitud y guardo el valor del body en la variable interrupcion
+	if err := json.NewDecoder(r.Body).Decode(&escritura); err != nil {
+		h.Log.ErrorContext(ctx, "Error al decodificar interrupción",
+			log.ErrAttr(err))
+		http.Error(w, "error al decodificar mensaje", http.StatusInternalServerError)
+		return
+	}
 
-	copy(h.EspacioDeUsuario[((marco*h.Config.PageSize)+offset):((marco*h.Config.PageSize)+offset)+len(valorAEscribir)], []byte(valorAEscribir))
+	copy(h.EspacioDeUsuario[((escritura.Frame*h.Config.PageSize)+escritura.Offset):((escritura.Frame*h.Config.PageSize)+escritura.Offset)+len(escritura.ValorAEscribir)],
+		escritura.ValorAEscribir)
 
 	h.Log.Debug("EscribirPagina",
 		log.AnyAttr("lecturaMemoria", h.EspacioDeUsuario))
 
-	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
+	tablaMetricas, _ := h.BuscarProcesoPorPID(escritura.PID)
 	tablaMetricas.CantidadDeEscritura++
 	/* Log obligatorio: Escritura / lectura en espacio de usuario
 	“## PID: <PID> - <Escritura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>”*/
-	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d", pid, valorAEscribir, marco+offset, len(valorAEscribir)))
+	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
+		escritura.PID, escritura.ValorAEscribir, escritura.Frame+escritura.Offset, len(escritura.ValorAEscribir)))
 
+	time.Sleep(time.Duration(h.Config.MemoryDelay))
+
+	// Devolvemos un status 200 OK
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("OK"))
 }
 
 func (h *Handler) CrearTabla(niveles int, entradasPorElemento int) interface{} {
@@ -741,11 +803,49 @@ func (h *Handler) AccesoATabla(w http.ResponseWriter, r *http.Request) {
 	tabla, _ := h.BuscarProcesoPorPID(pid)
 	//TO DO:
 	//CORREGIR VER COMO LO PASA LA MMU
-	h.BuscarMarcoPorPagina(tabla, []int{0, 0, 1})
+	buscarMarcoPorPaginaAux(tabla, []int{0, 0, 1})
 
 }
 
-func (h *Handler) BuscarMarcoPorPagina(tabla *TablasProceso, indices []int) (int, bool) {
+// BuscarMarcoPorPagina busca el marco correspondiente a una página dada en la tabla de páginas del proceso.
+// Recibe el PID del proceso y la página a buscar como parámetros.
+func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
+	var (
+		// Leemos el PID y la página de la consulta
+		pid    = r.URL.Query().Get("pid")
+		pagina = r.URL.Query().Get("pagina")
+	)
+
+	if pid == "" {
+		h.Log.Error("PID no proporcionado")
+		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
+		return
+	}
+	if pagina == "" {
+		h.Log.Error("Página no proporcionada")
+		http.Error(w, "Página no proporcionada", http.StatusBadRequest)
+		return
+	}
+	paginaInt, _ := strconv.Atoi(pagina)
+	tablaProceso, _ := h.BuscarProcesoPorPID(pid)
+
+	frame, found := buscarMarcoPorPaginaAux(tablaProceso, []int{paginaInt})
+	if !found {
+		h.Log.Error("Error al buscar marco por página",
+			log.StringAttr("pid", pid),
+			log.IntAttr("pagina", paginaInt),
+		)
+		http.Error(w, "error al buscar marco por página", http.StatusInternalServerError)
+		return
+	}
+	frameString := strconv.Itoa(frame)
+
+	// Devolvemos un status 200 OK y el marco encontrado
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(frameString))
+}
+
+func buscarMarcoPorPaginaAux(tabla *TablasProceso, indices []int) (int, bool) {
 	actual := tabla.TablasDePaginas
 	for i := 0; i < len(indices); i++ {
 		switch nodo := actual.(type) {
@@ -794,4 +894,74 @@ func (h *Handler) LlenarTablaConValores(tabla interface{}, valores []int) {
 	}
 
 	recorrer(tabla)
+}
+
+func (h *Handler) ConsultarDireccionLogica(w http.ResponseWriter, r *http.Request) {
+	var (
+		// Leemos el PID y la dirección lógica de la consulta
+		pid       = r.URL.Query().Get("pid")
+		dirLogica = r.URL.Query().Get("dir-logica")
+	)
+
+	if pid == "" {
+		h.Log.Error("PID no proporcionado")
+		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
+		return
+	}
+	if dirLogica == "" {
+		h.Log.Error("Dirección lógica no proporcionada")
+		http.Error(w, "Dirección lógica no proporcionada", http.StatusBadRequest)
+		return
+	}
+
+	dirLogicaInt, _ := strconv.Atoi(dirLogica)
+	tablaProceso, _ := h.BuscarProcesoPorPID(pid)
+
+	// Calcular número de página
+	nroPagina := dirLogicaInt / h.Config.PageSize
+	indices := []int{nroPagina}
+
+	//entrada_nivel_X = floor(nro_página  / cant_entradas_tabla ^ (N - X)) % cant_entradas_tabla
+	for i := 0; i < h.Config.NumberOfLevels; i++ {
+		entradaNivel := (nroPagina / (h.Config.EntriesPerPage ^ (h.Config.NumberOfLevels - i))) % h.Config.EntriesPerPage
+		indices = append(indices, entradaNivel)
+	}
+
+	h.Log.Debug("ConsultarDireccionLogica",
+		log.AnyAttr("indices", indices),
+	)
+
+	frame, found := buscarMarcoPorPaginaAux(tablaProceso, indices)
+	if !found {
+		h.Log.Error("Error al buscar frame y offset",
+			log.StringAttr("pid", pid),
+			log.IntAttr("dir_logica", dirLogicaInt),
+		)
+		http.Error(w, "error al buscar frame y offset", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"pagina": nroPagina,
+		"frame":  frame,
+		"offset": dirLogicaInt % h.Config.PageSize,
+	}
+
+	responseBytes, _ := json.Marshal(response)
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(responseBytes)
+}
+
+func (h *Handler) RetornarPageSizeYEntries(w http.ResponseWriter, _ *http.Request) {
+	response := map[string]int{
+		"page_size":        h.Config.PageSize,
+		"entries_per_page": h.Config.EntriesPerPage,
+	}
+
+	responseBytes, _ := json.Marshal(response)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(responseBytes)
 }

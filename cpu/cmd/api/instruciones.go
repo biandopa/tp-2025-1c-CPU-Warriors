@@ -107,7 +107,7 @@ func (h *Handler) decode(instruccion Instruccion, pid int) (string, []string, er
 		if len(args) > 0 {
 			// Traducir dirección lógica a física usando MMU
 			direccionLogica := args[0]
-			direccionFisica, err := h.Service.MMU.TraducirDireccion(pid, direccionLogica)
+			direccionFisica, err := h.Service.MMU.TraducirDireccion(pid, direccionLogica, h.Memoria)
 			if err != nil {
 				h.Log.Error("Error en traducción de dirección",
 					log.ErrAttr(err),
@@ -154,7 +154,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		datos := args[1]
 
 		// Usar la MMU para escribir con caché. Si la caché no está habilitada, se escribe directamente en memoria
-		if err := h.Service.MMU.EscribirConCache(pid, direccion, datos, h.Memoria); err != nil {
+		if err := h.Service.MMU.EscribirConCache(pid, direccion, datos); err != nil {
 			h.Log.Error("Error al escribir en memoria",
 				log.ErrAttr(err),
 				log.IntAttr("pid", pid),
@@ -190,7 +190,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		}
 
 		// Usar la MMU para leer con caché. Si la caché no está habilitada, se lee directamente en memoria
-		datoLeido, err := h.Service.MMU.LeerConCache(pid, direccion, tamanio, h.Memoria)
+		datoLeido, err := h.Service.MMU.LeerConCache(pid, direccion, tamanio)
 		if err != nil {
 			h.Log.Error("Error al leer de memoria",
 				log.ErrAttr(err),
@@ -227,8 +227,29 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		}
 		nuevoPC = pcAtoi
 		returnControl = true
+	case "INIT_PROC":
+		syscall := &internal.ProcesoSyscall{
+			PID:         pid,
+			PC:          pc + 1, // Avanzamos el PC para la syscall
+			Instruccion: tipo,
+			Args:        args,
+		}
 
-	case "IO", "INIT_PROC", "DUMP_MEMORY", "EXIT":
+		if err := h.Service.EnviarProcesoSyscall(syscall); err != nil {
+			h.Log.Error("Error al enviar proceso syscall", log.ErrAttr(err))
+			return false, pc // Si hay error, no avanzamos el PC
+		}
+
+		h.Log.Debug("Syscall enviada al kernel",
+			log.IntAttr("pid", pid),
+			log.StringAttr("instruccion", tipo),
+			log.IntAttr("pc_nuevo", pc+1))
+
+		// Para syscalls, retornamos false para indicar que el CPU debe devolver el control al kernel (menos INIT_PROC)
+		returnControl = true
+		nuevoPC++ // Avanzamos el PC para la syscall
+
+	case "IO", "DUMP_MEMORY", "EXIT":
 		syscall := &internal.ProcesoSyscall{
 			PID:         pid,
 			PC:          pc + 1, // Avanzamos el PC para la syscall

@@ -16,18 +16,20 @@ func main() {
 	mux := http.NewServeMux()
 	h := api.NewHandler(configFilePath)
 
-	// Recepción de valores
-	//mux.HandleFunc("POST /kernel/acceso", h.RecibirPeticionAcceso)                   // Kernel --> Memoria
-	//mux.HandleFunc("POST /cpu/acceso", h.RecibirPeticionAcceso)                      // CPU --> Memoria (READ/WRITE)
-	mux.HandleFunc("POST /cpu/instruccion", h.RecibirInstruccion) // CPU --> Memoria
-	mux.HandleFunc("GET /cpu/instruccion", h.EnviarInstruccion)   // Memoria --> CPU
-	//mux.HandleFunc("POST /kernel/proceso", h.RecibirProceso)                         // Kernel --> Memoria
+	mux.HandleFunc("POST /cpu/instruccion", h.RecibirInstruccion)                          // CPU --> Memoria
+	mux.HandleFunc("GET /cpu/instruccion", h.EnviarInstruccion)                            // Memoria --> CPU
+	mux.HandleFunc("POST /cpu/escritura", h.EscribirPagina)                                // CPU --> Memoria
+	mux.HandleFunc("GET /cpu/lectura", h.LeerPagina)                                       // CPU --> Memoria
+	mux.HandleFunc("GET /cpu/pagina-a-frame", h.BuscarMarcoPorPagina)                      // CPU --> Memoria
 	mux.HandleFunc("GET /kernel/espacio-disponible", h.ConsultarEspacioEInicializar)       // Kernel --> Memoria
 	mux.HandleFunc("/kernel/cargar-memoria-de-sistema", h.CargarProcesoEnMemoriaDeSistema) // Kernel --> Memoria
 	mux.HandleFunc("GET /kernel/swap-proceso", h.PasarProcesoASwap)                        // Kernel --> Memoria
+	mux.HandleFunc("GET /kernel/recuperar-proceso-swap", h.SacarProcesoDeSwap)             // Kernel --> Memoria
 	mux.HandleFunc("/kernel/dump-proceso", h.DumpProceso)                                  // Kernel --> Memoria
 	mux.HandleFunc("/kernel/acceso-a-tabla", h.AccesoATabla)
-	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso) // Kernel --> Memoria
+	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso)            // Kernel --> Memoria
+	mux.HandleFunc("GET /cpu/page-size-y-entries", h.RetornarPageSizeYEntries)      // CPU --> Memoria
+	mux.HandleFunc("POST /cpu/actualizar-pag-completa", h.ActualizarPaginaCompleta) // CPU --> Memoria
 
 	memoriaAddress := fmt.Sprintf("%s:%d", h.Config.IpMemory, h.Config.PortMemory)
 	if err := http.ListenAndServe(memoriaAddress, mux); err != nil {

@@ -32,12 +32,14 @@ func NewHandler(configFile string) *Handler {
 	logLevel := configStruct.LogLevel
 	logger := log.BuildLogger(logLevel)
 
+	mem := memoria.NewMemoria(configStruct.IpMemory, configStruct.PortMemory, logger)
+
 	return &Handler{
 		Config: configStruct,
 		Log:    logger,
 		Service: internal.NewService(logger, configStruct.IpKernel, configStruct.PortKernel,
 			configStruct.TlbEntries, configStruct.CacheEntries,
-			configStruct.TlbReplacement, configStruct.CacheReplacement),
-		Memoria: memoria.NewMemoria(configStruct.IpMemory, configStruct.PortMemory, logger),
+			configStruct.TlbReplacement, configStruct.CacheReplacement, mem),
+		Memoria: mem,
 	}
 }
