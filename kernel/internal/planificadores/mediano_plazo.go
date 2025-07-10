@@ -97,6 +97,9 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 		// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
 		p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado SUSP.BLOCKED al estado SUSP.READY", proceso.PCB.PID))
 
+		// Checkear si hay espacio en memoria para traer procesos suspendidos
+		p.CheckearEspacioEnMemoria()
+
 	} else {
 		//Proceso estaba en BLOCKED → READY
 		//Esto no se si tiene que estar aca, puede ser logica repetida

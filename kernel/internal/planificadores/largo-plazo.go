@@ -250,6 +250,9 @@ func (p *Service) FinalizarProceso(pid int) {
 	// 7. Liberar PCB
 	proceso.PCB = nil // Libero el PCB asociado al proceso
 
-	// 8. Le avisamos al channel de que puede ejecutar el algoritmo de largo plazo
+	// 8. Checkear si hay procesos suspendidos que puedan volver a memoria
+	p.CheckearEspacioEnMemoria()
+
+	// 9. Le avisamos al channel de que puede ejecutar el algoritmo de largo plazo
 	//p.CanalNuevoProcesoNew <- struct{}{}
 }
