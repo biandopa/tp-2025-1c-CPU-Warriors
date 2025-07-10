@@ -216,7 +216,11 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 			log.StringAttr("direccion", dirFisica))
 
 		// Acceso directo a memoria
-		datoLeido, err := m.Memoria.Read(pid, dirFisica, tamanio)
+		datoLeido, err := m.Memoria.Read(pid, dirFisica, tamanio, memoria.PageConfig{
+			PageSize:       m.PageSize,
+			Entries:        m.CantEntriesMem,
+			NumberOfLevels: m.NumberOfLevels,
+		})
 		if err != nil {
 			return "", dirFisica, err
 		}
@@ -245,7 +249,11 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 	// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %d", pid, nroPagina))
 
-	datos, err := m.Memoria.Read(pid, dirFisica, tamanio)
+	datos, err := m.Memoria.Read(pid, dirFisica, tamanio, memoria.PageConfig{
+		PageSize:       m.PageSize,
+		Entries:        m.CantEntriesMem,
+		NumberOfLevels: m.NumberOfLevels,
+	})
 	if err != nil {
 		return "", dirFisica, err
 	}
@@ -281,7 +289,11 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 			log.StringAttr("direccion", dirFisica))
 
 		// Acceso directo a memoria
-		return dirFisica, m.Memoria.Write(pid, dirFisica, datos)
+		return dirFisica, m.Memoria.Write(pid, dirFisica, datos, memoria.PageConfig{
+			PageSize:       m.PageSize,
+			Entries:        m.CantEntriesMem,
+			NumberOfLevels: m.NumberOfLevels,
+		})
 	}
 
 	// Buscar en caché primero
@@ -336,6 +348,7 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 	m.Log.Debug("Limpiando memoria del proceso",
 		log.IntAttr("pid", pid))
 
+	dataToSave := map[int]map[string]interface{}{}
 	// Limpiar TLB - eliminar todas las entradas del proceso
 	m.TLBMutex.Lock()
 	for key, entry := range m.TLB.Entries {
@@ -354,13 +367,25 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 		if entry.Modified {
 			m.Log.Debug("Escribiendo página modificada a memoria antes de limpiar",
 				log.IntAttr("page_id", entry.PageID))
-			// Aquí se escribiría a memoria si fuera necesario
+			dataToSave[entry.PageID] = map[string]interface{}{
+				"pid":  entry.PID,
+				"data": entry.Data,
+			}
 		}
 		delete(m.Cache.Entries, key)
 		m.Log.Debug("Entrada caché eliminada",
 			log.IntAttr("page_id", entry.PageID))
 	}
 	m.CacheMutex.Unlock()
+
+	// Enviar información a memoria
+	go func() {
+		if err := m.Memoria.GuardarPagsEnMemoria(dataToSave); err != nil {
+			m.Log.Error("Error al guardar páginas en memoria",
+				log.ErrAttr(err),
+			)
+		}
+	}()
 
 	m.Log.Debug("Limpieza de memoria completada",
 		log.IntAttr("pid", pid))

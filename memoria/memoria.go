@@ -19,7 +19,7 @@ func main() {
 	mux.HandleFunc("POST /cpu/instruccion", h.RecibirInstruccion)                          // CPU --> Memoria
 	mux.HandleFunc("GET /cpu/instruccion", h.EnviarInstruccion)                            // Memoria --> CPU
 	mux.HandleFunc("POST /cpu/escritura", h.EscribirPagina)                                // CPU --> Memoria
-	mux.HandleFunc("GET /cpu/lectura", h.LeerPagina)                                       // CPU --> Memoria
+	mux.HandleFunc("POST /cpu/lectura", h.LeerPagina)                                      // CPU --> Memoria
 	mux.HandleFunc("GET /cpu/pagina-a-frame", h.BuscarMarcoPorPagina)                      // CPU --> Memoria
 	mux.HandleFunc("GET /kernel/espacio-disponible", h.ConsultarEspacioEInicializar)       // Kernel --> Memoria
 	mux.HandleFunc("/kernel/cargar-memoria-de-sistema", h.CargarProcesoEnMemoriaDeSistema) // Kernel --> Memoria
