@@ -98,33 +98,12 @@ func (h *Handler) Fetch(pid int, pc int) (Instruccion, error) {
 
 // Decode Interpreta la instrucción y sus argumentos. Además, verifica si la misma requiere de una
 // traducción de dirección lógica a física.
-func (h *Handler) decode(instruccion Instruccion, pid int) (string, []string, error) {
+func (h *Handler) decode(instruccion Instruccion) (string, []string, error) {
 	tipo := strings.ToUpper(instruccion.Instruccion)
 	args := instruccion.Parametros
 
-	// Verificar si la instrucción requiere traducción de direcciones
-	if tipo == "READ" || tipo == "WRITE" {
-		if len(args) > 0 {
-			// Traducir dirección lógica a física usando MMU
-			direccionLogica := args[0]
-			direccionFisica, err := h.Service.MMU.TraducirDireccion(pid, direccionLogica, h.Memoria)
-			if err != nil {
-				h.Log.Error("Error en traducción de dirección",
-					log.ErrAttr(err),
-					log.IntAttr("pid", pid),
-					log.StringAttr("direccion_logica", direccionLogica))
-				return "", nil, err
-			}
-
-			// Reemplazar la dirección lógica con la física
-			args[0] = direccionFisica
-
-			h.Log.Debug("Dirección traducida",
-				log.IntAttr("pid", pid),
-				log.StringAttr("direccion_logica", direccionLogica),
-				log.StringAttr("direccion_fisica", direccionFisica))
-		}
-	}
+	// Para READ y WRITE, no traducimos aquí - lo harán las funciones LeerConCache y EscribirConCache
+	// que necesitan la dirección lógica original para calcular el número de página correctamente
 
 	return tipo, args, nil
 }
@@ -150,23 +129,25 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 				log.IntAttr("pc", pc))
 			return false, pc
 		}
-		direccion := args[0] // Ya traducida por la MMU
+		direccionLogica := args[0] // Dirección lógica
 		datos := args[1]
 
 		// Usar la MMU para escribir con caché. Si la caché no está habilitada, se escribe directamente en memoria
-		if err := h.Service.MMU.EscribirConCache(pid, direccion, datos); err != nil {
+		if err := h.Service.MMU.EscribirConCache(pid, direccionLogica, datos); err != nil {
 			h.Log.Error("Error al escribir en memoria",
 				log.ErrAttr(err),
 				log.IntAttr("pid", pid),
-				log.StringAttr("direccion", direccion),
+				log.StringAttr("direccion", direccionLogica),
 				log.StringAttr("datos", datos))
 			return false, pc
 		}
 
 		//Log obligatorio: Lectura/Escritura Memoria
 		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+		// Obtener dirección física para el log
+		direccionFisica, _ := h.Service.MMU.TraducirDireccion(pid, direccionLogica)
 		h.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
-			pid, args[0], args[1]))
+			pid, direccionFisica, datos))
 
 		nuevoPC++
 		returnControl = true
@@ -179,7 +160,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 			return false, pc
 		}
 
-		direccion := args[0] // Ya traducida por la MMU
+		direccionLogica := args[0] // Dirección lógica
 		tamanio, err := strconv.Atoi(args[1])
 		if err != nil {
 			h.Log.Error("Tamaño inválido en instrucción READ",
@@ -190,20 +171,22 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		}
 
 		// Usar la MMU para leer con caché. Si la caché no está habilitada, se lee directamente en memoria
-		datoLeido, err := h.Service.MMU.LeerConCache(pid, direccion, tamanio)
+		datoLeido, err := h.Service.MMU.LeerConCache(pid, direccionLogica, tamanio)
 		if err != nil {
 			h.Log.Error("Error al leer de memoria",
 				log.ErrAttr(err),
 				log.IntAttr("pid", pid),
-				log.StringAttr("direccion", direccion),
+				log.StringAttr("direccion", direccionLogica),
 				log.IntAttr("tamanio", tamanio))
 			return false, pc
 		}
 
 		//Log obligatorio: Lectura/Escritura Memoria
 		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+		// Obtener dirección física para el log
+		direccionFisica, _ := h.Service.MMU.TraducirDireccion(pid, direccionLogica)
 		h.Log.Info(fmt.Sprintf("## PID: %d - Acción: LEER - Dirección Física: %s - Valor: %s",
-			pid, args[0], datoLeido))
+			pid, direccionFisica, datoLeido))
 
 		nuevoPC++
 		returnControl = true

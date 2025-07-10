@@ -957,6 +957,7 @@ func (h *Handler) RetornarPageSizeYEntries(w http.ResponseWriter, _ *http.Reques
 	response := map[string]int{
 		"page_size":        h.Config.PageSize,
 		"entries_per_page": h.Config.EntriesPerPage,
+		"number_of_levels": h.Config.NumberOfLevels,
 	}
 
 	responseBytes, _ := json.Marshal(response)

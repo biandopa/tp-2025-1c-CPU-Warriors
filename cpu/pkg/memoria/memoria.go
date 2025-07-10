@@ -53,8 +53,9 @@ type DirInfoResponse struct {
 }
 
 type PageConfig struct {
-	PageSize int `json:"page_size"`
-	Entries  int `json:"entries_per_page"`
+	PageSize       int `json:"page_size"`
+	Entries        int `json:"entries_per_page"`
+	NumberOfLevels int `json:"number_of_levels"`
 }
 
 // NewMemoria crea una nueva instancia del cliente de memoria
@@ -334,7 +335,7 @@ func (m *Memoria) ConsultarPageSize() (PageConfig, error) {
 	return info, nil
 }
 
-func (m *Memoria) GuardarPagsEnMemoria(info map[string]map[string]interface{}) error {
+func (m *Memoria) GuardarPagsEnMemoria(info map[int]map[string]interface{}) error {
 	url := fmt.Sprintf("http://%s:%d//cpu/actualizar-pag-completa", m.IP, m.Puerto)
 
 	body := new(bytes.Buffer)
