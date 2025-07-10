@@ -904,11 +904,28 @@ func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	frame, found := buscarMarcoPorPaginaAux(tablaProceso, []int{paginaInt})
+	// Calcular índices para tabla multinivel (igual que en ConsultarDireccionLogica)
+	nroPagina := paginaInt
+	indices := make([]int, 0)
+
+	// Calcular entrada para cada nivel de la tabla
+	for i := 0; i < h.Config.NumberOfLevels; i++ {
+		entradaNivel := (nroPagina / (h.Config.EntriesPerPage ^ (h.Config.NumberOfLevels - i - 1))) % h.Config.EntriesPerPage
+		indices = append(indices, entradaNivel)
+	}
+
+	h.Log.Debug("BuscarMarcoPorPagina - índices calculados",
+		log.StringAttr("pid", pid),
+		log.IntAttr("pagina", paginaInt),
+		log.AnyAttr("indices", indices),
+	)
+
+	frame, found := buscarMarcoPorPaginaAux(tablaProceso, indices)
 	if !found {
 		h.Log.Error("Error al buscar marco por página",
 			log.StringAttr("pid", pid),
 			log.IntAttr("pagina", paginaInt),
+			log.AnyAttr("indices", indices),
 		)
 		http.Error(w, "error al buscar marco por página", http.StatusInternalServerError)
 		return
