@@ -329,7 +329,7 @@ func (m *Memoria) BuscarFrame(pagina, pid int) (DirInfoResponse, error) {
 
 func (m *Memoria) ConsultarPageSize() (PageConfig, error) {
 	var info PageConfig
-	url := fmt.Sprintf("http://%s:%d//cpu/page-size-y-entries", m.IP, m.Puerto)
+	url := fmt.Sprintf("http://%s:%d/cpu/page-size-y-entries", m.IP, m.Puerto)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -363,7 +363,7 @@ func (m *Memoria) ConsultarPageSize() (PageConfig, error) {
 }
 
 func (m *Memoria) GuardarPagsEnMemoria(info map[int]map[string]interface{}) error {
-	url := fmt.Sprintf("http://%s:%d//cpu/actualizar-pag-completa", m.IP, m.Puerto)
+	url := fmt.Sprintf("http://%s:%d/cpu/actualizar-pag-completa", m.IP, m.Puerto)
 
 	body := new(bytes.Buffer)
 	if err := json.NewEncoder(body).Encode(info); err != nil {

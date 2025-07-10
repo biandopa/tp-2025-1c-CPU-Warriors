@@ -27,7 +27,7 @@ func main() {
 	mux.HandleFunc("GET /kernel/recuperar-proceso-swap", h.SacarProcesoDeSwap)             // Kernel --> Memoria
 	mux.HandleFunc("/kernel/dump-proceso", h.DumpProceso)                                  // Kernel --> Memoria
 	mux.HandleFunc("/kernel/acceso-a-tabla", h.AccesoATabla)
-	mux.HandleFunc("POST /kernel/fin-proceso/{pid}", h.FinalizarProceso)            // Kernel --> Memoria
+	mux.HandleFunc("POST /kernel/fin-proceso", h.FinalizarProceso)                  // Kernel --> Memoria
 	mux.HandleFunc("GET /cpu/page-size-y-entries", h.RetornarPageSizeYEntries)      // CPU --> Memoria
 	mux.HandleFunc("POST /cpu/actualizar-pag-completa", h.ActualizarPaginaCompleta) // CPU --> Memoria
 

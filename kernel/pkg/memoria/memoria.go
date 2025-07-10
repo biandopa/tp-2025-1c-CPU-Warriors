@@ -1,8 +1,6 @@
 package memoria
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -81,13 +79,15 @@ func (m *Memoria) FinalizarProceso(pid int) (int, error) {
 		err    error
 		resp   *http.Response
 	)
-	url := fmt.Sprintf("http://%s:%d/kernel/fin-proceso", m.IP, m.Puerto)
+	url := fmt.Sprintf("http://%s:%d/kernel/fin-proceso?pid=%d", m.IP, m.Puerto, pid)
 
-	body, _ := json.Marshal(map[string]int{"pid": pid})
-	resp, err = http.Post(url, "application/json", bytes.NewBuffer(body))
+	resp, err = http.Post(url, "application/json", nil)
 
 	if resp != nil {
 		status = resp.StatusCode
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 	}
 
 	return status, err
