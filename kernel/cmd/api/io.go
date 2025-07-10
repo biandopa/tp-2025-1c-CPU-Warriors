@@ -65,10 +65,22 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 	//Fin de IO: "## (<PID>) finalizó IO y pasa a READY"
 	h.Log.Info(fmt.Sprintf("## (%d) finalizó IO y pasa a READY", ioIdentificacionPeticion.ProcesoID))
 
-	// Buscar el proceso y enviarlo a IO
-	proceso := h.Planificador.BuscarProcesoEnCola(ioIdentificacionPeticion.ProcesoID, ioIdentificacionPeticion.Cola)
-	//Aviso al kernel que el proceso termino su IO para que revise si esta suspendido
-	go h.Planificador.ManejarFinIO(proceso)
+	// Buscar el proceso en cualquier cola (primero en blocked, luego en suspended_blocked)
+	proceso := h.Planificador.BuscarProcesoEnCola(ioIdentificacionPeticion.ProcesoID, "blocked")
+	if proceso == nil {
+		// Si no está en blocked, buscar en suspended_blocked
+		proceso = h.Planificador.BuscarProcesoEnCola(ioIdentificacionPeticion.ProcesoID, "suspended_blocked")
+	}
+
+	if proceso != nil {
+		//Aviso al kernel que el proceso termino su IO para que revise si esta suspendido
+		go h.Planificador.ManejarFinIO(proceso)
+	} else {
+		h.Log.Error("Proceso no encontrado en ninguna cola al finalizar IO",
+			log.IntAttr("PID", ioIdentificacionPeticion.ProcesoID),
+			log.StringAttr("Cola_original", ioIdentificacionPeticion.Cola),
+		)
+	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }

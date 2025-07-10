@@ -64,6 +64,11 @@ func (p *Service) SuspenderProcesoBloqueado() {
 // ManejarFinIO Cuando un proceso en SUSP.BLOCKED finalizo su IO, deberá pasar a
 // SUSP.READY y quedar a la espera de su oportunidad de pasar a READY.
 func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
+	if proceso == nil {
+		p.Log.Error("ManejarFinIO: proceso es nil")
+		return
+	}
+
 	p.mutexSuspBlockQueue.Lock()
 	estabaSuspendido := estaEnCola(proceso, p.Planificador.SuspBlockQueue)
 	p.mutexSuspBlockQueue.Unlock()
@@ -214,7 +219,7 @@ func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
 		p.mutexSuspBlockQueue.Unlock()
 	}
 
-	p.Log.Error("Proceso no encontrado en la cola especificada",
+	p.Log.Debug("Proceso no encontrado en la cola especificada",
 		log.IntAttr("PID", pid),
 		log.StringAttr("Cola", cola),
 	)
