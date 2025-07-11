@@ -25,10 +25,19 @@ func (p *Service) PlanificadorCortoPlazo() {
 
 func (p *Service) PlanificadorCortoPlazoFIFO() {
 	for {
+		// Esperar hasta que haya trabajo que hacer
+		select {
+		case <-p.canalNuevoProcesoReady:
+			// Hay nuevos procesos en Ready, procesarlos
+			p.Log.Debug("Notificación de nuevo proceso en Ready recibida")
+		default:
+			// No hay notificaciones pendientes, continuar
+		}
+
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
-			// Usar semáforo para adquirir CPU (bloqueante)
-			cpuLibre := p.BuscarCPUDisponible()
+			// Usar versión no bloqueante para adquirir CPU
+			cpuLibre := p.IntentarBuscarCPUDisponible()
 
 			if cpuLibre != nil {
 				// Mover proceso de READY a EXEC
@@ -55,7 +64,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 					proceso.PCB.MetricasEstado[internal.EstadoExec]++
 
 					//Log obligatorio: Cambio de estado
-					// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
+					// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
 					p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado READY al estado EXEC", proceso.PCB.PID))
 
 					// Usar los valores copiados
@@ -78,13 +87,25 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 						log.IntAttr("pid", proceso.PCB.PID),
 						log.IntAttr("pc_final", newPC),
 					)
+
+					// Notificar que puede haber más trabajo que hacer
+					select {
+					case p.canalNuevoProcesoReady <- struct{}{}:
+					default:
+						// Canal lleno, no bloquear
+					}
 				}(cpuLibre, procesoElegido)
 			} else {
-				// No hay CPUs libres, salir del bucle
-				p.Log.Debug("No hay CPUs libres, saliendo del bucle")
-
+				// No hay CPUs libres, salir del bucle interno
+				p.Log.Debug("No hay CPUs libres, esperando...")
 				break
 			}
+		}
+
+		// Si no hay procesos en ReadyQueue, esperar hasta que lleguen
+		if len(p.Planificador.ReadyQueue) == 0 {
+			p.Log.Debug("No hay procesos en ReadyQueue, esperando notificación...")
+			<-p.canalNuevoProcesoReady
 		}
 	}
 }
@@ -137,17 +158,38 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 // PlanificarCortoPlazoSjfSinDesalojo planifica los procesos de corto plazo utilizando el algoritmo SJF sin desalojo.
 func (p *Service) PlanificarCortoPlazoSjfSinDesalojo() {
 	for {
+		// Esperar hasta que haya trabajo que hacer
+		select {
+		case <-p.canalNuevoProcesoReady:
+			// Hay nuevos procesos en Ready, procesarlos
+			p.Log.Debug("Notificación de nuevo proceso en Ready recibida (SJF)")
+		default:
+			// No hay notificaciones pendientes, continuar
+		}
+
 		p.odenarColaReadySjf()
 
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
-			// Usar semáforo para adquirir CPU (bloqueante)
-			if cpuLibre := p.BuscarCPUDisponible(); cpuLibre != nil {
+			// Usar versión no bloqueante para adquirir CPU
+			cpuLibre := p.IntentarBuscarCPUDisponible()
+
+			if cpuLibre != nil {
 				// Asignar el proceso con ráfaga más corta (el primero de ReadyQueue)
 				procesoMasCorto := p.Planificador.ReadyQueue[0]
 
 				p.asignarProcesoACPU(procesoMasCorto, cpuLibre)
+			} else {
+				// No hay CPUs libres, salir del bucle interno
+				p.Log.Debug("No hay CPUs libres, esperando... (SJF)")
+				break
 			}
+		}
+
+		// Si no hay procesos en ReadyQueue, esperar hasta que lleguen
+		if len(p.Planificador.ReadyQueue) == 0 {
+			p.Log.Debug("No hay procesos en ReadyQueue, esperando notificación... (SJF)")
+			<-p.canalNuevoProcesoReady
 		}
 	}
 }

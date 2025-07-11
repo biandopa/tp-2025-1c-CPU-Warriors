@@ -55,6 +55,14 @@ func (p *Service) LiberarCPU(cpuToRelease *cpu.Cpu) {
 
 	p.Log.Debug("CPU liberada",
 		log.StringAttr("cpu_id", cpuToRelease.ID))
+
+	// Notificar al planificador de corto plazo que puede haber más trabajo
+	select {
+	case p.canalNuevoProcesoReady <- struct{}{}:
+		p.Log.Debug("Notificación enviada al planificador de corto plazo - CPU liberada")
+	default:
+		// Canal lleno, no bloquear
+	}
 }
 
 // IntentarBuscarCPUDisponible intenta adquirir una CPU sin bloquear
