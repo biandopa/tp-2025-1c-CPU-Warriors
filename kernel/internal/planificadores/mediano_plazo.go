@@ -134,7 +134,7 @@ func estaEnCola(p *internal.Proceso, cola []*internal.Proceso) bool {
 	if p == nil || p.PCB == nil {
 		return false
 	}
-	if cola == nil || len(cola) == 0 {
+	if len(cola) == 0 {
 		return false
 	}
 
