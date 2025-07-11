@@ -131,6 +131,13 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 }
 
 func estaEnCola(p *internal.Proceso, cola []*internal.Proceso) bool {
+	if p == nil {
+		return false
+	}
+	if cola == nil || len(cola) == 0 {
+		return false
+	}
+
 	for _, proc := range cola {
 		if proc.PCB.PID == p.PCB.PID {
 			return true
