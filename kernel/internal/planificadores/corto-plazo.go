@@ -36,8 +36,8 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 
 		// Procesar todos los procesos en ReadyQueue
 		for len(p.Planificador.ReadyQueue) > 0 {
-			// Usar versión no bloqueante para adquirir CPU
-			cpuLibre := p.IntentarBuscarCPUDisponible()
+			// Usar versión bloqueante para adquirir CPU
+			cpuLibre := p.BuscarCPUDisponible()
 
 			if cpuLibre != nil {
 				// Mover proceso de READY a EXEC

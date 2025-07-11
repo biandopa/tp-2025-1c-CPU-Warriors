@@ -23,8 +23,11 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Buscar el dispositivo IO y marcarlo como libre
+	ioIdentificacionMutex.Lock()
+	encontrado := false
 	for i, ioDevice := range ioIdentificacion {
-		if ioDevice.Nombre == ioIdentificacionPeticion.Nombre && !ioDevice.Estado {
+		if ioDevice.Nombre == ioIdentificacionPeticion.Nombre && !ioDevice.Estado &&
+			ioDevice.IP == ioIdentificacionPeticion.IP && ioDevice.Puerto == ioIdentificacionPeticion.Puerto {
 			// Liberar el dispositivo IO
 			ioIdentificacion[i].Estado = true
 			ioIdentificacion[i].ProcesoID = -1 // Limpiar el PID asociado (usar -1 para indicar sin proceso)
@@ -54,15 +57,22 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 				ioIdentificacion[i].Cola = "blocked"
 
 				ioWaitQueuesMutex.Unlock()
+				ioIdentificacionMutex.Unlock()
 
 				// Enviar petición a IO para el proceso en espera
 				go h.Planificador.EnviarUsleep(ioDevice.Puerto, ioDevice.IP, nextWaitInfo.PID, nextWaitInfo.TimeSleep)
 			} else {
 				ioWaitQueuesMutex.Unlock()
+				ioIdentificacionMutex.Unlock()
 			}
 
+			encontrado = true
 			break
 		}
+	}
+	// Si no se encontró el dispositivo, liberar el mutex
+	if !encontrado {
+		ioIdentificacionMutex.Unlock()
 	}
 
 	//Log obligatorio: Fin de IO

@@ -20,19 +20,19 @@ type Config struct {
 }
 
 // Se usa para almacenar las IOs
-var ioIdentificacion []IOIdentificacion
+var (
+	ioIdentificacion      []IOIdentificacion
+	ioIdentificacionMutex sync.RWMutex // Mutex para proteger el acceso concurrente a ioIdentificacion
+
+	ioWaitQueues      map[string][]IOWaitInfo // Cola de espera para cada dispositivo IO
+	ioWaitQueuesMutex sync.RWMutex            // Mutex para proteger el acceso concurrente a ioWaitQueues
+)
 
 // Estructura para almacenar información de procesos en espera de IO
 type IOWaitInfo struct {
 	PID       int `json:"pid"`
 	TimeSleep int `json:"time_sleep"`
 }
-
-// Cola de espera para cada dispositivo IO
-var ioWaitQueues map[string][]IOWaitInfo // Mapea nombre de dispositivo a lista de procesos esperando
-
-// Mutex para proteger el acceso concurrente a ioWaitQueues
-var ioWaitQueuesMutex sync.RWMutex
 
 // IOIdentificacion EStructura que definimos para manejar las IOs
 type IOIdentificacion struct {

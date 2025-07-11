@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 )
 
 func BuildLogger(level string) *slog.Logger {
@@ -17,8 +18,6 @@ func BuildLogger(level string) *slog.Logger {
 	output := configurarLoggerOutput()
 	logger := slog.New(slog.NewJSONHandler(output, ops))
 
-	logger.Info("\n")
-
 	return logger
 }
 
@@ -28,7 +27,10 @@ func configurarLoggerOutput() io.Writer {
 		panic(fmt.Sprintf("Error al obtener el directorio de trabajo: %v", err))
 	}
 
-	logFile, err := os.OpenFile(workingDir+"/tp.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	now := time.Now()
+	nowStr := now.Format("2006-01-02T15-04-05")
+
+	logFile, err := os.OpenFile(workingDir+"/tp-"+nowStr+".log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		panic(err)
 	}

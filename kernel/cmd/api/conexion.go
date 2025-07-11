@@ -66,11 +66,16 @@ func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 
 	ioInfo.Estado = true
 	ioInfo.ProcesoID = -1 // Inicializar sin proceso asignado
-	ioIdentificacion = append(ioIdentificacion, ioInfo)
 
+	ioIdentificacionMutex.Lock()
+	ioIdentificacion = append(ioIdentificacion, ioInfo)
+	ioIdentificacionMutex.Unlock()
+
+	ioIdentificacionMutex.RLock()
 	h.Log.DebugContext(ctx, "Lista de IOs conectadas",
 		log.AnyAttr("IOsConectadas", ioIdentificacion),
 	)
+	ioIdentificacionMutex.RUnlock()
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
@@ -101,6 +106,7 @@ func (h *Handler) DesconexionIO(w http.ResponseWriter, r *http.Request) {
 
 	// Encontrar y remover el dispositivo de la lista
 	var dispositivoEncontrado *IOIdentificacion
+	ioIdentificacionMutex.Lock()
 	for i, device := range ioIdentificacion {
 		if device.Nombre == ioInfo.Nombre && device.IP == ioInfo.IP && device.Puerto == ioInfo.Puerto {
 			dispositivoEncontrado = &device
@@ -109,48 +115,22 @@ func (h *Handler) DesconexionIO(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	ioIdentificacionMutex.Unlock()
 
 	if dispositivoEncontrado != nil {
 		// Si había un proceso usando este dispositivo, enviarlo a EXIT
-		if dispositivoEncontrado.ProcesoID > 0 {
+		if dispositivoEncontrado.ProcesoID >= 0 {
 			h.Log.Debug(fmt.Sprintf("## (%d) - Proceso enviado a EXIT por desconexión de IO: %s",
 				dispositivoEncontrado.ProcesoID, dispositivoEncontrado.Nombre))
 			go h.Planificador.FinalizarProcesoEnCualquierCola(dispositivoEncontrado.ProcesoID)
 		}
-
-		// Verificar si quedan más instancias de este tipo de dispositivo
-		tieneOtrasInstancias := false
-		for _, device := range ioIdentificacion {
-			if device.Nombre == ioInfo.Nombre {
-				tieneOtrasInstancias = true
-				break
-			}
-		}
-
-		// Si no quedan más instancias, enviar todos los procesos en espera a EXIT
-		// IMPORTANTE: Hacer esto ANTES de procesar la cola para evitar enviar peticiones a dispositivos desconectados
-		if !tieneOtrasInstancias {
-			ioWaitQueuesMutex.Lock()
-			if queue, exists := ioWaitQueues[ioInfo.Nombre]; exists && len(queue) > 0 {
-				h.Log.Debug(fmt.Sprintf("No quedan más instancias de %s - enviando %d procesos en espera a EXIT",
-					ioInfo.Nombre, len(queue)))
-
-				for _, waitInfo := range queue {
-					h.Log.Debug(fmt.Sprintf("## (%d) - Proceso enviado a EXIT por falta de instancias de IO: %s",
-						waitInfo.PID, ioInfo.Nombre))
-					go h.Planificador.FinalizarProcesoEnCualquierCola(waitInfo.PID)
-				}
-
-				// Limpiar la cola de espera ANTES de que otros procesos intenten enviar peticiones
-				delete(ioWaitQueues, ioInfo.Nombre)
-			}
-			ioWaitQueuesMutex.Unlock()
-		}
 	}
 
+	ioIdentificacionMutex.RLock()
 	h.Log.DebugContext(ctx, "Estado actual de IOs conectadas después de desconexión",
 		log.AnyAttr("IOsConectadas", ioIdentificacion),
 	)
+	ioIdentificacionMutex.RUnlock()
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
