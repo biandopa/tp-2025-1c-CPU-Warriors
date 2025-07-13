@@ -124,6 +124,28 @@ func (h *Handler) DesconexionIO(w http.ResponseWriter, r *http.Request) {
 				dispositivoEncontrado.ProcesoID, dispositivoEncontrado.Nombre))
 			go h.Planificador.FinalizarProcesoEnCualquierCola(dispositivoEncontrado.ProcesoID)
 		}
+
+		// Si había procesos en la cola de espera y no hay otro dispositivo con el mismo nombre, finalizarlos también
+		var existeOtroIO bool
+		ioIdentificacionMutex.RLock()
+		for _, device := range ioIdentificacion {
+			if device.Nombre == dispositivoEncontrado.Nombre {
+				existeOtroIO = true
+				break
+			}
+		}
+		ioIdentificacionMutex.RUnlock()
+
+		if !existeOtroIO {
+			ioWaitQueuesMutex.Lock()
+			waitQ := ioWaitQueues[dispositivoEncontrado.Nombre]
+
+			for _, waitInfo := range waitQ {
+				h.Log.Debug(fmt.Sprintf("## (%d) - Proceso enviado a EXIT por desconexión de IO", waitInfo.PID))
+				go h.Planificador.FinalizarProcesoEnCualquierCola(waitInfo.PID)
+			}
+			ioWaitQueuesMutex.Unlock()
+		}
 	}
 
 	ioIdentificacionMutex.RLock()
