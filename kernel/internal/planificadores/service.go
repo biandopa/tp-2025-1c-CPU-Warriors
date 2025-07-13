@@ -21,13 +21,13 @@ type Service struct {
 	CanalNuevoProcesoNew   chan *internal.Proceso // Canal para recibir notificaciones de nuevos procesos en NewQueue
 	CanalNuevoProcBlocked  chan *internal.Proceso
 	CanalNewProcSuspReady  chan *internal.Proceso
-	mutexNewQueue          *sync.Mutex
-	mutexReadyQueue        *sync.Mutex
-	mutexCPUsConectadas    *sync.Mutex
-	mutexBlockQueue        *sync.Mutex
-	mutexExecQueue         *sync.Mutex
-	mutexSuspBlockQueue    *sync.Mutex
-	mutexSuspReadyQueue    *sync.Mutex
+	mutexNewQueue          *sync.RWMutex
+	mutexReadyQueue        *sync.RWMutex
+	mutexCPUsConectadas    *sync.RWMutex
+	mutexBlockQueue        *sync.RWMutex
+	mutexExecQueue         *sync.RWMutex
+	mutexSuspBlockQueue    *sync.RWMutex
+	mutexSuspReadyQueue    *sync.RWMutex
 	SjfConfig              *SjfConfig
 	MedianoPlazoConfig     *MedianoPlazoConfig
 	CPUSemaphore           chan struct{} // Semáforo contador para CPUs disponibles
@@ -84,13 +84,13 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		CanalNuevoProcesoNew:   make(chan *internal.Proceso, 100), // Buffer para evitar deadlocks
 		CanalNewProcSuspReady:  make(chan *internal.Proceso, 100),
 		CanalNuevoProcBlocked:  make(chan *internal.Proceso, 100),
-		mutexNewQueue:          &sync.Mutex{},
-		mutexReadyQueue:        &sync.Mutex{},
-		mutexBlockQueue:        &sync.Mutex{},
-		mutexExecQueue:         &sync.Mutex{},
-		mutexSuspBlockQueue:    &sync.Mutex{},
-		mutexSuspReadyQueue:    &sync.Mutex{},
-		mutexCPUsConectadas:    &sync.Mutex{},
+		mutexNewQueue:          &sync.RWMutex{},
+		mutexReadyQueue:        &sync.RWMutex{},
+		mutexBlockQueue:        &sync.RWMutex{},
+		mutexExecQueue:         &sync.RWMutex{},
+		mutexSuspBlockQueue:    &sync.RWMutex{},
+		mutexSuspReadyQueue:    &sync.RWMutex{},
+		mutexCPUsConectadas:    &sync.RWMutex{},
 		MedianoPlazoConfig: &MedianoPlazoConfig{
 			SuspensionTime: suspTime,
 		},

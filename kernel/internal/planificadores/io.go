@@ -37,7 +37,7 @@ func (p *Service) EnviarUsleep(puertoIO int, iPIO string, pid, timeSleep int) {
 	url := fmt.Sprintf("http://%s:%d/kernel/usleep", iPIO, puertoIO)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		p.Log.Error("Error al enviar el usleep al IO",
+		p.Log.Debug("Error al enviar el usleep al IO",
 			log.ErrAttr(err),
 			log.IntAttr("pid", pid),
 		)
