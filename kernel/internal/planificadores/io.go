@@ -78,6 +78,9 @@ func (p *Service) BloquearPorIO(pid int) error {
 		return fmt.Errorf("proceso con PID %d no encontrado en EXEC", pid)
 	}
 
+	// Actualizar ráfaga anterior antes de bloquear (IMPORTANTE para SRT)
+	p.actualizarRafagaAnterior(proceso)
+
 	// Actualizar métricas de tiempo para EXEC
 	if proceso.PCB.MetricasTiempo[internal.EstadoExec] != nil {
 		proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=

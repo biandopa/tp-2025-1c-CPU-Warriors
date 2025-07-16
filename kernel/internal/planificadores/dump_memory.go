@@ -12,13 +12,15 @@ import (
 // Bloquea el proceso, solicita el dump a memoria, y luego lo desbloquea o envía a EXIT
 func (p *Service) RealizarDumpMemory(pid int) {
 	// Mover el proceso de EXEC a BLOCKED
-	if err := p.moverProcesoExecABlocked(pid); err != nil {
-		p.Log.Error("Error al mover proceso de EXEC a BLOCKED",
-			log.IntAttr("pid", pid),
-			log.ErrAttr(err),
-		)
-		return
-	}
+	go func() {
+		if err := p.moverProcesoExecABlocked(pid); err != nil {
+			p.Log.Error("Error al mover proceso de EXEC a BLOCKED",
+				log.IntAttr("pid", pid),
+				log.ErrAttr(err),
+			)
+			return
+		}
+	}()
 
 	// Realizar el dump de memoria de forma asíncrona
 	go func() {
@@ -72,6 +74,9 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 	if proceso == nil {
 		return fmt.Errorf("proceso con PID %d no encontrado en EXEC", pid)
 	}
+
+	// Actualizar ráfaga anterior antes de mover a BLOCKED (IMPORTANTE para SRT)
+	p.actualizarRafagaAnterior(proceso)
 
 	// Actualizar métricas de tiempo para EXEC
 	if proceso.PCB.MetricasTiempo[internal.EstadoExec] != nil {
@@ -127,16 +132,17 @@ func (p *Service) moverProcesoBlockedAReady(pid int) error {
 	// Agregar a READY
 	p.mutexReadyQueue.Lock()
 	p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-	p.mutexReadyQueue.Unlock()
-
 	// Inicializar métricas de tiempo para READY
 	if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
 		proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
 	}
 	proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoReady]++
+	p.mutexReadyQueue.Unlock()
 
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado READY", proceso.PCB.PID))
+
+	p.canalNuevoProcesoReady <- struct{}{} // Notificar al planificador de corto plazo
 
 	return nil
 }

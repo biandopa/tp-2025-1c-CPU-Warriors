@@ -105,21 +105,19 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 		//Esto no se si tiene que estar aca, puede ser logica repetida
 		p.mutexBlockQueue.Lock()
 		quitarDeCola(&p.Planificador.BlockQueue, proceso)
+		if proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] != nil {
+			proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoAcumulado += time.Since(proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoInicio)
+		}
 		p.mutexBlockQueue.Unlock()
 
 		p.mutexReadyQueue.Lock()
 		p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-		p.mutexReadyQueue.Unlock()
-
-		if proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] != nil {
-			proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoAcumulado += time.Since(proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoInicio)
-		}
-
 		if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
 			proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
 		}
 		proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 		proceso.PCB.MetricasEstado[internal.EstadoReady]++
+		p.mutexReadyQueue.Unlock()
 
 		//Log obligatorio: Cambio de estado
 		// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
@@ -171,62 +169,62 @@ func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
 	colaString := strings.ToLower(cola)
 	switch colaString {
 	case "suspended_blocked":
-		p.mutexSuspBlockQueue.Lock()
+		p.mutexSuspBlockQueue.RLock()
 		for _, proc := range p.Planificador.SuspBlockQueue {
 			if proc.PCB.PID == pid {
-				p.mutexSuspBlockQueue.Unlock()
+				p.mutexSuspBlockQueue.RUnlock()
 				return proc
 			}
 		}
-		p.mutexSuspBlockQueue.Unlock()
+		p.mutexSuspBlockQueue.RUnlock()
 	case "blocked":
-		p.mutexBlockQueue.Lock()
+		p.mutexBlockQueue.RLock()
 		for _, proc := range p.Planificador.BlockQueue {
 			if proc.PCB.PID == pid {
-				p.mutexBlockQueue.Unlock()
+				p.mutexBlockQueue.RUnlock()
 				return proc
 			}
 		}
-		p.mutexBlockQueue.Unlock()
+		p.mutexBlockQueue.RUnlock()
 	case "ready":
-		p.mutexReadyQueue.Lock()
+		p.mutexReadyQueue.RLock()
 		for _, proc := range p.Planificador.ReadyQueue {
 			if proc.PCB.PID == pid {
-				p.mutexReadyQueue.Unlock()
+				p.mutexReadyQueue.RUnlock()
 				return proc
 			}
 		}
-		p.mutexReadyQueue.Unlock()
+		p.mutexReadyQueue.RUnlock()
 	case "suspended_ready":
-		p.mutexSuspReadyQueue.Lock()
+		p.mutexSuspReadyQueue.RLock()
 		for _, proc := range p.Planificador.SuspReadyQueue {
 			if proc.PCB.PID == pid {
-				p.mutexSuspReadyQueue.Unlock()
+				p.mutexSuspReadyQueue.RUnlock()
 				return proc
 			}
 		}
-		p.mutexSuspReadyQueue.Unlock()
+		p.mutexSuspReadyQueue.RUnlock()
 	default:
 		// Si no se especifica cola o es desconocida, buscar en todas las colas relevantes
 		// Primero en BLOCKED (más probable para procesos de IO)
-		p.mutexBlockQueue.Lock()
+		p.mutexBlockQueue.RLock()
 		for _, proc := range p.Planificador.BlockQueue {
 			if proc.PCB.PID == pid {
-				p.mutexBlockQueue.Unlock()
+				p.mutexBlockQueue.RUnlock()
 				return proc
 			}
 		}
-		p.mutexBlockQueue.Unlock()
+		p.mutexBlockQueue.RUnlock()
 
 		// Luego en SUSP.BLOCKED
-		p.mutexSuspBlockQueue.Lock()
+		p.mutexSuspBlockQueue.RLock()
 		for _, proc := range p.Planificador.SuspBlockQueue {
 			if proc.PCB.PID == pid {
-				p.mutexSuspBlockQueue.Unlock()
+				p.mutexSuspBlockQueue.RUnlock()
 				return proc
 			}
 		}
-		p.mutexSuspBlockQueue.Unlock()
+		p.mutexSuspBlockQueue.RUnlock()
 	}
 
 	p.Log.Debug("Proceso no encontrado en la cola especificada",

@@ -114,14 +114,13 @@ func (p *Service) CheckearEspacioEnMemoria() {
 			// Agrego el proceso a la cola de ready
 			p.mutexReadyQueue.Lock()
 			p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-			p.mutexReadyQueue.Unlock()
-
 			if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
 				proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
 			}
 			proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 
 			proceso.PCB.MetricasEstado[internal.EstadoReady]++
+			p.mutexReadyQueue.Unlock()
 
 			// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
 			p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
@@ -129,8 +128,8 @@ func (p *Service) CheckearEspacioEnMemoria() {
 			// Enviar señal al canal de corto plazo para procesos suspendidos
 			p.Log.Debug("Enviando señal al canal de corto plazo (SUSP.READY -> READY)",
 				log.IntAttr("pid", proceso.PCB.PID))
+
 			p.canalNuevoProcesoReady <- struct{}{}
-			p.Log.Debug("Señal enviada al canal de corto plazo (SUSP.READY -> READY)")
 
 			// No incrementar i porque removimos un elemento
 		} else {
@@ -165,10 +164,9 @@ func (p *Service) CheckearEspacioEnMemoria() {
 				// Primero agrego el proceso a la cola de ready
 				p.mutexReadyQueue.Lock()
 				p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-				p.mutexReadyQueue.Unlock()
-
 				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 				proceso.PCB.MetricasEstado[internal.EstadoReady]++
+				p.mutexReadyQueue.Unlock()
 
 				// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
 				p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado NEW al estado READY", proceso.PCB.PID))
@@ -176,8 +174,8 @@ func (p *Service) CheckearEspacioEnMemoria() {
 				// Luego, envío la señal para que el planificador de corto plazo pueda ejecutar el proceso
 				p.Log.Debug("Enviando señal al canal de corto plazo",
 					log.IntAttr("pid", proceso.PCB.PID))
+
 				p.canalNuevoProcesoReady <- struct{}{}
-				p.Log.Debug("Señal enviada al canal de corto plazo")
 
 				// No incrementar i porque removimos un elemento
 			} else {
@@ -247,15 +245,15 @@ func (p *Service) FinalizarProceso(pid int) {
 	// 6. Loguear métricas (acá deberías tenerlas guardadas en el PCB)
 
 	//Log obligatorio: Cambio de estado
-	// “## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>”
+	// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado EXIT", proceso.PCB.PID))
 
 	//Log obligatorio: Finalización de proceso
-	//“## (<PID>) - Finaliza el proceso”
+	//"## (<PID>) - Finaliza el proceso"
 	p.Log.Info(fmt.Sprintf("## (%d) Finaliza el proceso", proceso.PCB.PID))
 
 	// Log obligatorio: Métricas de Estado
-	//“## (<PID>) - Métricas de estado: NEW (NEW_COUNT) (NEW_TIME), READY (READY_COUNT) (READY_TIME), …”
+	//"## (<PID>) - Métricas de estado: NEW (NEW_COUNT) (NEW_TIME), READY (READY_COUNT) (READY_TIME), …"
 	p.Log.Info("Métricas de estado",
 		log.AnyAttr("metricas_estado", proceso.PCB.MetricasEstado),
 		log.AnyAttr("metricas_tiempo", proceso.PCB.MetricasTiempo),
@@ -267,8 +265,9 @@ func (p *Service) FinalizarProceso(pid int) {
 	// 8. Checkear si hay procesos suspendidos que puedan volver a memoria
 	p.CheckearEspacioEnMemoria()
 
-	// 9. Le avisamos al channel de que puede ejecutar el algoritmo de largo plazo
-	//p.CanalNuevoProcesoNew <- struct{}{}
+	/*// 9. Le avisamos al channel de que puede ejecutar el algoritmo de largo plazo
+	p.canalNuevoProcesoReady <- struct{}{}
+	p.canalRafagaActualizada <- struct{}{}*/
 }
 
 // FinalizarProcesoEnCualquierCola busca un proceso en todas las colas y lo finaliza
