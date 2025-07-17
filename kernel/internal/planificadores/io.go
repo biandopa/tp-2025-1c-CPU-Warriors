@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
@@ -35,7 +34,7 @@ func (p *Service) EnviarUsleep(puertoIO int, iPIO string, pid, timeSleep int) {
 
 	// Realizar la petición POST al IO
 	url := fmt.Sprintf("http://%s:%d/kernel/usleep", iPIO, puertoIO)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := p.HttpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		p.Log.Debug("Error al enviar el usleep al IO",
 			log.ErrAttr(err),

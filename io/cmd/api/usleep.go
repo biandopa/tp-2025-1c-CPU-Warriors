@@ -77,7 +77,7 @@ func (h *Handler) notificarKernelFinIO(pid int) error {
 
 	// Enviar la solicitud POST al kernel
 	url := fmt.Sprintf("http://%s:%d/io/peticion-finalizada", h.Config.IpKernel, h.Config.PortKernel)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	resp, err := h.HttpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("error sending POST to kernel: %w", err)
 	}

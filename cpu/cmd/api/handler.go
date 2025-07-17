@@ -2,6 +2,8 @@ package api
 
 import (
 	"log/slog"
+	"net/http"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/cpu/internal"
 	"github.com/sisoputnfrba/tp-golang/cpu/pkg/memoria"
@@ -10,10 +12,11 @@ import (
 )
 
 type Handler struct {
-	Log     *slog.Logger
-	Config  *Config
-	Service *internal.Service
-	Memoria *memoria.Memoria
+	Log        *slog.Logger
+	Config     *Config
+	Service    *internal.Service
+	Memoria    *memoria.Memoria
+	HttpClient *http.Client
 }
 
 func NewHandler(configFile string) *Handler {
@@ -34,12 +37,17 @@ func NewHandler(configFile string) *Handler {
 
 	mem := memoria.NewMemoria(configStruct.IpMemory, configStruct.PortMemory, logger)
 
+	httpClient := &http.Client{
+		Timeout: 2 * time.Minute,
+	}
+
 	return &Handler{
 		Config: configStruct,
 		Log:    logger,
 		Service: internal.NewService(logger, configStruct.IpKernel, configStruct.PortKernel,
 			configStruct.TlbEntries, configStruct.CacheEntries,
 			configStruct.TlbReplacement, configStruct.CacheReplacement, mem),
-		Memoria: mem,
+		Memoria:    mem,
+		HttpClient: httpClient,
 	}
 }

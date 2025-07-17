@@ -27,7 +27,7 @@ func (h *Handler) ConexionInicialMemoria(archivoNombre, tamanioProceso string) {
 	}
 
 	url := fmt.Sprintf("http://%s:%d/kernel/acceso", h.Config.IpMemory, h.Config.PortMemory)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	resp, err := h.HttpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.Error("Error enviando mensaje a memoria",
 			log.ErrAttr(err),

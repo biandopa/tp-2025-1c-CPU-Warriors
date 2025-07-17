@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 type Memoria struct {
-	IP     string
-	Puerto int
-	Log    *slog.Logger
+	IP         string
+	Puerto     int
+	Log        *slog.Logger
+	httpClient *http.Client
 }
 
 func NewMemoria(ip string, puerto int, logger *slog.Logger) *Memoria {
@@ -19,6 +21,9 @@ func NewMemoria(ip string, puerto int, logger *slog.Logger) *Memoria {
 		IP:     ip,
 		Puerto: puerto,
 		Log:    logger,
+		httpClient: &http.Client{
+			Timeout: 2 * time.Minute, // 2 minutos
+		},
 	}
 }
 
@@ -26,7 +31,7 @@ func (m *Memoria) ConsultarEspacio(sizeProceso string, pid int) bool {
 	url := fmt.Sprintf("http://%s:%d/kernel/espacio-disponible", m.IP, m.Puerto)
 	url = fmt.Sprintf("%s?tamanio-proceso=%s&pid=%d", url, sizeProceso, pid)
 
-	resp, err := http.Get(url)
+	resp, err := m.httpClient.Get(url)
 	if err != nil {
 		m.Log.Error("Error al consultar espacio en memoria",
 			log.ErrAttr(err),
@@ -60,7 +65,7 @@ func (m *Memoria) CargarProcesoEnMemoriaDeSistema(file string, pid int) bool {
 	url := fmt.Sprintf("http://%s:%d/kernel/cargar-memoria-de-sistema", m.IP, m.Puerto)
 	url = fmt.Sprintf("%s?archivo=%s&pid=%d", url, file, pid)
 
-	_, err := http.Get(url)
+	_, err := m.httpClient.Get(url)
 	if err != nil {
 		m.Log.Error("Error cargar proceso en memoria de sistema",
 			log.ErrAttr(err),
@@ -81,7 +86,7 @@ func (m *Memoria) FinalizarProceso(pid int) (int, error) {
 	)
 	url := fmt.Sprintf("http://%s:%d/kernel/fin-proceso?pid=%d", m.IP, m.Puerto, pid)
 
-	resp, err = http.Post(url, "application/json", nil)
+	resp, err = m.httpClient.Post(url, "application/json", nil)
 
 	if resp != nil {
 		status = resp.StatusCode
@@ -98,7 +103,7 @@ func (m *Memoria) DumpProceso(pid int) error {
 	url := fmt.Sprintf("http://%s:%d/kernel/dump-proceso", m.IP, m.Puerto)
 	url = fmt.Sprintf("%s?pid=%d", url, pid)
 
-	resp, err := http.Get(url)
+	resp, err := m.httpClient.Get(url)
 	if err != nil {
 		m.Log.Error("Error al solicitar dump de proceso a memoria",
 			log.ErrAttr(err),
@@ -135,7 +140,7 @@ func (m *Memoria) DumpProceso(pid int) error {
 func (m *Memoria) SwapProceso(pid int) error {
 	url := fmt.Sprintf("http://%s:%d/kernel/swap-proceso?pid=%d", m.IP, m.Puerto, pid)
 
-	resp, err := http.Get(url)
+	resp, err := m.httpClient.Get(url)
 
 	if err != nil {
 		m.Log.Error("Error al solicitar swap de proceso a memoria",

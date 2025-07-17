@@ -2,6 +2,7 @@ package planificadores
 
 import (
 	"log/slog"
+	"net/http"
 	"sync"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
@@ -31,6 +32,7 @@ type Service struct {
 	SjfConfig              *SjfConfig
 	MedianoPlazoConfig     *MedianoPlazoConfig
 	CPUSemaphore           chan struct{} // Semáforo contador para CPUs disponibles
+	HttpClient             *http.Client
 }
 
 type Planificador struct {
@@ -62,7 +64,7 @@ type MedianoPlazoConfig struct {
 // NewPlanificador función que sirve para crear una nueva instancia del planificador de procesos. El planificador posee
 // varias colas para gestionar los procesos en diferentes estados: New, Ready, Block, Suspended Ready, Suspended Block, Exec y Exit.
 func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlazoAlgoritmo string,
-	puertoMemoria int, sjfConfig *SjfConfig, suspTime int) *Service {
+	puertoMemoria int, sjfConfig *SjfConfig, suspTime int, httpClient *http.Client) *Service {
 	return &Service{
 		Planificador: &Planificador{
 			NewQueue:       make([]*internal.Proceso, 0),
@@ -94,6 +96,8 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		MedianoPlazoConfig: &MedianoPlazoConfig{
 			SuspensionTime: suspTime,
 		},
-		CPUSemaphore: make(chan struct{}, 100), // Inicializamos el semáforo vacío, se llenará cuando se conecten CPUs. Buffer máximo de 100 CPUs
+		CPUSemaphore: make(chan struct{}, 100), // Inicializamos el semáforo vacío, se llenará cuando se conecten CPUs.
+		// Buffer máximo de 100 CPUs
+		HttpClient: httpClient,
 	}
 }

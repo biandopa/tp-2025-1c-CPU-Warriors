@@ -6,17 +6,19 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 type Cpu struct {
-	IP      string
-	Puerto  int
-	ID      string
-	Estado  bool
-	Log     *slog.Logger
-	Proceso *ProcesoCpu
+	IP         string
+	Puerto     int
+	ID         string
+	Estado     bool
+	Log        *slog.Logger
+	Proceso    *ProcesoCpu
+	httpClient *http.Client
 }
 
 type ProcesoCpu struct {
@@ -32,6 +34,9 @@ type Interrupcion struct {
 }
 
 func NewCpu(ip string, puerto int, id string, logger *slog.Logger) *Cpu {
+	httpClient := &http.Client{
+		Timeout: 2 * time.Minute,
+	}
 	return &Cpu{
 		IP:     ip,
 		Puerto: puerto,
@@ -41,6 +46,7 @@ func NewCpu(ip string, puerto int, id string, logger *slog.Logger) *Cpu {
 		Proceso: &ProcesoCpu{
 			PID: -1, // Inicialmente no hay proceso asignado
 		},
+		httpClient: httpClient,
 	}
 }
 
@@ -54,7 +60,7 @@ func (c *Cpu) DispatchProcess() (int, string) {
 	}
 
 	url := fmt.Sprintf("http://%s:%d/kernel/procesos", c.IP, c.Puerto)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		c.Log.Error("error enviando mensaje",
 			log.ErrAttr(err),
@@ -95,7 +101,7 @@ func (c *Cpu) EnviarInterrupcion(tipo string, esEnmascarable bool) bool {
 	}
 
 	url := fmt.Sprintf("http://%s:%d/kernel/interrupciones", c.IP, c.Puerto)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	resp, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		c.Log.Error("error enviando interrupción",
 			log.ErrAttr(err),

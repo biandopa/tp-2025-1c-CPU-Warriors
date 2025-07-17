@@ -50,7 +50,7 @@ func (h *Handler) EnviarInstruccion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	url := fmt.Sprintf("http://%s:%d/cpu/instruccion", h.Config.IpMemory, h.Config.PortMemory)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	resp, err := h.HttpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.ErrorContext(ctx, "Error enviando mensaje",
 			log.StringAttr("ip", h.Config.IpMemory),

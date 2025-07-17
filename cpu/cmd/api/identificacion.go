@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+
 	"github.com/sisoputnfrba/tp-golang/utils/log"
-	"net/http"
 )
 
 func (h *Handler) EnviarIdentificacion(nombre string) {
@@ -24,7 +24,7 @@ func (h *Handler) EnviarIdentificacion(nombre string) {
 	}
 
 	url := fmt.Sprintf("http://%s:%d/cpu/conexion-inicial", h.Config.IpKernel, h.Config.PortKernel)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	resp, err := h.HttpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.Error("error enviando mensaje",
 			log.ErrAttr(err),

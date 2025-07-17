@@ -39,8 +39,6 @@ func (p *Service) BuscarCPUDisponible() *cpu.Cpu {
 		}
 	}
 
-	// Esto no debería suceder si el semáforo funciona correctamente
-	p.Log.Debug("Error: semáforo permitió adquirir CPU pero no hay CPUs libres")
 	return nil
 }
 
