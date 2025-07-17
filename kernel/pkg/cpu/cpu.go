@@ -33,12 +33,14 @@ type Interrupcion struct {
 
 func NewCpu(ip string, puerto int, id string, logger *slog.Logger) *Cpu {
 	return &Cpu{
-		IP:      ip,
-		Puerto:  puerto,
-		ID:      id,
-		Estado:  true,
-		Log:     logger,
-		Proceso: &ProcesoCpu{},
+		IP:     ip,
+		Puerto: puerto,
+		ID:     id,
+		Estado: true,
+		Log:    logger,
+		Proceso: &ProcesoCpu{
+			PID: -1, // Inicialmente no hay proceso asignado
+		},
 	}
 }
 

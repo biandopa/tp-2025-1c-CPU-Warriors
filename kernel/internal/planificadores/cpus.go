@@ -31,7 +31,7 @@ func (p *Service) BuscarCPUDisponible() *cpu.Cpu {
 	defer p.mutexCPUsConectadas.Unlock()
 
 	for i := range p.CPUsConectadas {
-		if p.CPUsConectadas[i].Estado {
+		if p.CPUsConectadas[i].Estado && p.CPUsConectadas[i].Proceso.PID == -1 {
 			p.CPUsConectadas[i].Estado = false // Marcar como ocupada
 			p.Log.Debug("CPU adquirida",
 				log.StringAttr("cpu_id", p.CPUsConectadas[i].ID))
@@ -40,7 +40,7 @@ func (p *Service) BuscarCPUDisponible() *cpu.Cpu {
 	}
 
 	// Esto no debería suceder si el semáforo funciona correctamente
-	p.Log.Error("Error: semáforo permitió adquirir CPU pero no hay CPUs libres")
+	p.Log.Warn("Error: semáforo permitió adquirir CPU pero no hay CPUs libres")
 	return nil
 }
 
@@ -48,7 +48,8 @@ func (p *Service) BuscarCPUDisponible() *cpu.Cpu {
 func (p *Service) LiberarCPU(cpuToRelease *cpu.Cpu) {
 	p.mutexCPUsConectadas.Lock()
 	defer p.mutexCPUsConectadas.Unlock()
-	cpuToRelease.Estado = true // Marcar como libre
+	cpuToRelease.Estado = true    // Marcar como libre
+	cpuToRelease.Proceso.PID = -1 // Limpiar el PID del proceso asociado
 
 	// Liberar el semáforo (release)
 	p.CPUSemaphore <- struct{}{}
