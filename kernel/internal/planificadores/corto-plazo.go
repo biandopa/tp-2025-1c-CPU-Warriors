@@ -89,12 +89,6 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 						log.IntAttr("pc_final", newPC),
 					)
 
-					/*// Notificar que puede haber más trabajo que hacer
-					select {
-					case p.canalNuevoProcesoReady <- struct{}{}:
-					default:
-						// Canal lleno, no bloquear
-					}*/
 				}(cpuLibre, procesoElegido)
 			} else {
 				// No hay CPUs libres, salir del bucle interno
@@ -259,7 +253,7 @@ func (p *Service) evaluarDesalojo(procesoNuevo *internal.Proceso) *internal.Proc
 		rafagaEstimada := p.calcularSiguienteEstimacion(procesoEjecutando)
 		tiempoRestante := rafagaEstimada - tiempoEjecutado
 
-		p.Log.Info("Analizando proceso en ejecución",
+		p.Log.Debug("Analizando proceso en ejecución",
 			log.IntAttr("pid_ejecutando", procesoEjecutando.PCB.PID),
 			log.AnyAttr("rafaga_estimada", rafagaEstimada),
 			log.AnyAttr("tiempo_ejecutado", tiempoEjecutado),
