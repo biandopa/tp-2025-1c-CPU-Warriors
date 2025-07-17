@@ -258,7 +258,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 
 	default:
 		h.Log.Warn("Instrucción no reconocida", log.StringAttr("tipo", tipo))
-		nuevoPC++
+		return returnControl, nuevoPC
 	}
 
 	// Log obligatorio: Instrucción Ejecutada
