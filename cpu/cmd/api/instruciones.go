@@ -257,7 +257,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		nuevoPC++ // Avanzamos el PC para la syscall
 
 	default:
-		h.Log.Warn("Instrucción no reconocida", log.StringAttr("tipo", tipo))
+		h.Log.Debug("Instrucción no reconocida", log.StringAttr("tipo", tipo))
 		return returnControl, nuevoPC
 	}
 
