@@ -128,6 +128,7 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 				}
 			}
 			h.eliminarOcurrencias(pidInt)
+			//h.SacarProcesoDeSwap(pid)
 		} else {
 			tablaProceso := &TablasProceso{
 				PID:             pid,
@@ -392,55 +393,14 @@ func (h *Handler) ObtenerMarcosDeLaTabla(tabla interface{}) []int {
 	return marcos
 }
 
-func (h *Handler) SacarProcesoDeSwap(w http.ResponseWriter, r *http.Request) {
-	var (
-		// Leemos el PID
-		pid = r.URL.Query().Get("pid")
-	)
-
-	if pid == "" {
-		h.Log.Error("PID no proporcionado")
-		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
-		return
-	}
+func (h *Handler) SacarProcesoDeSwap(pid string) {
 
 	pidDeSwap, _ := strconv.Atoi(pid)
 
-	h.Log.Debug("SacarProcesoDeSwap",
-		log.AnyAttr("pidDeSwap", pidDeSwap))
-
 	posicionEnSwap := h.PosicionesDeProcesoEnSwap(pidDeSwap)
 
-	h.Log.Debug("SacarProcesoDeSwap",
-		log.AnyAttr("posicionEnSwap", posicionEnSwap))
-
-	h.Log.Debug("SacarProcesoDeSwap",
-		log.AnyAttr("lenPosicionEnSwap", len(posicionEnSwap)))
-
-	var paginasNecesarias = len(posicionEnSwap)
-	var paginasLibres = h.ContarLibres()
-
-	h.Log.Debug("SacarProcesoDeSwap",
-		log.AnyAttr("paginasNecesarias", paginasNecesarias))
-
-	h.Log.Debug("SacarProcesoDeSwap",
-		log.AnyAttr("paginasNecesarias", paginasLibres))
-
-	if 0 < paginasLibres-paginasNecesarias {
-		//agregar un parametro que reprsente si es actualizacion o no
-		h.AsignarMemoriaDeUsuario(paginasNecesarias, pid, true)
-	} else {
-		h.Log.Error("No hay espacio disponible")
-		return
-	}
-
 	procesYTablaAsociadaDeSwap, _ := h.BuscarProcesoPorPID(pid)
-	h.Log.Debug("SacarProcesoDeSwap",
-		log.AnyAttr("procesYTablaAsociada", procesYTablaAsociadaDeSwap.TablasDePaginas))
-
 	marcosDelProcesoDeSwap := h.ObtenerMarcosDeLaTabla(procesYTablaAsociadaDeSwap.TablasDePaginas)
-	h.Log.Debug("SacarProcesoDeSwap",
-		log.AnyAttr("marcosDelProcesoDeSwap", marcosDelProcesoDeSwap))
 
 	//ir escribiendo cada frame en memoria
 	if err := h.CargarPaginasEnMemoriaDesdeSwap(posicionEnSwap, marcosDelProcesoDeSwap); err != nil {
@@ -449,14 +409,13 @@ func (h *Handler) SacarProcesoDeSwap(w http.ResponseWriter, r *http.Request) {
 			log.AnyAttr("posicionEnSwap", posicionEnSwap),
 			log.AnyAttr("marcosDelProcesoDeSwap", marcosDelProcesoDeSwap),
 		)
-		http.Error(w, "error al cargar páginas en memoria desde swap", http.StatusInternalServerError)
 		return
 	}
 	h.Log.Debug("SacarProcesoDeSwap",
 		log.AnyAttr("CargarPaginasEnMemoriaDesdeSwap", h.EspacioDeUsuario))
 
 	//compactar la posicion en swap y borrarlo en la lista de procesos}
-	h.eliminarOcurrencias(pidDeSwap)
+	//h.eliminarOcurrencias(pidDeSwap)
 	h.Log.Debug("SacarProcesoDeSwap",
 		log.AnyAttr("eliminarOcurrencias", h.ProcesoPorPosicionSwap))
 
@@ -464,14 +423,15 @@ func (h *Handler) SacarProcesoDeSwap(w http.ResponseWriter, r *http.Request) {
 		h.Log.Error("Error al compactar swap",
 			log.ErrAttr(err),
 		)
-		http.Error(w, "error al compactar swap", http.StatusInternalServerError)
 		return
 	}
 	time.Sleep(time.Duration(h.Config.SwapDelay))
 
 	// Devolvemos una respuesta exitosa
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("OK"))
+
+	//UBicar ESTO
+	//w.WriteHeader(http.StatusOK)
+	//_, _ = w.Write([]byte("OK"))
 }
 
 func (h *Handler) CompactarSwap() error {
