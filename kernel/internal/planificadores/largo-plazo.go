@@ -254,7 +254,7 @@ func (p *Service) FinalizarProceso(pid int) {
 
 	// Log obligatorio: Métricas de Estado
 	//"## (<PID>) - Métricas de estado: NEW (NEW_COUNT) (NEW_TIME), READY (READY_COUNT) (READY_TIME), …"
-	p.Log.Info("Métricas de estado",
+	p.Log.Info(fmt.Sprintf("## (%d) - Métricas de estado", proceso.PCB.PID),
 		log.AnyAttr("metricas_estado", proceso.PCB.MetricasEstado),
 		log.AnyAttr("metricas_tiempo", proceso.PCB.MetricasTiempo),
 	)
@@ -276,6 +276,13 @@ func (p *Service) FinalizarProcesoEnCualquierCola(pid int) {
 	var proceso *internal.Proceso
 	var estadoAnterior string
 
+	p.Log.Info("Procesos en las colas antes de finalizar",
+		log.AnyAttr("ExecQueue", p.Planificador.ExecQueue),
+		log.AnyAttr("BlockQueue", p.Planificador.BlockQueue),
+		log.AnyAttr("SuspBlockQueue", p.Planificador.SuspBlockQueue),
+		log.AnyAttr("ReadyQueue", p.Planificador.ReadyQueue),
+		log.AnyAttr("SuspReadyQueue", p.Planificador.SuspReadyQueue),
+	)
 	// 1. Buscar el proceso en todas las colas posibles
 	// Primero en EXEC (comportamiento normal)
 	for i, proc := range p.Planificador.ExecQueue {
@@ -409,7 +416,7 @@ func (p *Service) FinalizarProcesoEnCualquierCola(pid int) {
 	p.Log.Info(fmt.Sprintf("## (%d) Finaliza el proceso", proceso.PCB.PID))
 
 	// Log obligatorio: Métricas de Estado
-	p.Log.Info("Métricas de estado",
+	p.Log.Info(fmt.Sprintf("## (%d) - Métricas de estado", proceso.PCB.PID),
 		log.AnyAttr("metricas_estado", proceso.PCB.MetricasEstado),
 		log.AnyAttr("metricas_tiempo", proceso.PCB.MetricasTiempo),
 	)
