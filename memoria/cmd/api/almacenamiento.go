@@ -62,16 +62,6 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 	var paginasNecesarias = DivRedondeoArriba(tamanioProcesoInt, h.Config.PageSize)
 	var paginasLibres = h.ContarLibres()
 
-	h.Log.InfoContext(ctx, "PaginasLibres",
-		log.AnyAttr("paginasLibres", paginasLibres),
-		log.StringAttr("pid", pid),
-	)
-
-	h.Log.InfoContext(ctx, "paginasNecesarias",
-		log.AnyAttr("paginasNecesarias", paginasNecesarias),
-		log.StringAttr("pid", pid),
-	)
-
 	if 0 <= paginasLibres-paginasNecesarias {
 		h.AsignarMemoriaDeUsuario(paginasNecesarias, pid, false)
 	} else {
