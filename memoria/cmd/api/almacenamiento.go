@@ -312,7 +312,7 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 
 	//iterar la lista de marcos un for, y por cada uno multiplicarlo por el sizepage
 
-	archivoSwap, err := os.OpenFile(h.Config.SwapfilePath, os.O_RDWR|os.O_CREATE, 0644)
+	archivoSwap, err := os.OpenFile(h.Config.SwapfilePath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -328,7 +328,7 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 	}
 
 	for marco := range marcosDelProceso {
-		err := h.escribirMarcoEnSwap(archivoSwap, marco)
+		err = h.escribirMarcoEnSwap(archivoSwap, marco)
 		if err != nil {
 			panic(err)
 		}
