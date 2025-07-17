@@ -65,7 +65,10 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 	if 0 <= paginasLibres-paginasNecesarias {
 		h.AsignarMemoriaDeUsuario(paginasNecesarias, pid, false)
 	} else {
-		h.Log.Error("No hay espacio disponible")
+		h.Log.Error("No hay espacio disponible",
+			log.IntAttr("PaginasLibres", paginasLibres),
+			log.IntAttr("PaginasNecesarias", paginasNecesarias))
+		http.Error(w, "no hay espacio disponible", http.StatusInsufficientStorage)
 		return
 	}
 
@@ -106,15 +109,25 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 
 		h.LlenarTablaConValores(tabla, framesLibres)
 
+		// Actualizar el espacio de usuario con los marcos ocupados
+		for _, marco := range framesLibres {
+			h.FrameTable[marco] = true // Marcar el marco como ocupado
+			h.Log.Debug("AsignarMemoriaDeUsuario",
+				log.IntAttr("marco", marco),
+				log.StringAttr("pid", pid))
+		}
+
 		h.Log.Debug("AsignarMemoriaDeUsuario",
 			log.AnyAttr("tabla", tabla))
 
-		if esActualizacion {
+		pidInt, _ := strconv.Atoi(pid)
+		if h.ContienePIDEnSwap(pidInt) {
 			for _, tp := range h.TablasProcesos {
 				if tp.PID == pid {
 					tp.TablasDePaginas = tabla
 				}
 			}
+			h.eliminarOcurrencias(pidInt)
 		} else {
 			tablaProceso := &TablasProceso{
 				PID:             pid,
@@ -138,6 +151,12 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 	//Log obligatorio: Creación de Proceso
 	//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
 	h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
+	h.Log.Info("Espacio disponible en memoria",
+		log.IntAttr("paginas_libres", h.ContarLibres()),
+		log.IntAttr("paginas_necesarias", paginasAOcupar),
+		log.IntAttr("size_page", h.Config.PageSize),
+		log.IntAttr("tamanio_proceso", paginasAOcupar*h.Config.PageSize),
+	)
 }
 
 func (h *Handler) escribirMarcoEnSwap(archivo *os.File, marco int) error {
@@ -192,7 +211,7 @@ type TablasProceso struct {
 func (h *Handler) MarcosLibres(paginasNecesarias int) []int {
 	libres := make([]int, 0)
 	for i, ocupado := range h.FrameTable {
-		if !ocupado {
+		if !ocupado { // Si el marco está libre, su valor es false
 			libres = append(libres, i)
 			if len(libres) == paginasNecesarias {
 				return libres
@@ -202,7 +221,6 @@ func (h *Handler) MarcosLibres(paginasNecesarias int) []int {
 	return libres
 }
 
-// TODO: A revisar!!
 func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx = r.Context()
@@ -280,7 +298,10 @@ func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http
 		h.Instrucciones[pidInt] = append(h.Instrucciones[pidInt], instruccion)
 	}
 
-	h.Log.Info("Carga de Proceso en Memoria de Sistema Exitosa")
+	h.Log.Debug("Carga de Proceso en Memoria de Sistema Exitosa",
+		log.StringAttr("pid", pid),
+		log.StringAttr("file_path", filePath),
+	)
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -310,6 +331,11 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 		log.AnyAttr("procesYTablaAsociada", procesYTablaAsociada.TablasDePaginas))
 
 	marcosDelProceso := h.ObtenerMarcosDeLaTabla(procesYTablaAsociada.TablasDePaginas)
+
+	// Actualizar el espacio de usuario con los marcos libres
+	for _, marco := range marcosDelProceso {
+		h.FrameTable[marco] = false // Marcar el marco como libre
+	}
 
 	h.Log.Debug("PasarProcesoASwapAuxiliar",
 		log.AnyAttr("ObtenerMarcosValidos", marcosDelProceso))
@@ -705,10 +731,6 @@ func (h *Handler) ContienePIDEnSwap(pid int) bool {
 	}
 	return false
 }
-
-/*func (h *Handler) LeerPaginaCompleta(marco int, pid string) {
-	h.LeerPagina(marco, 0, h.Config.PageSize, pid)
-}*/
 
 func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Request) {
 	var (

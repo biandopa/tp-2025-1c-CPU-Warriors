@@ -24,8 +24,8 @@ func main() {
 	mux.HandleFunc("GET /kernel/espacio-disponible", h.ConsultarEspacioEInicializar)       // Kernel --> Memoria
 	mux.HandleFunc("/kernel/cargar-memoria-de-sistema", h.CargarProcesoEnMemoriaDeSistema) // Kernel --> Memoria
 	mux.HandleFunc("GET /kernel/swap-proceso", h.PasarProcesoASwap)                        // Kernel --> Memoria
-	mux.HandleFunc("GET /kernel/recuperar-proceso-swap", h.SacarProcesoDeSwap)             // Kernel --> Memoria
-	mux.HandleFunc("/kernel/dump-proceso", h.DumpProceso)                                  // Kernel --> Memoria
+	//mux.HandleFunc("GET /kernel/recuperar-proceso-swap", h.SacarProcesoDeSwap)             // Kernel --> Memoria
+	mux.HandleFunc("/kernel/dump-proceso", h.DumpProceso) // Kernel --> Memoria
 	mux.HandleFunc("/kernel/acceso-a-tabla", h.AccesoATabla)
 	mux.HandleFunc("POST /kernel/fin-proceso", h.FinalizarProceso)                  // Kernel --> Memoria
 	mux.HandleFunc("GET /cpu/page-size-y-entries", h.RetornarPageSizeYEntries)      // CPU --> Memoria

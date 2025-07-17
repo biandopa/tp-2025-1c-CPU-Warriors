@@ -56,13 +56,11 @@ func (p *Service) PlanificadorLargoPlazoFIFO(proceso *internal.Proceso) {
 
 	p.mutexNewQueue.Lock()
 	p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
-	p.Memoria.CargarProcesoEnMemoriaDeSistema(proceso.PCB.NombreArchivo, proceso.PCB.PID)
 	p.mutexNewQueue.Unlock()
 
 }
 
 func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
-
 	sizeProcesoEntrante, _ := strconv.Atoi(proceso.PCB.Tamanio)
 
 	p.mutexNewQueue.Lock()
@@ -73,6 +71,7 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 		sizeProcesoEncolado, _ := strconv.Atoi(procesoEncolado.PCB.Tamanio)
 		if sizeProcesoEntrante < sizeProcesoEncolado {
 
+			// Si el proceso entrante es más chico que el encolado, lo agrego antes
 			p.Planificador.NewQueue = append(
 				p.Planificador.NewQueue[:i],
 				append([]*internal.Proceso{proceso}, p.Planificador.NewQueue[i:]...)...,
@@ -85,7 +84,6 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 
 	if yaLoAgregue {
 		p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
-		p.Memoria.CargarProcesoEnMemoriaDeSistema(proceso.PCB.NombreArchivo, proceso.PCB.PID)
 	}
 
 	p.mutexNewQueue.Unlock()
@@ -160,6 +158,8 @@ func (p *Service) CheckearEspacioEnMemoria() {
 				if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
 					proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
 				}
+
+				p.Memoria.CargarProcesoEnMemoriaDeSistema(proceso.PCB.NombreArchivo, proceso.PCB.PID)
 
 				// Primero agrego el proceso a la cola de ready
 				p.mutexReadyQueue.Lock()

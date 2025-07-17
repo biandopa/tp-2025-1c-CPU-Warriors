@@ -20,6 +20,7 @@ func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
 		return
 	}
+
 	tablaMetricas, err := h.BuscarProcesoPorPID(pid)
 	if err != nil {
 		h.Log.Error("Error al buscar el proceso por PID",
@@ -46,11 +47,10 @@ func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) finalizarProcesoFuncionAuxiliar(pid string) {
-
 	pidInt, _ := strconv.Atoi(pid)
 
 	if h.ContienePIDEnSwap(pidInt) {
-		//compactar la posicion en swap y borrarlo en la lista de procesos}
+		//compactar la posicion en swap y borrarlo en la lista de procesos
 		h.eliminarOcurrencias(pidInt)
 		if err := h.CompactarSwap(); err != nil {
 			h.Log.Error("Error al compactar swap", log.ErrAttr(err))
@@ -66,7 +66,20 @@ func (h *Handler) finalizarProcesoFuncionAuxiliar(pid string) {
 		for marco := range marcosDelProceso {
 			copy(h.EspacioDeUsuario[marco*h.Config.PageSize:((marco+1)*h.Config.PageSize-1)], make([]byte, h.Config.PageSize))
 		}
+
+		// Actualizar el espacio de usuario con los marcos libres
+		h.Log.Info("Liberando marcos de memoria",
+			log.AnyAttr("marcos_del_proceso", marcosDelProceso),
+		)
+		for _, marco := range marcosDelProceso {
+			h.FrameTable[marco] = false // Marcar el marco como libre
+		}
+		h.Log.Info("Marcos liberados correctamente",
+			log.AnyAttr("frame_table", h.FrameTable),
+		)
+
 	}
+
 	//hasta aca el else
 	//2do borrarlo de la lista de tablas
 	if err := h.borrarProcesoPorPID(pid); err != nil {
