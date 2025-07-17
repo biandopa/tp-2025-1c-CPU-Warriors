@@ -20,7 +20,15 @@ func (h *Handler) FinalizarProceso(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
 		return
 	}
-	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
+	tablaMetricas, err := h.BuscarProcesoPorPID(pid)
+	if err != nil {
+		h.Log.Error("Error al buscar el proceso por PID",
+			log.ErrAttr(err),
+			log.StringAttr("pid", pid),
+		)
+		http.Error(w, "Proceso no encontrado", http.StatusNotFound)
+		return
+	}
 	/* Log obligatorio: Destrucción de Proceso
 	“## PID: <PID> - Proceso Destruido - Métricas - Acc.T.Pag: <ATP>;
 	Inst.Sol.: <Inst.Sol.>; SWAP: <SWAP>; Mem.Prin.: <Mem.Prin.>; Lec.Mem.: <Lec.Mem.>; Esc.Mem.: <Esc.Mem.>”*/

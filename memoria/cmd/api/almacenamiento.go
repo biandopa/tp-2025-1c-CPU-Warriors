@@ -62,7 +62,17 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 	var paginasNecesarias = DivRedondeoArriba(tamanioProcesoInt, h.Config.PageSize)
 	var paginasLibres = h.ContarLibres()
 
-	if 0 < paginasLibres-paginasNecesarias {
+	h.Log.InfoContext(ctx, "PaginasLibres",
+		log.AnyAttr("paginasLibres", paginasLibres),
+		log.StringAttr("pid", pid),
+	)
+
+	h.Log.InfoContext(ctx, "paginasNecesarias",
+		log.AnyAttr("paginasNecesarias", paginasNecesarias),
+		log.StringAttr("pid", pid),
+	)
+
+	if 0 <= paginasLibres-paginasNecesarias {
 		h.AsignarMemoriaDeUsuario(paginasNecesarias, pid, false)
 	} else {
 		h.Log.Error("No hay espacio disponible")
@@ -99,31 +109,36 @@ func (h *Handler) ContarLibres() int {
 }
 
 func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActualizacion bool) {
+	if paginasAOcupar != 0 {
+		framesLibres := h.MarcosLibres(paginasAOcupar)
 
-	var FramesLibres = h.MarcosLibres(paginasAOcupar)
+		tabla := h.CrearTabla(h.Config.NumberOfLevels, h.Config.EntriesPerPage)
 
-	tabla := h.CrearTabla(h.Config.NumberOfLevels, h.Config.EntriesPerPage)
+		h.LlenarTablaConValores(tabla, framesLibres)
 
-	h.LlenarTablaConValores(tabla, FramesLibres)
+		h.Log.Debug("AsignarMemoriaDeUsuario",
+			log.AnyAttr("tabla", tabla))
 
-	h.Log.Debug("AsignarMemoriaDeUsuario",
-		log.AnyAttr("tabla", tabla))
-
-	var tablaProceso *TablasProceso
-
-	if esActualizacion {
-		for _, tp := range h.TablasProcesos {
-			if tp.PID == pid {
-				tp.TablasDePaginas = tabla
+		if esActualizacion {
+			for _, tp := range h.TablasProcesos {
+				if tp.PID == pid {
+					tp.TablasDePaginas = tabla
+				}
 			}
+		} else {
+			tablaProceso := &TablasProceso{
+				PID:             pid,
+				Tamanio:         paginasAOcupar * h.Config.PageSize,
+				TablasDePaginas: tabla,
+			}
+			//VER ESTO!! PUEDE QUE TENGA QUE IR AFUERA
+			h.TablasProcesos = append(h.TablasProcesos, tablaProceso)
 		}
 	} else {
-		tablaProceso = &TablasProceso{
-			PID:             pid,
-			Tamanio:         paginasAOcupar * h.Config.MemorySize,
-			TablasDePaginas: tabla,
+		tablaProceso := &TablasProceso{
+			PID:     pid,
+			Tamanio: paginasAOcupar * h.Config.PageSize,
 		}
-		//VER ESTO!! PUEDE QUE TENGA QUE IR AFUERA
 		h.TablasProcesos = append(h.TablasProcesos, tablaProceso)
 	}
 
@@ -132,8 +147,7 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 
 	//Log obligatorio: Creación de Proceso
 	//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
-	h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.MemorySize))
-
+	h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
 }
 
 func (h *Handler) escribirMarcoEnSwap(archivo *os.File, marco int) error {
@@ -805,8 +819,17 @@ func (h *Handler) EscribirPagina(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	copy(h.EspacioDeUsuario[((escritura.Frame*h.Config.PageSize)+escritura.Offset):((escritura.Frame*h.Config.PageSize)+escritura.Offset)+len(escritura.ValorAEscribir)],
-		escritura.ValorAEscribir)
+	dl := escritura.Frame*h.Config.PageSize + escritura.Offset
+
+	if dl < 0 || dl >= len(h.EspacioDeUsuario) {
+		h.Log.ErrorContext(ctx, "Error de escritura fuera de límites",
+			log.IntAttr("direccion_logica", dl),
+			log.IntAttr("tamanio_espacio_usuario", len(h.EspacioDeUsuario)))
+		http.Error(w, "error de escritura fuera de límites", http.StatusBadRequest)
+		return
+	}
+
+	copy(h.EspacioDeUsuario[dl:dl+len(escritura.ValorAEscribir)], escritura.ValorAEscribir)
 
 	h.Log.Debug("EscribirPagina",
 		log.AnyAttr("lecturaMemoria", h.EspacioDeUsuario))
