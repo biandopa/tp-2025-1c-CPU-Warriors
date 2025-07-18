@@ -23,6 +23,7 @@ type MMU struct {
 	TLBMutex       *sync.RWMutex
 	CacheMutex     *sync.RWMutex
 	Memoria        *memoria.Memoria
+	Retardo        time.Duration // Retardo para operaciones de caché
 }
 
 // TLB representa la Translation Lookaside Buffer
@@ -60,7 +61,8 @@ type CacheEntry struct {
 }
 
 // NewMMU crea una nueva instancia de MMU
-func NewMMU(tlbEntries, cacheEntries int, tlbAlgoritmo, cacheAlgoritmo string, logger *slog.Logger, memoria *memoria.Memoria) *MMU {
+func NewMMU(tlbEntries, cacheEntries int, tlbAlgoritmo, cacheAlgoritmo string, logger *slog.Logger,
+	memoria *memoria.Memoria, retardoCache time.Duration) *MMU {
 	// Consultar a memoria la cantidad de entradas y el tamaño de página
 	info, err := memoria.ConsultarPageSize()
 	if err != nil {
@@ -89,6 +91,7 @@ func NewMMU(tlbEntries, cacheEntries int, tlbAlgoritmo, cacheAlgoritmo string, l
 		CantEntriesMem: info.Entries,
 		NumberOfLevels: info.NumberOfLevels,
 		Memoria:        memoria,
+		Retardo:        retardoCache,
 	}
 }
 
@@ -178,6 +181,8 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 // LeerConCache realiza una operación de lectura usando la caché si está habilitada.
 // Retorna el dato leído, la dirección física traducida y el número de página.
 func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, string, error) {
+	time.Sleep(m.Retardo) // Simular retardo de caché
+
 	// Traducir dirección lógica a física para obtener el número de página
 	dirFisica, err := m.TraducirDireccion(pid, dirLogica)
 	if err != nil {
@@ -262,6 +267,8 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 // EscribirConCache realiza una operación de escritura usando la caché si está habilitada.
 // Retorna la dirección física traducida y un error si ocurre.
 func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error) {
+	time.Sleep(m.Retardo) // Simular retardo de caché
+
 	// Traducir dirección lógica a física para obtener el número de página
 	dirFisica, err := m.TraducirDireccion(pid, dirLogica)
 	if err != nil {
@@ -524,11 +531,6 @@ func (m *MMU) evictCacheClock() {
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
 
-			m.Log.Info("Entrada de caché evictada exitosamente",
-				log.StringAttr("entradas_por_nivel", entry.PageID),
-				log.IntAttr("pid", entry.PID),
-				log.StringAttr("data", entry.Data),
-			)
 			return
 		}
 		entry.Reference = false // Limpiar reference bit
@@ -557,11 +559,6 @@ func (m *MMU) evictCacheClock() {
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
-			m.Log.Info("Entrada de caché evictada exitosamente",
-				log.StringAttr("entradas_por_nivel", entry.PageID),
-				log.IntAttr("pid", entry.PID),
-				log.StringAttr("data", entry.Data),
-			)
 			return
 		}
 	}
@@ -599,11 +596,6 @@ func (m *MMU) evictCacheClockM() {
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
-			m.Log.Info("Entrada de caché evictada exitosamente",
-				log.StringAttr("entradas_por_nivel", entry.PageID),
-				log.IntAttr("pid", entry.PID),
-				log.StringAttr("data", entry.Data),
-			)
 			return
 		}
 	}
@@ -631,11 +623,6 @@ func (m *MMU) evictCacheClockM() {
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
-			m.Log.Info("Entrada de caché evictada exitosamente",
-				log.StringAttr("entradas_por_nivel", entry.PageID),
-				log.IntAttr("pid", entry.PID),
-				log.StringAttr("data", entry.Data),
-			)
 			return
 		}
 		entry.Reference = false // Limpiar reference bit
@@ -664,11 +651,6 @@ func (m *MMU) evictCacheClockM() {
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
-			m.Log.Info("Entrada de caché evictada exitosamente",
-				log.StringAttr("entradas_por_nivel", entry.PageID),
-				log.IntAttr("pid", entry.PID),
-				log.StringAttr("data", entry.Data),
-			)
 			return
 		}
 	}

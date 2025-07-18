@@ -46,7 +46,8 @@ func NewHandler(configFile string) *Handler {
 		Log:    logger,
 		Service: internal.NewService(logger, configStruct.IpKernel, configStruct.PortKernel,
 			configStruct.TlbEntries, configStruct.CacheEntries,
-			configStruct.TlbReplacement, configStruct.CacheReplacement, mem),
+			configStruct.TlbReplacement, configStruct.CacheReplacement, mem,
+			configStruct.CacheDelay*time.Millisecond),
 		Memoria:    mem,
 		HttpClient: httpClient,
 	}
