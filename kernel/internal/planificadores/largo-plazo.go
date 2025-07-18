@@ -421,9 +421,6 @@ func (p *Service) FinalizarProcesoEnCualquierCola(pid int) {
 		log.AnyAttr("metricas_tiempo", proceso.PCB.MetricasTiempo),
 	)
 
-	// 4. Liberar PCB
-	proceso.PCB = nil
-
-	// 5. Checkear si hay procesos suspendidos que puedan volver a memoria
+	// 4. Checkear si hay procesos suspendidos que puedan volver a memoria
 	p.CheckearEspacioEnMemoria()
 }

@@ -78,14 +78,16 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 					)
 
 					newPC, _ := cpuElegida.DispatchProcess()
-					proceso.PCB.PC = newPC
+					if proceso != nil && proceso.PCB != nil {
+						proceso.PCB.PC = newPC
+					}
 
 					// Liberar CPU usando semáforo
 					p.LiberarCPU(cpuElegida)
 
 					p.Log.Debug("Proceso completado en CPU",
 						log.StringAttr("cpu_id", cpuElegida.ID),
-						log.IntAttr("pid", proceso.PCB.PID),
+						//log.IntAttr("pid", proceso.PCB.PID),
 						log.IntAttr("pc_final", newPC),
 					)
 
