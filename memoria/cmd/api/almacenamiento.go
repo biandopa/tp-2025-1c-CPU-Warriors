@@ -63,7 +63,7 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 	var paginasLibres = h.ContarLibres()
 
 	if 0 <= paginasLibres-paginasNecesarias {
-		h.AsignarMemoriaDeUsuario(paginasNecesarias, pid, false)
+		h.AsignarMemoriaDeUsuario(paginasNecesarias, pid)
 	} else {
 		h.Log.Error("No hay espacio disponible",
 			log.IntAttr("PaginasLibres", paginasLibres),
@@ -101,7 +101,7 @@ func (h *Handler) ContarLibres() int {
 	return libres
 }
 
-func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActualizacion bool) {
+func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 	if paginasAOcupar != 0 {
 		framesLibres := h.MarcosLibres(paginasAOcupar)
 
