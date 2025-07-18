@@ -362,7 +362,7 @@ func (m *Memoria) ConsultarPageSize() (PageConfig, error) {
 	return info, nil
 }
 
-func (m *Memoria) GuardarPagsEnMemoria(info map[int]map[string]interface{}) error {
+func (m *Memoria) GuardarPagsEnMemoria(info map[string]map[string]interface{}) error {
 	url := fmt.Sprintf("http://%s:%d/cpu/actualizar-pag-completa", m.IP, m.Puerto)
 
 	body := new(bytes.Buffer)

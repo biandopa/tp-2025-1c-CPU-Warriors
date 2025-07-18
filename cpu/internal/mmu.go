@@ -43,7 +43,7 @@ type TLBEntry struct {
 
 // Cache representa la caché de páginas
 type Cache struct {
-	Entries    map[int]*CacheEntry
+	Entries    map[string]*CacheEntry
 	MaxEntries int
 	Algorithm  string // "CLOCK" o "CLOCK-M"
 	Clock      int    // Para algoritmo CLOCK
@@ -52,7 +52,7 @@ type Cache struct {
 // CacheEntry representa una entrada en la caché
 type CacheEntry struct {
 	PID        int // PID del proceso
-	PageID     int
+	PageID     string
 	Data       string // Eso se pasa a memoria
 	LastAccess time.Time
 	Reference  bool // Para algoritmo CLOCK
@@ -77,7 +77,7 @@ func NewMMU(tlbEntries, cacheEntries int, tlbAlgoritmo, cacheAlgoritmo string, l
 			Algoritmo:  tlbAlgoritmo,
 		},
 		Cache: &Cache{
-			Entries:    make(map[int]*CacheEntry),
+			Entries:    make(map[string]*CacheEntry),
 			MaxEntries: cacheEntries,
 			Algorithm:  cacheAlgoritmo,
 			Clock:      0,
@@ -111,42 +111,7 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 
 	// Calcular entradas por nivel según paginación multinivel
 	// entrada_nivel_X = floor(nro_página / cant_entradas_tabla ^ (N - X)) % cant_entradas_tabla
-	entriesKey := ""
-	if m.CantEntriesMem > 0 && m.NumberOfLevels > 0 {
-		var entradasNivel []int
-		cantNiveles := m.NumberOfLevels
-		cantEntradasTabla := m.CantEntriesMem
-
-		for x := 1; x <= cantNiveles; x++ {
-			// Calcular entrada para el nivel X
-			potencia := 1
-			for i := 0; i < (cantNiveles - x); i++ {
-				potencia *= cantEntradasTabla
-			}
-			entradaNivel := (nroPagina / potencia) % cantEntradasTabla
-			entradasNivel = append(entradasNivel, entradaNivel)
-		}
-
-		// Split array of int into a string with commas
-		// Convertir []int a []string
-		strNumeros := make([]string, len(entradasNivel))
-		for i, num := range entradasNivel {
-			strNumeros[i] = strconv.Itoa(num)
-		}
-
-		// Unir con "-"
-		entriesKey = strings.Join(strNumeros, "-")
-
-		m.Log.Debug("Entradas por nivel calculadas",
-			log.IntAttr("pid", pid),
-			log.IntAttr("nro_pagina", nroPagina),
-			log.IntAttr("cant_niveles", cantNiveles),
-			log.IntAttr("cant_entradas_tabla", cantEntradasTabla),
-			log.AnyAttr("entradas_nivel", entradasNivel),
-		)
-	} else {
-		entriesKey = strconv.Itoa(nroPagina) // Si no hay paginación multinivel, usar el número de página directamente
-	}
+	entriesKey := m.calcularEntradasPorNivel(nroPagina)
 
 	// 1. Primero: Verificar TLB (si está habilitada)
 	if m.TLB.MaxEntries > 0 {
@@ -223,6 +188,8 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 	dirLogicaInt, _ := strconv.Atoi(dirLogica)
 	nroPagina := dirLogicaInt / m.PageSize
 
+	entriesKey := m.calcularEntradasPorNivel(nroPagina)
+
 	// Verificar si la caché está habilitada
 	if m.Cache.MaxEntries == 0 {
 		m.Log.Debug("Caché deshabilitada, accediendo directamente a memoria",
@@ -243,7 +210,7 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 
 	// Buscar en caché primero
 	m.CacheMutex.RLock()
-	cacheEntry, exists := m.Cache.Entries[nroPagina]
+	cacheEntry, exists := m.Cache.Entries[entriesKey]
 	m.CacheMutex.RUnlock()
 
 	if exists {
@@ -273,7 +240,7 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 	}
 
 	// Agregar a caché
-	m.agregarACache(pid, nroPagina, datos)
+	m.agregarACache(pid, entriesKey, datos)
 
 	// Log obligatorio: Página ingresada en Caché
 	// "PID: <PID> - Cache Add - Pagina: <NUMERO_PAGINA>"
@@ -296,6 +263,8 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 	nroPagina := dirLogicaInt / m.PageSize
 	nroPaginaStr := strconv.Itoa(nroPagina)
 
+	entriesKey := m.calcularEntradasPorNivel(nroPagina)
+
 	// Verificar si la caché está habilitada
 	if m.Cache.MaxEntries == 0 {
 		m.Log.Debug("Caché deshabilitada, escribiendo directamente a memoria",
@@ -312,7 +281,7 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 
 	// Buscar en caché primero
 	m.CacheMutex.Lock()
-	cacheEntry, exists := m.Cache.Entries[nroPagina]
+	cacheEntry, exists := m.Cache.Entries[entriesKey]
 
 	if exists {
 		// Log obligatorio: Página encontrada en Caché
@@ -333,10 +302,15 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 	// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %s", pid, nroPaginaStr))
 
+	// Verificar si necesitamos hacer evicción ANTES de añadir
+	if len(m.Cache.Entries) >= m.Cache.MaxEntries {
+		m.evictCacheEntry()
+	}
+
 	// Cache miss - agregar nueva entrada
-	m.Cache.Entries[nroPagina] = &CacheEntry{
+	m.Cache.Entries[entriesKey] = &CacheEntry{
 		PID:        pid,
-		PageID:     nroPagina,
+		PageID:     entriesKey,
 		Data:       datos,
 		LastAccess: time.Now(),
 		Reference:  true,
@@ -348,11 +322,6 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 	// "PID: <PID> - Cache Add - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Add - Pagina: %s", pid, nroPaginaStr))
 
-	// Verificar si necesitamos hacer evicción
-	if len(m.Cache.Entries) > m.Cache.MaxEntries {
-		m.evictCacheEntry()
-	}
-
 	return dirFisica, nil
 }
 
@@ -361,7 +330,7 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 	m.Log.Debug("Limpiando memoria del proceso",
 		log.IntAttr("pid", pid))
 
-	dataToSave := map[int]map[string]interface{}{}
+	dataToSave := map[string]map[string]interface{}{}
 	// Limpiar TLB - eliminar todas las entradas del proceso
 	m.TLBMutex.Lock()
 	for key, entry := range m.TLB.Entries {
@@ -379,7 +348,7 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 		// Limpiamos toda la caché
 		if entry.Modified {
 			m.Log.Debug("Escribiendo página modificada a memoria antes de limpiar",
-				log.IntAttr("page_id", entry.PageID))
+				log.StringAttr("page_id", entry.PageID))
 			dataToSave[entry.PageID] = map[string]interface{}{
 				"pid":  strconv.Itoa(entry.PID),
 				"data": entry.Data,
@@ -387,7 +356,7 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 		}
 		delete(m.Cache.Entries, key)
 		m.Log.Debug("Entrada caché eliminada",
-			log.IntAttr("page_id", entry.PageID))
+			log.StringAttr("page_id", entry.PageID))
 	}
 	m.CacheMutex.Unlock()
 
@@ -481,7 +450,7 @@ func (m *MMU) evictTLBLRU() {
 }
 
 // agregarACache agrega una nueva entrada a la caché
-func (m *MMU) agregarACache(pid, pageID int, data string) {
+func (m *MMU) agregarACache(pid int, entriesXPage, data string) {
 	m.CacheMutex.Lock()
 	defer m.CacheMutex.Unlock()
 
@@ -491,9 +460,9 @@ func (m *MMU) agregarACache(pid, pageID int, data string) {
 	}
 
 	// Agregar nueva entrada
-	m.Cache.Entries[pageID] = &CacheEntry{
+	m.Cache.Entries[entriesXPage] = &CacheEntry{
 		PID:        pid,
-		PageID:     pageID,
+		PageID:     entriesXPage,
 		Data:       data,
 		LastAccess: time.Now(),
 		Reference:  true,
@@ -502,7 +471,7 @@ func (m *MMU) agregarACache(pid, pageID int, data string) {
 
 	m.Log.Debug("Nueva entrada agregada a caché",
 		log.IntAttr("pid", pid),
-		log.IntAttr("page_id", pageID))
+		log.StringAttr("page_id", entriesXPage))
 }
 
 // evictCacheEntry remueve una entrada de la caché según el algoritmo configurado
@@ -517,12 +486,12 @@ func (m *MMU) evictCacheEntry() {
 
 // evictCacheClock implementa el algoritmo CLOCK para caché
 func (m *MMU) evictCacheClock() {
-	keys := make([]int, 0, len(m.Cache.Entries))
+	keys := make([]string, 0, len(m.Cache.Entries))
 	for key := range m.Cache.Entries {
 		keys = append(keys, key)
 	}
 
-	dataAAlmacenar := map[int]map[string]interface{}{}
+	dataAAlmacenar := map[string]map[string]interface{}{}
 	if len(keys) > 0 {
 		// Buscar una página con reference bit = false
 		for _, key := range keys {
@@ -535,7 +504,14 @@ func (m *MMU) evictCacheClock() {
 				}
 				delete(m.Cache.Entries, key)
 				m.Log.Debug("Entrada caché evictada (CLOCK)",
-					log.IntAttr("page_id", key))
+					log.StringAttr("page_id", key))
+
+				// Enviar información a memoria y salir
+				if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
+					m.Log.Error("Error al guardar páginas en memoria",
+						log.ErrAttr(err),
+					)
+				}
 				return
 			}
 			entry.Reference = false // Limpiar reference bit
@@ -551,27 +527,26 @@ func (m *MMU) evictCacheClock() {
 			}
 			delete(m.Cache.Entries, firstKey)
 			m.Log.Debug("Entrada caché evictada (CLOCK - segunda pasada)",
-				log.IntAttr("page_id", firstKey))
+				log.StringAttr("page_id", firstKey))
+
+			// Enviar información a memoria
+			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
+				m.Log.Error("Error al guardar páginas en memoria",
+					log.ErrAttr(err),
+				)
+			}
 		}
 	}
-	// Enviar información a memoria
-	go func() {
-		if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
-			m.Log.Error("Error al guardar páginas en memoria",
-				log.ErrAttr(err),
-			)
-		}
-	}()
 }
 
 // evictCacheClockM implementa el algoritmo CLOCK modificado para caché
 func (m *MMU) evictCacheClockM() {
-	keys := make([]int, 0, len(m.Cache.Entries))
+	keys := make([]string, 0, len(m.Cache.Entries))
 	for key := range m.Cache.Entries {
 		keys = append(keys, key)
 	}
 
-	dataAAlmacenar := map[int]map[string]interface{}{}
+	dataAAlmacenar := map[string]map[string]interface{}{}
 	if len(keys) > 0 {
 		// Priorizar páginas no modificadas y no referenciadas
 		for _, key := range keys {
@@ -584,7 +559,14 @@ func (m *MMU) evictCacheClockM() {
 				}
 				delete(m.Cache.Entries, key)
 				m.Log.Debug("Entrada caché evictada (CLOCK-M)",
-					log.IntAttr("page_id", key))
+					log.StringAttr("page_id", key))
+
+				// Enviar información a memoria y salir
+				if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
+					m.Log.Error("Error al guardar páginas en memoria",
+						log.ErrAttr(err),
+					)
+				}
 				return
 			}
 		}
@@ -599,16 +581,54 @@ func (m *MMU) evictCacheClockM() {
 			}
 			delete(m.Cache.Entries, firstKey)
 			m.Log.Debug("Entrada caché evictada (CLOCK-M - fallback)",
-				log.IntAttr("page_id", firstKey))
+				log.StringAttr("page_id", firstKey))
+
+			// Enviar información a memoria
+			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
+				m.Log.Error("Error al guardar páginas en memoria",
+					log.ErrAttr(err),
+				)
+			}
 		}
 	}
+}
 
-	// Enviar información a memoria
-	go func() {
-		if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
-			m.Log.Error("Error al guardar páginas en memoria",
-				log.ErrAttr(err),
-			)
+func (m *MMU) calcularEntradasPorNivel(nroPagina int) string {
+	entriesKey := ""
+	if m.CantEntriesMem > 0 && m.NumberOfLevels > 0 {
+		var entradasNivel []int
+		cantNiveles := m.NumberOfLevels
+		cantEntradasTabla := m.CantEntriesMem
+
+		for x := 1; x <= cantNiveles; x++ {
+			// Calcular entrada para el nivel X
+			potencia := 1
+			for i := 0; i < (cantNiveles - x); i++ {
+				potencia *= cantEntradasTabla
+			}
+			entradaNivel := (nroPagina / potencia) % cantEntradasTabla
+			entradasNivel = append(entradasNivel, entradaNivel)
 		}
-	}()
+
+		// Split array of int into a string with commas
+		// Convertir []int a []string
+		strNumeros := make([]string, len(entradasNivel))
+		for i, num := range entradasNivel {
+			strNumeros[i] = strconv.Itoa(num)
+		}
+
+		// Unir con "-"
+		entriesKey = strings.Join(strNumeros, "-")
+
+		m.Log.Debug("Entradas por nivel calculadas",
+			log.IntAttr("nro_pagina", nroPagina),
+			log.IntAttr("cant_niveles", cantNiveles),
+			log.IntAttr("cant_entradas_tabla", cantEntradasTabla),
+			log.AnyAttr("entradas_nivel", entradasNivel),
+		)
+	} else {
+		entriesKey = strconv.Itoa(nroPagina) // Si no hay paginación multinivel, usar el número de página directamente
+	}
+
+	return entriesKey
 }
