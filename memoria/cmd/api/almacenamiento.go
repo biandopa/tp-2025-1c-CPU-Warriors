@@ -351,7 +351,7 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 		h.ProcesoPorPosicionSwap = append(h.ProcesoPorPosicionSwap, pidInt)
 	}
 
-	for marco := range marcosDelProceso {
+	for _, marco := range marcosDelProceso {
 		err = h.escribirMarcoEnSwap(archivoSwap, marco)
 		if err != nil {
 			panic(err)
@@ -551,11 +551,6 @@ func (h *Handler) DumpProceso(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Log.Debug("Dump del proceso creado exitosamente",
-		log.StringAttr("pid", pid),
-		log.StringAttr("dump_path", h.Config.DumpPath),
-	)
-
 	// Enviamos una respuesta exitosa
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("Dump del proceso creado exitosamente"))
@@ -656,11 +651,6 @@ func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) error {
 			return fmt.Errorf("error escribiendo el dump asociado al marco %d: %w", marco, err)
 		}
 	}
-
-	h.Log.Info("Dump del proceso creado exitosamente",
-		log.StringAttr("pid", pid),
-		log.StringAttr("archivo", fullPath),
-		log.IntAttr("marcos_procesados", len(marcosDelProceso)))
 
 	return nil
 }

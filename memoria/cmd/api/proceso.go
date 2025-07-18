@@ -66,16 +66,9 @@ func (h *Handler) finalizarProcesoFuncionAuxiliar(pid string) {
 			copy(h.EspacioDeUsuario[marco*h.Config.PageSize:(marco+1)*h.Config.PageSize], make([]byte, h.Config.PageSize))
 		}
 
-		// Actualizar el espacio de usuario con los marcos libres
-		h.Log.Info("Liberando marcos de memoria",
-			log.AnyAttr("marcos_del_proceso", marcosDelProceso),
-		)
 		for _, marco := range marcosDelProceso {
 			h.FrameTable[marco] = false // Marcar el marco como libre
 		}
-		h.Log.Info("Marcos liberados correctamente",
-			log.AnyAttr("frame_table", h.FrameTable),
-		)
 
 	}
 
