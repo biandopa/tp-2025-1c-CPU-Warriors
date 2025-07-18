@@ -166,7 +166,7 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 
 	// Agregar entrada a TLB si está habilitada
 	if m.TLB.MaxEntries > 0 {
-		m.agregarATLB(nroPagina, frame)
+		m.agregarATLB(entriesKey, nroPagina, frame)
 	}
 
 	// Calcular dirección física
@@ -374,7 +374,7 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 }
 
 // agregarATLB agrega una nueva entrada a la TLB
-func (m *MMU) agregarATLB(nroPagina, marco int) {
+func (m *MMU) agregarATLB(entriesKey string, page, marco int) {
 	m.TLBMutex.Lock()
 	defer m.TLBMutex.Unlock()
 
@@ -384,8 +384,8 @@ func (m *MMU) agregarATLB(nroPagina, marco int) {
 	}
 
 	// Agregar nueva entrada
-	m.TLB.Entries[strconv.Itoa(nroPagina)] = &TLBEntry{
-		Page:            nroPagina,
+	m.TLB.Entries[entriesKey] = &TLBEntry{
+		Page:            page,
 		Frame:           marco,
 		UltimoAcceso:    time.Now(),
 		TiempoCreacion:  time.Now(),
@@ -393,7 +393,7 @@ func (m *MMU) agregarATLB(nroPagina, marco int) {
 	}
 
 	m.Log.Debug("Nueva entrada agregada a TLB",
-		log.IntAttr("pagina", nroPagina),
+		log.IntAttr("pagina", page),
 		log.IntAttr("marco", marco))
 }
 
@@ -551,7 +551,31 @@ func (m *MMU) evictCacheClockM() {
 		// Priorizar páginas no modificadas y no referenciadas
 		for _, key := range keys {
 			entry := m.Cache.Entries[key]
-			if !entry.Reference && !entry.Modified {
+			if !entry.Reference && !entry.Modified { // uso = 0 y modificado = 0
+				// Se agrega la data a almacenar
+				dataAAlmacenar[key] = map[string]interface{}{
+					"pid":  strconv.Itoa(entry.PID),
+					"data": entry.Data,
+				}
+				delete(m.Cache.Entries, key)
+				m.Log.Debug("Entrada caché evictada (CLOCK-M)",
+					log.StringAttr("page_id", key))
+
+				// Enviar información a memoria y salir
+				if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
+					m.Log.Error("Error al guardar páginas en memoria",
+						log.ErrAttr(err),
+					)
+				}
+				return
+			}
+			entry.Reference = false // Limpiar reference bit
+		}
+
+		// Si no hay páginas ideales, buscar páginas modificadas y no referenciadas
+		for _, key := range keys {
+			entry := m.Cache.Entries[key]
+			if !entry.Reference { // uso = 0 y modificado = 1
 				// Se agrega la data a almacenar
 				dataAAlmacenar[key] = map[string]interface{}{
 					"pid":  strconv.Itoa(entry.PID),
