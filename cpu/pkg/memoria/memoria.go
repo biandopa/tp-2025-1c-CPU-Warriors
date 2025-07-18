@@ -290,9 +290,9 @@ func (m *Memoria) FetchInstruccion(pid int, pc int) (Instruccion, error) {
 	return instruccion, nil
 }
 
-func (m *Memoria) BuscarFrame(pagina, pid int) (DirInfoResponse, error) {
-	url := fmt.Sprintf("http://%s:%d/cpu/pagina-a-frame?pid=%d&pagina=%d",
-		m.IP, m.Puerto, pid, pagina)
+func (m *Memoria) BuscarFrame(pid int, entradasPorNivel string) (DirInfoResponse, error) {
+	url := fmt.Sprintf("http://%s:%d/cpu/pagina-a-frame?pid=%d&entradas-nivel=%s",
+		m.IP, m.Puerto, pid, entradasPorNivel)
 
 	resp, err := http.Get(url)
 	if err != nil {

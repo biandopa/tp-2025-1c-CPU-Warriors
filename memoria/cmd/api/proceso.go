@@ -51,8 +51,7 @@ func (h *Handler) finalizarProcesoFuncionAuxiliar(pid string) {
 
 	if h.ContienePIDEnSwap(pidInt) {
 		//compactar la posicion en swap y borrarlo en la lista de procesos
-		h.eliminarOcurrencias(pidInt)
-		if err := h.CompactarSwap(); err != nil {
+		if err := h.CompactarSwap(pid); err != nil {
 			h.Log.Error("Error al compactar swap", log.ErrAttr(err))
 		}
 
@@ -63,8 +62,8 @@ func (h *Handler) finalizarProcesoFuncionAuxiliar(pid string) {
 
 		marcosDelProceso := h.ObtenerMarcosDeLaTabla(procesYTablaAsociada.TablasDePaginas)
 
-		for marco := range marcosDelProceso {
-			copy(h.EspacioDeUsuario[marco*h.Config.PageSize:((marco+1)*h.Config.PageSize-1)], make([]byte, h.Config.PageSize))
+		for _, marco := range marcosDelProceso {
+			copy(h.EspacioDeUsuario[marco*h.Config.PageSize:(marco+1)*h.Config.PageSize], make([]byte, h.Config.PageSize))
 		}
 
 		// Actualizar el espacio de usuario con los marcos libres

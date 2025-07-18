@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,7 +27,7 @@ type MMU struct {
 
 // TLB representa la Translation Lookaside Buffer
 type TLB struct {
-	Entries    map[int]*TLBEntry
+	Entries    map[string]*TLBEntry
 	MaxEntries int
 	Algoritmo  string // "FIFO" o "LRU"
 }
@@ -71,7 +72,7 @@ func NewMMU(tlbEntries, cacheEntries int, tlbAlgoritmo, cacheAlgoritmo string, l
 
 	return &MMU{
 		TLB: &TLB{
-			Entries:    make(map[int]*TLBEntry),
+			Entries:    make(map[string]*TLBEntry),
 			MaxEntries: tlbEntries,
 			Algoritmo:  tlbAlgoritmo,
 		},
@@ -110,8 +111,9 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 
 	// Calcular entradas por nivel según paginación multinivel
 	// entrada_nivel_X = floor(nro_página / cant_entradas_tabla ^ (N - X)) % cant_entradas_tabla
-	var entradasNivel []int
+	entriesKey := ""
 	if m.CantEntriesMem > 0 && m.NumberOfLevels > 0 {
+		var entradasNivel []int
 		cantNiveles := m.NumberOfLevels
 		cantEntradasTabla := m.CantEntriesMem
 
@@ -125,6 +127,16 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 			entradasNivel = append(entradasNivel, entradaNivel)
 		}
 
+		// Split array of int into a string with commas
+		// Convertir []int a []string
+		strNumeros := make([]string, len(entradasNivel))
+		for i, num := range entradasNivel {
+			strNumeros[i] = strconv.Itoa(num)
+		}
+
+		// Unir con "-"
+		entriesKey = strings.Join(strNumeros, "-")
+
 		m.Log.Debug("Entradas por nivel calculadas",
 			log.IntAttr("pid", pid),
 			log.IntAttr("nro_pagina", nroPagina),
@@ -132,12 +144,14 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 			log.IntAttr("cant_entradas_tabla", cantEntradasTabla),
 			log.AnyAttr("entradas_nivel", entradasNivel),
 		)
+	} else {
+		entriesKey = strconv.Itoa(nroPagina) // Si no hay paginación multinivel, usar el número de página directamente
 	}
 
 	// 1. Primero: Verificar TLB (si está habilitada)
 	if m.TLB.MaxEntries > 0 {
 		m.TLBMutex.RLock()
-		tlbEntry, exists := m.TLB.Entries[nroPagina]
+		tlbEntry, exists := m.TLB.Entries[entriesKey]
 		m.TLBMutex.RUnlock()
 
 		if exists {
@@ -171,7 +185,7 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 	)
 
 	// Obtención de marco de tabla de páginas
-	response, err := m.Memoria.BuscarFrame(nroPagina, pid)
+	response, err := m.Memoria.BuscarFrame(pid, entriesKey)
 	if err != nil {
 		m.Log.Error("Error al buscar marco en tabla de páginas",
 			log.ErrAttr(err),
@@ -342,7 +356,6 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 	return dirFisica, nil
 }
 
-// TODO: Agregar escritura en memoria de lo almacenado en caché (Usar lo de página completa)
 // LimpiarMemoriaProceso limpia TLB y caché cuando un proceso termina o es desalojado
 func (m *MMU) LimpiarMemoriaProceso(pid int) {
 	m.Log.Debug("Limpiando memoria del proceso",
@@ -355,7 +368,7 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 		// Limpiamos toda la TLB
 		delete(m.TLB.Entries, key)
 		m.Log.Debug("Entrada TLB eliminada",
-			log.IntAttr("key", key),
+			log.StringAttr("key", key),
 			log.IntAttr("frame", entry.Frame))
 	}
 	m.TLBMutex.Unlock()
@@ -402,7 +415,7 @@ func (m *MMU) agregarATLB(nroPagina, marco int) {
 	}
 
 	// Agregar nueva entrada
-	m.TLB.Entries[nroPagina] = &TLBEntry{
+	m.TLB.Entries[strconv.Itoa(nroPagina)] = &TLBEntry{
 		Page:            nroPagina,
 		Frame:           marco,
 		UltimoAcceso:    time.Now(),
@@ -428,7 +441,7 @@ func (m *MMU) evictTLBEntry() {
 // evictTLBFIFO implementa el algoritmo FIFO para TLB
 func (m *MMU) evictTLBFIFO() {
 	var (
-		oldestKey  int
+		oldestKey  string
 		oldestTime = time.Now()
 	)
 
@@ -439,17 +452,17 @@ func (m *MMU) evictTLBFIFO() {
 		}
 	}
 
-	if oldestKey >= 0 {
+	if oldestKey != "" {
 		delete(m.TLB.Entries, oldestKey)
 		m.Log.Debug("Entrada TLB evictada (FIFO)",
-			log.IntAttr("key", oldestKey))
+			log.StringAttr("key", oldestKey))
 	}
 }
 
 // evictTLBLRU implementa el algoritmo LRU para TLB
 func (m *MMU) evictTLBLRU() {
 	var (
-		lruKey  int
+		lruKey  string
 		lruTime = time.Now()
 	)
 
@@ -460,10 +473,10 @@ func (m *MMU) evictTLBLRU() {
 		}
 	}
 
-	if lruKey >= 0 {
+	if lruKey != "" {
 		delete(m.TLB.Entries, lruKey)
 		m.Log.Debug("Entrada TLB evictada (LRU)",
-			log.IntAttr("key", lruKey))
+			log.StringAttr("key", lruKey))
 	}
 }
 

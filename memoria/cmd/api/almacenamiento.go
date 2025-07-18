@@ -127,8 +127,7 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 					tp.TablasDePaginas = tabla
 				}
 			}
-			h.eliminarOcurrencias(pidInt)
-			//h.SacarProcesoDeSwap(pid)
+			h.SacarProcesoDeSwap(pid)
 		} else {
 			tablaProceso := &TablasProceso{
 				PID:             pid,
@@ -152,12 +151,6 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string, esActu
 	//Log obligatorio: Creación de Proceso
 	//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
 	h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
-	h.Log.Info("Espacio disponible en memoria",
-		log.IntAttr("paginas_libres", h.ContarLibres()),
-		log.IntAttr("paginas_necesarias", paginasAOcupar),
-		log.IntAttr("size_page", h.Config.PageSize),
-		log.IntAttr("tamanio_proceso", paginasAOcupar*h.Config.PageSize),
-	)
 }
 
 func (h *Handler) escribirMarcoEnSwap(archivo *os.File, marco int) error {
@@ -364,7 +357,7 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 			panic(err)
 		}
 
-		copy(h.EspacioDeUsuario[marco*h.Config.PageSize:((marco+1)*h.Config.PageSize-1)], make([]byte, h.Config.PageSize))
+		copy(h.EspacioDeUsuario[marco*h.Config.PageSize:(marco+1)*h.Config.PageSize], make([]byte, h.Config.PageSize))
 	}
 	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
 	tablaMetricas.CantidadBajadasSwap++
@@ -394,7 +387,6 @@ func (h *Handler) ObtenerMarcosDeLaTabla(tabla interface{}) []int {
 }
 
 func (h *Handler) SacarProcesoDeSwap(pid string) {
-
 	pidDeSwap, _ := strconv.Atoi(pid)
 
 	posicionEnSwap := h.PosicionesDeProcesoEnSwap(pidDeSwap)
@@ -414,12 +406,8 @@ func (h *Handler) SacarProcesoDeSwap(pid string) {
 	h.Log.Debug("SacarProcesoDeSwap",
 		log.AnyAttr("CargarPaginasEnMemoriaDesdeSwap", h.EspacioDeUsuario))
 
-	//compactar la posicion en swap y borrarlo en la lista de procesos}
-	//h.eliminarOcurrencias(pidDeSwap)
-	h.Log.Debug("SacarProcesoDeSwap",
-		log.AnyAttr("eliminarOcurrencias", h.ProcesoPorPosicionSwap))
-
-	if err := h.CompactarSwap(); err != nil {
+	// Compactar el swap eliminando el contenido del proceso
+	if err := h.CompactarSwap(pid); err != nil {
 		h.Log.Error("Error al compactar swap",
 			log.ErrAttr(err),
 		)
@@ -434,8 +422,9 @@ func (h *Handler) SacarProcesoDeSwap(pid string) {
 	//_, _ = w.Write([]byte("OK"))
 }
 
-func (h *Handler) CompactarSwap() error {
+func (h *Handler) CompactarSwap(pidAEliminar string) error {
 	pageSize := h.Config.PageSize
+	pidInt, _ := strconv.Atoi(pidAEliminar)
 
 	// Abrimos el archivo en modo lectura/escritura
 	swapFile, err := os.OpenFile(h.Config.SwapfilePath, os.O_RDWR, 0644)
@@ -449,46 +438,41 @@ func (h *Handler) CompactarSwap() error {
 	posDestino := 0
 	nuevaPosiciones := make([]int, 0)
 
-	for _, marco := range h.ProcesoPorPosicionSwap {
-		offset := marco * pageSize
-		buffer := make([]byte, pageSize)
+	// Recorremos la lista actual y solo mantenemos los que NO son del PID a eliminar
+	for i, pid := range h.ProcesoPorPosicionSwap {
+		if pid != pidInt {
+			// Este marco NO pertenece al PID a eliminar, lo conservamos
+			offset := i * pageSize
+			buffer := make([]byte, pageSize)
 
-		// Leer el marco original
-		_, err := swapFile.ReadAt(buffer, int64(offset))
-		if err != nil && err != io.EOF {
-			return fmt.Errorf("error leyendo marco %d: %w", marco, err)
+			// Leer el marco original
+			_, err := swapFile.ReadAt(buffer, int64(offset))
+			if err != nil && err != io.EOF {
+				return fmt.Errorf("error leyendo marco %d: %w", i, err)
+			}
+
+			// Escribirlo en la nueva posición compactada
+			_, err = swapFile.WriteAt(buffer, int64(posDestino))
+			if err != nil {
+				return fmt.Errorf("error escribiendo marco en pos %d: %w", posDestino/pageSize, err)
+			}
+
+			// Guardamos la nueva posición y el PID correspondiente
+			nuevaPosiciones = append(nuevaPosiciones, pid)
+			posDestino += pageSize
 		}
-
-		// Escribirlo en la nueva posición
-		_, err = swapFile.WriteAt(buffer, int64(posDestino))
-		if err != nil {
-			return fmt.Errorf("error escribiendo marco en pos %d: %w", posDestino/pageSize, err)
-		}
-
-		// Guardamos el nuevo marco (actualizado)
-		nuevaPosiciones = append(nuevaPosiciones, posDestino/pageSize)
-		posDestino += pageSize
 	}
 
-	// Truncar el archivo para eliminar los marcos vacíos al final
+	// Truncar el archivo para eliminar los marcos no utilizados al final
 	err = swapFile.Truncate(int64(posDestino))
 	if err != nil {
 		return fmt.Errorf("error truncando swap.bin: %w", err)
 	}
 
-	// Actualizar la lista con las posiciones compactadas
+	// Actualizar la lista con las posiciones compactadas (sin el PID eliminado)
 	h.ProcesoPorPosicionSwap = nuevaPosiciones
-	return nil
-}
 
-func (h *Handler) eliminarOcurrencias(pid int) {
-	listaActualizada := make([]int, 0)
-	for _, v := range h.ProcesoPorPosicionSwap {
-		if v != pid {
-			listaActualizada = append(listaActualizada, v)
-		}
-	}
-	h.ProcesoPorPosicionSwap = listaActualizada
+	return nil
 }
 
 func (h *Handler) CargarPaginasEnMemoriaDesdeSwap(posicionesSwap []int, marcosDestino []int) error {
@@ -514,10 +498,8 @@ func (h *Handler) CargarPaginasEnMemoriaDesdeSwap(posicionesSwap []int, marcosDe
 
 		_, err := archivoSwap.ReadAt(buffer, offset)
 		if err != nil {
-
-			h.Log.Debug("CargarPaginasEnMemoriaDesdeSwap",
+			h.Log.Error("Tamaño del Proceso no proporcionado",
 				log.AnyAttr("err", err))
-			h.Log.Error("Tamaño del Proceso no proporcionado")
 		}
 
 		// Copiar al EspacioDeUsuario en el marco correspondiente
@@ -705,7 +687,6 @@ func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// TODO: Checkear si está bien implementada
 	for i := 0; i < len(body); i++ {
 		cacheData := body[strconv.Itoa(i)]
 		pid := cacheData.PID
@@ -718,7 +699,7 @@ func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Reques
 		tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
 		tablaMetricas.CantidadDeEscritura++
 
-		copy(h.EspacioDeUsuario[i*h.Config.PageSize:((i+1)*h.Config.PageSize)-1], data)
+		copy(h.EspacioDeUsuario[i*h.Config.PageSize:(i+1)*h.Config.PageSize], data)
 
 		h.Log.Debug(fmt.Sprintf("## PID: %s - Actualización de página completa - Dir. Física: %d - Tamaño: %d",
 			pid, i*h.Config.PageSize, len(data)))
@@ -749,9 +730,9 @@ func (h *Handler) LeerPagina(w http.ResponseWriter, r *http.Request) {
 
 	lecturaMemoria = h.limpiarNulos(lecturaMemoria)
 	/* Log obligatorio: Escritura / lectura en espacio de usuario
-	“## PID: <PID> - <Lectura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>”*/
+	"## PID: <PID> - <Lectura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>"*/
 	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
-		lectura.PID, lecturaMemoria, lectura.Frame+lectura.Offset, lectura.Tamanio))
+		lectura.PID, lecturaMemoria, lectura.Frame*h.Config.PageSize+lectura.Offset, lectura.Tamanio))
 
 	tablaMetricas, _ := h.BuscarProcesoPorPID(lectura.PID)
 	tablaMetricas.CantidadDeLectura++
@@ -809,9 +790,9 @@ func (h *Handler) EscribirPagina(w http.ResponseWriter, r *http.Request) {
 	tablaMetricas, _ := h.BuscarProcesoPorPID(escritura.PID)
 	tablaMetricas.CantidadDeEscritura++
 	/* Log obligatorio: Escritura / lectura en espacio de usuario
-	“## PID: <PID> - <Escritura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>”*/
+	"## PID: <PID> - <Escritura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>"*/
 	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
-		escritura.PID, escritura.ValorAEscribir, escritura.Frame+escritura.Offset, len(escritura.ValorAEscribir)))
+		escritura.PID, escritura.ValorAEscribir, escritura.Frame*h.Config.PageSize+escritura.Offset, len(escritura.ValorAEscribir)))
 
 	time.Sleep(time.Duration(h.Config.MemoryDelay))
 
@@ -867,8 +848,8 @@ func (h *Handler) AccesoATabla(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 	var (
 		// Leemos el PID y la página/dirección lógica de la consulta
-		pid    = r.URL.Query().Get("pid")
-		pagina = r.URL.Query().Get("pagina")
+		pid           = r.URL.Query().Get("pid")
+		entradasNivel = r.URL.Query().Get("entradas-nivel")
 	)
 
 	if pid == "" {
@@ -877,17 +858,14 @@ func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var paginaInt int
 	var err error
 
 	// Determinar si se proporcionó página o dirección lógica
-	if pagina != "" {
-		paginaInt, err = strconv.Atoi(pagina)
-		if err != nil {
-			h.Log.Error("Página inválida", log.StringAttr("pagina", pagina))
-			http.Error(w, "página inválida", http.StatusBadRequest)
-			return
-		}
+	if entradasNivel == "" {
+		h.Log.Error("Entradas por nivel faltantes",
+			log.StringAttr("paginas", entradasNivel))
+		http.Error(w, "entradas por nivel faltantes", http.StatusBadRequest)
+		return
 	}
 
 	tablaProceso, err := h.BuscarProcesoPorPID(pid)
@@ -899,27 +877,29 @@ func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Calcular índices para tabla multinivel (igual que en ConsultarDireccionLogica)
-	nroPagina := paginaInt
-	indices := make([]int, 0)
-
-	// Calcular entrada para cada nivel de la tabla
-	for i := 0; i < h.Config.NumberOfLevels; i++ {
-		entradaNivel := (nroPagina / (h.Config.EntriesPerPage ^ (h.Config.NumberOfLevels - i - 1))) % h.Config.EntriesPerPage
-		indices = append(indices, entradaNivel)
-	}
-
 	h.Log.Debug("BuscarMarcoPorPagina - índices calculados",
 		log.StringAttr("pid", pid),
-		log.IntAttr("pagina", paginaInt),
-		log.AnyAttr("indices", indices),
 	)
+
+	var indices = make([]int, 0)
+	indicesSplit := strings.Split(entradasNivel, "-")
+	for _, indice := range indicesSplit {
+		paginaInt, err := strconv.Atoi(indice)
+		if err != nil {
+			h.Log.Error("Error al convertir entrada de nivel a entero",
+				log.ErrAttr(err),
+				log.StringAttr("entrada", indice),
+			)
+			http.Error(w, "error al convertir entrada de nivel a entero", http.StatusBadRequest)
+			return
+		}
+		indices = append(indices, paginaInt)
+	}
 
 	frame, found := buscarMarcoPorPaginaAux(tablaProceso, indices)
 	if !found {
 		h.Log.Error("Error al buscar marco por página",
 			log.StringAttr("pid", pid),
-			log.IntAttr("pagina", paginaInt),
 			log.AnyAttr("indices", indices),
 		)
 		http.Error(w, "error al buscar marco por página", http.StatusInternalServerError)
@@ -928,9 +908,7 @@ func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 
 	// Devolver respuesta en formato JSON compatible con CPU
 	response := map[string]interface{}{
-		"pagina": paginaInt,
-		"frame":  frame,
-		"offset": 0, // El offset no se calcula aquí, se hace en el CPU
+		"frame": frame,
 	}
 
 	responseBytes, _ := json.Marshal(response)
@@ -942,6 +920,7 @@ func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 func buscarMarcoPorPaginaAux(tabla *TablasProceso, indices []int) (int, bool) {
 	actual := tabla.TablasDePaginas
 	for i := 0; i < len(indices); i++ {
+		tabla.CantidadAccesosATablas++
 		switch nodo := actual.(type) {
 		case []interface{}:
 			if indices[i] < 0 || indices[i] >= len(nodo) {
@@ -956,9 +935,7 @@ func buscarMarcoPorPaginaAux(tabla *TablasProceso, indices []int) (int, bool) {
 		default:
 			return 0, false
 		}
-		tabla.CantidadAccesosATablas++
 	}
-
 	return 0, false
 }
 
@@ -1017,7 +994,7 @@ func (h *Handler) ConsultarDireccionLogica(w http.ResponseWriter, r *http.Reques
 
 	//entrada_nivel_X = floor(nro_página  / cant_entradas_tabla ^ (N - X)) % cant_entradas_tabla
 	for i := 0; i < h.Config.NumberOfLevels; i++ {
-		entradaNivel := (nroPagina / (h.Config.EntriesPerPage ^ (h.Config.NumberOfLevels - i))) % h.Config.EntriesPerPage
+		entradaNivel := (nroPagina / (pow(h.Config.EntriesPerPage, h.Config.NumberOfLevels-i))) % h.Config.EntriesPerPage
 		indices = append(indices, entradaNivel)
 	}
 
@@ -1038,7 +1015,6 @@ func (h *Handler) ConsultarDireccionLogica(w http.ResponseWriter, r *http.Reques
 	response := map[string]interface{}{
 		"pagina": nroPagina,
 		"frame":  frame,
-		"offset": dirLogicaInt % h.Config.PageSize,
 	}
 
 	responseBytes, _ := json.Marshal(response)
@@ -1059,4 +1035,16 @@ func (h *Handler) RetornarPageSizeYEntries(w http.ResponseWriter, _ *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(responseBytes)
+}
+
+// Función auxiliar para calcular potencia entera
+func pow(base, exp int) int {
+	if exp == 0 {
+		return 1
+	}
+	result := 1
+	for i := 0; i < exp; i++ {
+		result *= base
+	}
+	return result
 }
