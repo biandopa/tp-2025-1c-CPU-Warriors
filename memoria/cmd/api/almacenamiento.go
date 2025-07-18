@@ -677,22 +677,47 @@ func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	for i := 0; i < len(body); i++ {
-		cacheData := body[strconv.Itoa(i)]
+	for entradasNivel, cacheData := range body {
 		pid := cacheData.PID
 		data := cacheData.Data
 
-		h.Log.Debug("ActualizarPaginaCompleta",
-			log.AnyAttr("pid", pid),
-			log.AnyAttr("data", data))
+		var indices = make([]int, 0)
+		indicesSplit := strings.Split(entradasNivel, "-")
+		for _, indice := range indicesSplit {
+			paginaInt, err := strconv.Atoi(indice)
+			if err != nil {
+				h.Log.Error("Error al convertir entrada de nivel a entero",
+					log.ErrAttr(err),
+					log.StringAttr("entrada", indice),
+				)
+				http.Error(w, "error al convertir entrada de nivel a entero", http.StatusBadRequest)
+				return
+			}
+			indices = append(indices, paginaInt)
+		}
 
-		tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
+		tablaMetricas, err := h.BuscarProcesoPorPID(pid)
+		if err != nil {
+			h.Log.Error("Error al buscar proceso por PID",
+				log.StringAttr("pid", pid),
+				log.ErrAttr(err))
+			http.Error(w, "proceso no encontrado", http.StatusNotFound)
+			return
+		}
 		tablaMetricas.CantidadDeEscritura++
 
-		copy(h.EspacioDeUsuario[i*h.Config.PageSize:(i+1)*h.Config.PageSize], data)
+		frame, found := buscarMarcoPorPaginaAux(tablaMetricas, indices)
+		if !found {
+			h.Log.Error("Marco no encontrado para la página",
+				log.AnyAttr("indices", indices),
+				log.StringAttr("pid", pid))
+			http.Error(w, "marco no encontrado para la página", http.StatusNotFound)
+			return
+		}
+		copy(h.EspacioDeUsuario[frame*h.Config.PageSize:(frame+1)*h.Config.PageSize], data)
 
 		h.Log.Debug(fmt.Sprintf("## PID: %s - Actualización de página completa - Dir. Física: %d - Tamaño: %d",
-			pid, i*h.Config.PageSize, len(data)))
+			pid, frame*h.Config.PageSize, len(data)))
 	}
 
 	// Enviamos una respuesta exitosa
@@ -714,9 +739,9 @@ func (h *Handler) LeerPagina(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dl := lectura.Frame*h.Config.PageSize + lectura.Offset
 	//if tamanioALeer mayor a cero
-	lecturaMemoria := string(
-		h.EspacioDeUsuario[((lectura.Frame * h.Config.PageSize) + lectura.Offset):((lectura.Frame * h.Config.PageSize) + lectura.Offset + lectura.Tamanio + 1)])
+	lecturaMemoria := string(h.EspacioDeUsuario[dl:(dl + lectura.Tamanio)])
 
 	lecturaMemoria = h.limpiarNulos(lecturaMemoria)
 	/* Log obligatorio: Escritura / lectura en espacio de usuario
