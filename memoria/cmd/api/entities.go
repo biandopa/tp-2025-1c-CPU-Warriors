@@ -17,6 +17,7 @@ type Config struct {
 	ScriptsPath    string `json:"scripts_path"`
 }
 
+// Creo que esto no lo estamos usando
 type MetricasProceso struct {
 	AccesosTablaDePaginas    int `json:"accesos_tabla_de_paginas"`
 	InstruccionesSolicitadas int `json:"instrucciones_solicitadas"`
@@ -35,9 +36,3 @@ type Proceso struct {
 	PID int `json:"pid"`
 	PC  int `json:"pc"`
 }
-
-/*type TablasProceso struct {
-	PID             int `json:"pid"`
-	Tamanio         int `json:"tamanio_proceso"`
-	TablasDePaginas int `json:"tabla_de_paginas"`
-}*/

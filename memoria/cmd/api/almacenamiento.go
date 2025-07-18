@@ -33,7 +33,7 @@ type CacheData struct {
 	Data string `json:"data"`
 }
 
-// ConsultarEspacioEInicializar recibe una consulta sobre el espacio libre en memoria.
+// ConsultarEspacioEInicializar recibe una consulta sobre el espacio libre en memoria. (Lo recibe cuando el proceso pasa al ready ya que ahi empeiza a ocupar memoria)
 // En caso de que haya espacio, se inicializa el proceso, se responde con un mensaje de éxito y el tamaño disponible.
 // En caso contrario, se responde con un mensaje de error.
 func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Request) {
@@ -87,10 +87,12 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusOK)
 }
 
+// Redondea para arriba al dividir el (tamanio de proceso / paginas), esto es xq no le puedo asignar una pagina y media o es 1 o son 2
 func DivRedondeoArriba(numerador, denominador int) int {
 	return (numerador + denominador - 1) / denominador
 }
 
+// Cuenta cuantas paginas libres hay y las devuelve en un int la cantidad
 func (h *Handler) ContarLibres() int {
 	libres := 0
 	for _, ocupado := range h.FrameTable {
@@ -101,6 +103,9 @@ func (h *Handler) ContarLibres() int {
 	return libres
 }
 
+// Si hay espacio en ConsultarEspacioEInicializar entonces entra aca
+// Verifica si el proceso existe (Salde suspBLocked es decir de Swap) crea solo la tabla de paginas
+// Si el proceso no exisita en memoria le crea un TablasProceso, donde ademas le crea la tabla de paginas vacia y le asigna los frames
 func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 	if paginasAOcupar != 0 {
 		framesLibres := h.MarcosLibres(paginasAOcupar)
@@ -134,7 +139,6 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 				Tamanio:         paginasAOcupar * h.Config.PageSize,
 				TablasDePaginas: tabla,
 			}
-			//VER ESTO!! PUEDE QUE TENGA QUE IR AFUERA
 			h.TablasProcesos = append(h.TablasProcesos, tablaProceso)
 		}
 	} else {
@@ -153,6 +157,7 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 	h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
 }
 
+// Recibe el archivo Swap y el marco que debe pasar a Swap y lo escribe en el swap
 func (h *Handler) escribirMarcoEnSwap(archivo *os.File, marco int) error {
 	// Calculamos la posición en bytes donde va este marco en swap.bin
 	posicion := int64(marco * h.Config.PageSize)
@@ -180,6 +185,7 @@ func (h *Handler) escribirMarcoEnSwap(archivo *os.File, marco int) error {
 	return nil
 }
 
+// Busca la tablaProceso dentro de la lista de TablasProcesos por pid
 func (h *Handler) BuscarProcesoPorPID(pid string) (*TablasProceso, error) {
 	for _, proceso := range h.TablasProcesos {
 		if proceso.PID == pid {
@@ -189,6 +195,7 @@ func (h *Handler) BuscarProcesoPorPID(pid string) (*TablasProceso, error) {
 	return nil, fmt.Errorf("proceso con PID %s no encontrado", pid)
 }
 
+// Estructura en la cual guardamos las metricas y la tabla de paginas
 type TablasProceso struct {
 	PID             string      `json:"pid"`
 	Tamanio         int         `json:"tamanio_proceso"`
@@ -202,6 +209,7 @@ type TablasProceso struct {
 	CantidadDeLectura                int `json:"cantidad_de_lectura"`
 }
 
+// Le pasamos cuantas paginas necesitamos y nos devuelve una lista de cuales debemos usar
 func (h *Handler) MarcosLibres(paginasNecesarias int) []int {
 	libres := make([]int, 0)
 	for i, ocupado := range h.FrameTable {
@@ -215,6 +223,7 @@ func (h *Handler) MarcosLibres(paginasNecesarias int) []int {
 	return libres
 }
 
+// Carga las instrucciones en la memoria del sistema, tener en cuenta que esta no es limitada en cuanto a espacio
 func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx = r.Context()
@@ -300,6 +309,7 @@ func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusOK)
 }
 
+// Recibe la llamada del Kernel cuando un proceso se suspendio, y lo pasa  Swap usando PasarProcesoASwapAuxiliar
 func (h *Handler) PasarProcesoASwap(w http.ResponseWriter, r *http.Request) {
 	var (
 		// Leemos el PID
@@ -319,6 +329,10 @@ func (h *Handler) PasarProcesoASwap(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Recibe el PID, con eso utiliza BuscarProcesoPorPID para traer la tablaProceso
+// Con ObtenerMarcosDeLaTabla obtiene los marcos, libera el bitmap de  memoriaDeUsuario
+// escribirMarcoEnSwap escribe efectivamente en swap los marcos que le pasamos
+// por ultimo actualizamos las metricas
 func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 	procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
 	h.Log.Debug("PasarProcesoASwapAuxiliar",
@@ -363,6 +377,7 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 	tablaMetricas.CantidadBajadasSwap++
 }
 
+// Le pasamos la tabla de paginas y nos devuelve los marcos ocupados en esa tabla
 func (h *Handler) ObtenerMarcosDeLaTabla(tabla interface{}) []int {
 	var marcos []int
 
@@ -386,6 +401,8 @@ func (h *Handler) ObtenerMarcosDeLaTabla(tabla interface{}) []int {
 	return marcos
 }
 
+// Es llamada desde AsignarMemoriaDeUsuario si el proceso sale del bloque a ready
+// se encarga de buscar en swap ese proceso y actualizar la memoria de usuario
 func (h *Handler) SacarProcesoDeSwap(pid string) {
 	pidDeSwap, _ := strconv.Atoi(pid)
 
@@ -422,6 +439,7 @@ func (h *Handler) SacarProcesoDeSwap(pid string) {
 	//_, _ = w.Write([]byte("OK"))
 }
 
+// Se encarga de compactar tanto la swap como elk bitmap de la swap
 func (h *Handler) CompactarSwap(pidAEliminar string) error {
 	pageSize := h.Config.PageSize
 	pidInt, _ := strconv.Atoi(pidAEliminar)
@@ -475,6 +493,7 @@ func (h *Handler) CompactarSwap(pidAEliminar string) error {
 	return nil
 }
 
+// Carga las paginas desde Swap a memmoria de usuario
 func (h *Handler) CargarPaginasEnMemoriaDesdeSwap(posicionesSwap []int, marcosDestino []int) error {
 	if len(posicionesSwap) != len(marcosDestino) {
 		return fmt.Errorf("la cantidad de posiciones y marcos no coincide")
@@ -516,6 +535,7 @@ func (h *Handler) CargarPaginasEnMemoriaDesdeSwap(posicionesSwap []int, marcosDe
 	return nil
 }
 
+// Busca en el "Bitmap" del Swap y devuelve en que posciones del swap esta
 func (h *Handler) PosicionesDeProcesoEnSwap(pid int) []int {
 	posiciones := make([]int, 0)
 	for i, p := range h.ProcesoPorPosicionSwap {
@@ -526,6 +546,7 @@ func (h *Handler) PosicionesDeProcesoEnSwap(pid int) []int {
 	return posiciones
 }
 
+// Recibe la llamada del Kernel para hacer el dump, usa DumpProcesoFuncionAuxiliar
 func (h *Handler) DumpProceso(w http.ResponseWriter, r *http.Request) {
 	var (
 		// Leemos el PID
@@ -556,6 +577,7 @@ func (h *Handler) DumpProceso(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("Dump del proceso creado exitosamente"))
 }
 
+// Busca con el pid la tabla asociada para luego hacer el dump
 func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) error {
 	h.Log.Debug("DumpFuncionAuxiliar",
 		log.AnyAttr("pid", pid))
@@ -655,6 +677,7 @@ func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) error {
 	return nil
 }
 
+// Busca si el PID se encuentra en el bitmap de swap
 func (h *Handler) ContienePIDEnSwap(pid int) bool {
 	for _, valor := range h.ProcesoPorPosicionSwap {
 		if valor == pid {
@@ -664,6 +687,7 @@ func (h *Handler) ContienePIDEnSwap(pid int) bool {
 	return false
 }
 
+// Recibe la llamada de CPU para realizar la actualizacion de una pagina que se encontraba en cache
 func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Request) {
 	var (
 		body map[string]CacheData // La key es el índice de la página, el valor es un CacheData con PID y Data
@@ -725,7 +749,7 @@ func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Reques
 	_, _ = w.Write([]byte(`{Ok}`))
 }
 
-// VER EL TAMANIO A LEER XQ SI ES MAS GRANDE QUE LO QUE TENGO DEVOLVERIA CARACTERES REPRESENTANDO LA POSCION VACIA CHECKEAR
+// Recibe la instruccion READ de CPU
 func (h *Handler) LeerPagina(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx     = r.Context()
@@ -770,10 +794,12 @@ func (h *Handler) LeerPagina(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(responseBody)
 }
 
+// Limpia los espacios nules para hacer la lectura mas legible
 func (h *Handler) limpiarNulos(cadena string) string {
 	return strings.ReplaceAll(cadena, "\x00", "")
 }
 
+// Recibe la instruccion WRITE de CPU
 func (h *Handler) EscribirPagina(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx       = r.Context()
@@ -816,6 +842,7 @@ func (h *Handler) EscribirPagina(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("OK"))
 }
 
+// funcion que se encarga de crear la tabla de paginas
 func (h *Handler) CrearTabla(niveles int, entradasPorElemento int) interface{} {
 	if niveles <= 0 {
 		return nil
@@ -954,6 +981,8 @@ func buscarMarcoPorPaginaAux(tabla *TablasProceso, indices []int) (int, bool) {
 	return 0, false
 }
 
+// Llena el ultimo nivel de la tabla para que apunte a los frames que debe ocupar
+// en caso de no ocupar todos pondra en -1 los que no use
 func (h *Handler) LlenarTablaConValores(tabla interface{}, valores []int) {
 	var index int
 
@@ -982,6 +1011,7 @@ func (h *Handler) LlenarTablaConValores(tabla interface{}, valores []int) {
 	recorrer(tabla)
 }
 
+// Esta no la estamos usando ---
 func (h *Handler) ConsultarDireccionLogica(w http.ResponseWriter, r *http.Request) {
 	var (
 		// Leemos el PID y la dirección lógica de la consulta
@@ -1038,6 +1068,7 @@ func (h *Handler) ConsultarDireccionLogica(w http.ResponseWriter, r *http.Reques
 	_, _ = w.Write(responseBytes)
 }
 
+// Funcion que llama la MMU para solicitar los datos de config para luego poder hacer las traducciones
 func (h *Handler) RetornarPageSizeYEntries(w http.ResponseWriter, _ *http.Request) {
 	response := map[string]int{
 		"page_size":        h.Config.PageSize,

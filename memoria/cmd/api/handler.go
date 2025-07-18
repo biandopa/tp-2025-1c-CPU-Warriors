@@ -8,10 +8,9 @@ import (
 )
 
 type Handler struct {
-	Log              *slog.Logger
-	Config           *Config
-	EspacioDeUsuario []byte
-	//TablasDePaginas  map[int]map[int]byte // PID -> Pagina -> Frame ???
+	Log                    *slog.Logger
+	Config                 *Config
+	EspacioDeUsuario       []byte
 	MetricasProcesos       map[int]*MetricasProceso
 	Instrucciones          map[int][]Instruccion
 	FrameTable             []bool
@@ -35,10 +34,9 @@ func NewHandler(configFile string) *Handler {
 	logLevel := configStruct.LogLevel
 
 	return &Handler{
-		Config:           configStruct,
-		Log:              log.BuildLogger(logLevel),
-		EspacioDeUsuario: make([]byte, configStruct.MemorySize),
-		//TablasDePaginas:  make(map[int]map[int]byte),
+		Config:                 configStruct,
+		Log:                    log.BuildLogger(logLevel),
+		EspacioDeUsuario:       make([]byte, configStruct.MemorySize),
 		MetricasProcesos:       make(map[int]*MetricasProceso),
 		Instrucciones:          make(map[int][]Instruccion),
 		FrameTable:             make([]bool, configStruct.MemorySize/configStruct.PageSize),
