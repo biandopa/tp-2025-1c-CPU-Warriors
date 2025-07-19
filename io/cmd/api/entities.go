@@ -9,17 +9,14 @@ type Config struct {
 }
 
 type IOIdentificacion struct {
-	Nombre string `json:"nombre"`
-	IP     string `json:"ip"`
-	Puerto int    `json:"puerto"`
+	Nombre    string `json:"nombre"`
+	IP        string `json:"ip"`
+	Puerto    int    `json:"puerto"`
+	ProcesoID int    `json:"pid"`  // PID del proceso que está usando la IO
+	Cola      string `json:"cola"` // Cola a la que pertenece el proceso
 }
 
 type Usleep struct {
 	PID         int `json:"pid"`
 	TiempoSleep int `json:"tiempo_sleep"`
-}
-
-type finIO struct {
-	PID         int    `json:"pid"`
-	Dispositivo string `json:"dispositivo"`
 }

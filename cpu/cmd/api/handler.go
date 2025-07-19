@@ -2,16 +2,21 @@ package api
 
 import (
 	"log/slog"
+	"net/http"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/cpu/internal"
+	"github.com/sisoputnfrba/tp-golang/cpu/pkg/memoria"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 type Handler struct {
-	Log     *slog.Logger
-	Config  *Config
-	Service *internal.Service
+	Log        *slog.Logger
+	Config     *Config
+	Service    *internal.Service
+	Memoria    *memoria.Memoria
+	HttpClient *http.Client
 }
 
 func NewHandler(configFile string) *Handler {
@@ -30,9 +35,20 @@ func NewHandler(configFile string) *Handler {
 	logLevel := configStruct.LogLevel
 	logger := log.BuildLogger(logLevel)
 
+	mem := memoria.NewMemoria(configStruct.IpMemory, configStruct.PortMemory, logger)
+
+	httpClient := &http.Client{
+		Timeout: 2 * time.Minute,
+	}
+
 	return &Handler{
-		Config:  configStruct,
-		Log:     logger,
-		Service: internal.NewService(logger, configStruct.IpKernel, configStruct.PortKernel),
+		Config: configStruct,
+		Log:    logger,
+		Service: internal.NewService(logger, configStruct.IpKernel, configStruct.PortKernel,
+			configStruct.TlbEntries, configStruct.CacheEntries,
+			configStruct.TlbReplacement, configStruct.CacheReplacement, mem,
+			configStruct.CacheDelay*time.Millisecond),
+		Memoria:    mem,
+		HttpClient: httpClient,
 	}
 }

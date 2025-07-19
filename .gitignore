@@ -6,3 +6,6 @@
 *.xml
 *.iml
 
+# Test files
+*.bin
+*.dmp

@@ -15,5 +15,5 @@ imports:
 .PHONY: linter
 linter:
 	@echo "==> Running linter"
-	@golangci-lint run .
+	@golangci-lint run ./...
 	@echo "==> Done"

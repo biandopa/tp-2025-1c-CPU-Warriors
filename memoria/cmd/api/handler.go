@@ -2,18 +2,22 @@ package api
 
 import (
 	"log/slog"
+	"sync"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 type Handler struct {
-	Log              *slog.Logger
-	Config           *Config
-	EspacioContiguo  []byte
-	TablasDePaginas  map[int]map[int]byte // PID -> Pagina -> Frame ???
-	MetricasProcesos map[int]*MetricasProceso
-	Instrucciones    []Instruccion
+	Log                    *slog.Logger
+	Config                 *Config
+	EspacioDeUsuario       []byte
+	MetricasProcesos       map[int]*MetricasProceso
+	mutexInstrucciones     *sync.RWMutex
+	Instrucciones          map[int][]Instruccion
+	FrameTable             []bool
+	TablasProcesos         []*TablasProceso
+	ProcesoPorPosicionSwap []int
 }
 
 func NewHandler(configFile string) *Handler {
@@ -32,10 +36,14 @@ func NewHandler(configFile string) *Handler {
 	logLevel := configStruct.LogLevel
 
 	return &Handler{
-		Config:           configStruct,
-		Log:              log.BuildLogger(logLevel),
-		EspacioContiguo:  make([]byte, configStruct.MemorySize),
-		TablasDePaginas:  make(map[int]map[int]byte),
-		MetricasProcesos: make(map[int]*MetricasProceso),
+		Config:                 configStruct,
+		Log:                    log.BuildLogger(logLevel),
+		EspacioDeUsuario:       make([]byte, configStruct.MemorySize),
+		MetricasProcesos:       make(map[int]*MetricasProceso),
+		Instrucciones:          make(map[int][]Instruccion),
+		FrameTable:             make([]bool, configStruct.MemorySize/configStruct.PageSize),
+		TablasProcesos:         make([]*TablasProceso, 0),
+		ProcesoPorPosicionSwap: make([]int, 0),
+		mutexInstrucciones:     &sync.RWMutex{},
 	}
 }

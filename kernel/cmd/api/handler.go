@@ -2,16 +2,21 @@ package api
 
 import (
 	"log/slog"
+	"net/http"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/kernel/internal/planificadores"
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
+	uniqueid "github.com/sisoputnfrba/tp-golang/utils/unique-id"
 )
 
 type Handler struct {
 	Log          *slog.Logger
 	Config       *Config
 	Planificador *planificadores.Service
+	UniqueID     *uniqueid.UniqueID
+	HttpClient   *http.Client
 }
 
 func NewHandler(configFile string) *Handler {
@@ -30,11 +35,25 @@ func NewHandler(configFile string) *Handler {
 	logLevel := configStruct.LogLevel
 	logger := log.BuildLogger(logLevel)
 
+	httpClient := &http.Client{
+		Timeout: 2 * time.Minute,
+	}
+
 	return &Handler{
 		Config: configStruct,
 		Log:    logger,
 		Planificador: planificadores.NewPlanificador(
-			logger, configStruct.IpMemory, configStruct.PortMemory,
+			logger, configStruct.IpMemory,
+			configStruct.ReadyIngressAlgorithm, configStruct.SchedulerAlgorithm,
+			configStruct.PortMemory,
+			&planificadores.SjfConfig{
+				Alpha:           configStruct.Alpha,
+				InitialEstimate: configStruct.InitialEstimate,
+			},
+			configStruct.SuspensionTime,
+			httpClient,
 		),
+		UniqueID:   uniqueid.Init(),
+		HttpClient: httpClient,
 	}
 }

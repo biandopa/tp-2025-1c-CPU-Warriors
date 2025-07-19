@@ -4,19 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"strconv"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 func (h *Handler) EnviarIdentificacion(nombre string) {
-	puerto, _ := strconv.Atoi(nombre)
-
 	data := map[string]interface{}{
 		"ip":     h.Config.IpCpu,
-		"puerto": puerto, // Cambiar por el puerto real
-		"id":     nombre, // Cambiar por el ID real
+		"puerto": h.Config.PortCpu,
+		"id":     nombre,
 	}
 
 	body, err := json.Marshal(data)
@@ -28,7 +24,7 @@ func (h *Handler) EnviarIdentificacion(nombre string) {
 	}
 
 	url := fmt.Sprintf("http://%s:%d/cpu/conexion-inicial", h.Config.IpKernel, h.Config.PortKernel)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	resp, err := h.HttpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.Error("error enviando mensaje",
 			log.ErrAttr(err),
@@ -38,11 +34,11 @@ func (h *Handler) EnviarIdentificacion(nombre string) {
 	}
 
 	if resp != nil {
-		h.Log.Info("Respuesta del servidor",
+		h.Log.Debug("Respuesta del servidor",
 			log.StringAttr("status", resp.Status),
 			log.StringAttr("body", string(body)),
 		)
 	} else {
-		h.Log.Info("Respuesta del servidor: nil")
+		h.Log.Debug("Respuesta del servidor: nil")
 	}
 }

@@ -2,15 +2,18 @@ package api
 
 import (
 	"log/slog"
+	"net/http"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 type Handler struct {
-	Nombre string
-	Log    *slog.Logger
-	Config *Config
+	Nombre     string
+	Log        *slog.Logger
+	Config     *Config
+	HttpClient *http.Client
 }
 
 func NewHandler(configFile, nombre string) *Handler {
@@ -28,9 +31,14 @@ func NewHandler(configFile, nombre string) *Handler {
 	// Initialize the logger with the log level from the configuration
 	logLevel := configStruct.LogLevel
 
+	httpClient := &http.Client{
+		Timeout: 2 * time.Minute,
+	}
+
 	return &Handler{
-		Nombre: nombre,
-		Config: configStruct,
-		Log:    log.BuildLogger(logLevel),
+		Nombre:     nombre,
+		Config:     configStruct,
+		Log:        log.BuildLogger(logLevel),
+		HttpClient: httpClient,
 	}
 }
