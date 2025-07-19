@@ -266,16 +266,11 @@ func (p *Service) FinalizarProceso(pid int) {
 // FinalizarProcesoEnCualquierCola busca un proceso en todas las colas y lo finaliza
 // Esta función es útil cuando el proceso puede estar en BLOCKED, SUSP.BLOCKED, etc.
 func (p *Service) FinalizarProcesoEnCualquierCola(pid int) {
-	var proceso *internal.Proceso
-	var estadoAnterior string
-
-	p.Log.Info("Procesos en las colas antes de finalizar",
-		log.AnyAttr("ExecQueue", p.Planificador.ExecQueue),
-		log.AnyAttr("BlockQueue", p.Planificador.BlockQueue),
-		log.AnyAttr("SuspBlockQueue", p.Planificador.SuspBlockQueue),
-		log.AnyAttr("ReadyQueue", p.Planificador.ReadyQueue),
-		log.AnyAttr("SuspReadyQueue", p.Planificador.SuspReadyQueue),
+	var (
+		proceso        *internal.Proceso
+		estadoAnterior string
 	)
+
 	// 1. Buscar el proceso en todas las colas posibles
 	// Primero en EXEC (comportamiento normal)
 	for i, proc := range p.Planificador.ExecQueue {

@@ -402,6 +402,14 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 	// Actualizar la CPU con el proceso
 	// Ejecutar en goroutine para no bloquear el planificador
 	go func(cpuElegida *cpu.Cpu, procesoExec *internal.Proceso) {
+		if cpuElegida == nil || procesoExec == nil || procesoExec.PCB == nil {
+			p.Log.Error("CPU o proceso inválido al asignar a CPU",
+				log.AnyAttr("cpu", cpuElegida),
+				log.AnyAttr("proceso", procesoExec),
+			)
+			return
+		}
+
 		cpuElegida.Proceso.PID = procesoExec.PCB.PID
 		cpuElegida.Proceso.PC = procesoExec.PCB.PC
 
