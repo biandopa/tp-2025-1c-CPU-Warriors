@@ -189,22 +189,21 @@ func (p *Service) CheckearEspacioEnMemoria() {
 }
 
 func (p *Service) FinalizarProceso(pid int) {
-	// 1. Buscar el proceso en la cola de exec
-	var (
-		proceso       *internal.Proceso
-		lugarColaExec int
-	)
+	// 1. Buscar el proceso en la cola de exec (verificación inicial sin lock)
+	var proceso *internal.Proceso
 
-	for i, proc := range p.Planificador.ExecQueue {
+	// Verificación inicial para ver si el proceso existe
+	procesoEncontrado := false
+	for _, proc := range p.Planificador.ExecQueue {
 		if proc.PCB.PID == pid {
 			proceso = proc
-			lugarColaExec = i
+			procesoEncontrado = true
 			break
 		}
 	}
 
-	if proceso == nil {
-		p.Log.Error("No se encontró el proceso en la cola de exec",
+	if !procesoEncontrado {
+		p.Log.Debug("No se encontró el proceso en la cola de exec",
 			log.IntAttr("PID", pid),
 		)
 		return
@@ -220,8 +219,16 @@ func (p *Service) FinalizarProceso(pid int) {
 		return
 	}
 
-	// 3. Lo saco de la cola de exec
-	p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:lugarColaExec], p.Planificador.ExecQueue[lugarColaExec+1:]...)
+	// 3. Lo saco de la cola de exec (re-buscar con protección de mutex)
+	p.mutexExecQueue.Lock()
+	for i, proc := range p.Planificador.ExecQueue {
+		if proc.PCB.PID == pid {
+			// 3. Lo saco de la cola de exec
+			p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:i], p.Planificador.ExecQueue[i+1:]...)
+			break
+		}
+	}
+	p.mutexExecQueue.Unlock()
 
 	// 4. Cambiar el estado de la CPU
 	cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)

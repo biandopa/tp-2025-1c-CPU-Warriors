@@ -138,7 +138,7 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 			// Bloquear el proceso
 			err = h.Planificador.BloquearPorIO(syscall.PID)
 			if err != nil {
-				h.Log.Error("Error al bloquear proceso por IO",
+				h.Log.Debug("Error al bloquear proceso por IO",
 					log.ErrAttr(err),
 					log.IntAttr("pid", syscall.PID),
 				)
