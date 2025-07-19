@@ -234,13 +234,37 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		returnControl = true
 		nuevoPC++ // Avanzamos el PC para la syscall
 
-	case "IO", "DUMP_MEMORY", "EXIT":
+	case "IO", "DUMP_MEMORY":
 		syscall := &internal.ProcesoSyscall{
 			PID:         pid,
 			PC:          pc + 1, // Avanzamos el PC para la syscall
 			Instruccion: tipo,
 			Args:        args,
 		}
+
+		if err := h.Service.EnviarProcesoSyscall(syscall); err != nil {
+			h.Log.Error("Error al enviar proceso syscall", log.ErrAttr(err))
+			return false, pc // Si hay error, no avanzamos el PC
+		}
+
+		h.Log.Debug("Syscall enviada al kernel",
+			log.IntAttr("pid", pid),
+			log.StringAttr("instruccion", tipo),
+			log.IntAttr("pc_nuevo", pc+1))
+
+		// Para syscalls, retornamos false para indicar que el CPU debe devolver el control al kernel
+		returnControl = false
+		nuevoPC++ // Avanzamos el PC para la syscall
+	case "EXIT":
+		syscall := &internal.ProcesoSyscall{
+			PID:         pid,
+			PC:          pc + 1, // Avanzamos el PC para la syscall
+			Instruccion: tipo,
+			Args:        args,
+		}
+
+		// Limpiar memoria (TLB y caché) cuando el proceso termina
+		h.Service.LimpiarMemoriaProceso(pid)
 
 		if err := h.Service.EnviarProcesoSyscall(syscall); err != nil {
 			h.Log.Error("Error al enviar proceso syscall", log.ErrAttr(err))
@@ -300,9 +324,6 @@ func (h *Handler) Ciclo(proceso *Proceso) string {
 		if tipo == "EXIT" {
 			h.Log.Debug("Proceso finalizado",
 				log.IntAttr("pid", proceso.PID))
-
-			// Limpiar memoria (TLB y caché) cuando el proceso termina
-			h.Service.LimpiarMemoriaProceso(proceso.PID)
 
 			break
 		}
