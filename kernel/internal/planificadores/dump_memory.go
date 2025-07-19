@@ -43,7 +43,7 @@ func (p *Service) RealizarDumpMemory(pid int) {
 
 		} else {
 			// Si es exitoso, mover el proceso de BLOCKED a READY
-			p.Log.Info("DUMP_MEMORY exitoso - desbloqueando proceso",
+			p.Log.Debug("DUMP_MEMORY exitoso - desbloqueando proceso",
 				log.IntAttr("pid", pid),
 			)
 			if err = p.moverProcesoBlockedAReady(pid); err != nil {

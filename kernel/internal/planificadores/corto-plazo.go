@@ -285,7 +285,7 @@ func (p *Service) evaluarDesalojo(procesoNuevo *internal.Proceso) *internal.Proc
 	p.mutexExecQueue.RUnlock()
 
 	if procesoADesalojar != nil {
-		p.Log.Info("DESALOJO SRT - Proceso seleccionado para desalojo",
+		p.Log.Debug("DESALOJO SRT - Proceso seleccionado para desalojo",
 			log.IntAttr("pid_desalojado", procesoADesalojar.PCB.PID),
 			log.IntAttr("pid_nuevo", procesoNuevo.PCB.PID),
 			log.AnyAttr("rafaga_nueva", rafagaNueva),

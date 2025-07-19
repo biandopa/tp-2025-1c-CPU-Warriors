@@ -344,6 +344,8 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 		log.IntAttr("pid", pid))
 
 	dataToSave := map[string]map[string]interface{}{}
+	pags := make([]string, 0)
+
 	// Limpiar TLB - eliminar todas las entradas del proceso
 	m.TLBMutex.Lock()
 	for key, entry := range m.TLB.Entries {
@@ -369,6 +371,7 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 				"pid":  strconv.Itoa(entry.PID),
 				"data": entry.Data,
 			}
+			pags = append(pags, entry.PageID)
 		}
 		// Eliminar entrada de caché
 		m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
@@ -378,6 +381,19 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 	m.CacheMutex.Unlock()
 
 	// Enviar información a memoria
+
+	for _, pageID := range pags {
+		frame := 0
+		// Obtenemos el frame asociado a la página
+		response, _ := m.Memoria.BuscarFrame(pid, pageID)
+		frame = response.Frame
+
+		nroPag, _ := m.calcularNumeroPagina(pageID)
+
+		// Log obligatorio: Limpieza de memoria
+		m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+			pid, nroPag, frame))
+	}
 
 	if err := m.Memoria.GuardarPagsEnMemoria(dataToSave); err != nil {
 		m.Log.Error("Error al guardar páginas en memoria",
@@ -521,6 +537,17 @@ func (m *MMU) evictCacheClock() {
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
+			frame := 0
+			// Obtenemos el frame asociado a la página
+			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
+			frame = response.Frame
+
+			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
+
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+				entry.PID, nroPag, frame))
+
 			// Enviar información a memoria y salir
 			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
 				m.Log.Error("Error al guardar páginas en memoria",
@@ -549,6 +576,17 @@ func (m *MMU) evictCacheClock() {
 			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
+
+			frame := 0
+			// Obtenemos el frame asociado a la página
+			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
+			frame = response.Frame
+
+			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
+
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+				entry.PID, nroPag, frame))
 
 			// Enviar información a memoria y salir
 			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
@@ -587,6 +625,17 @@ func (m *MMU) evictCacheClockM() {
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
+			frame := 0
+			// Obtenemos el frame asociado a la página
+			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
+			frame = response.Frame
+
+			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
+
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+				entry.PID, nroPag, frame))
+
 			// Enviar información a memoria y salir
 			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
 				m.Log.Error("Error al guardar páginas en memoria",
@@ -613,6 +662,17 @@ func (m *MMU) evictCacheClockM() {
 			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
+
+			frame := 0
+			// Obtenemos el frame asociado a la página
+			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
+			frame = response.Frame
+
+			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
+
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+				entry.PID, nroPag, frame))
 
 			// Enviar información a memoria y salir
 			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
@@ -641,6 +701,17 @@ func (m *MMU) evictCacheClockM() {
 			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
+
+			frame := 0
+			// Obtenemos el frame asociado a la página
+			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
+			frame = response.Frame
+
+			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
+
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+				entry.PID, nroPag, frame))
 
 			// Enviar información a memoria y salir
 			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
@@ -694,6 +765,29 @@ func (m *MMU) calcularEntradasPorNivel(nroPagina int) string {
 	}
 
 	return entriesKey
+}
+
+func (m *MMU) calcularNumeroPagina(entradasPorNivel string) (int, error) {
+	// Dividir el string por "-"
+	entradas := strings.Split(entradasPorNivel, "-")
+
+	// Convertir cada entrada a int
+	nroPagina := 0
+	for i, entrada := range entradas {
+		numero, err := strconv.Atoi(entrada)
+		if err != nil {
+			return 0, fmt.Errorf("error al convertir entrada %s a número: %w", entrada, err)
+		}
+
+		// Calcular el desplazamiento según el nivel
+		potencia := 1
+		for j := 0; j < len(entradas)-1-i; j++ {
+			potencia *= m.CantEntriesMem
+		}
+		nroPagina += numero * potencia
+	}
+
+	return nroPagina, nil
 }
 
 func (m *MMU) reordenarCacheEntries() []*CacheEntry {
