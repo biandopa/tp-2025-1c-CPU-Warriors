@@ -357,7 +357,7 @@ func (p *Service) FinalizarProcesoEnCualquierCola(pid int) {
 	}
 
 	if proceso == nil {
-		p.Log.Error("No se encontró el proceso en ninguna cola",
+		p.Log.Debug("No se encontró el proceso en ninguna cola",
 			log.IntAttr("PID", pid),
 		)
 		return
@@ -366,7 +366,7 @@ func (p *Service) FinalizarProcesoEnCualquierCola(pid int) {
 	// 2. Notificar a Memoria
 	status, err := p.Memoria.FinalizarProceso(proceso.PCB.PID)
 	if err != nil || status != http.StatusOK {
-		p.Log.Error("Error al finalizar proceso en memoria",
+		p.Log.Debug("Error al finalizar proceso en memoria",
 			log.ErrAttr(err),
 			log.IntAttr("PID", proceso.PCB.PID),
 		)
