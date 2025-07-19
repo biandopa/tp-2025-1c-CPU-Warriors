@@ -1,17 +1,41 @@
 package log
 
 import (
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 )
 
 func BuildLogger(level string) *slog.Logger {
 	ops := &slog.HandlerOptions{
-		AddSource: true,
-		Level:     getLevelByName(level),
+		//AddSource: true,
+		Level: getLevelByName(level),
 	}
-	return slog.New(slog.NewJSONHandler(os.Stderr, ops))
+
+	output := configurarLoggerOutput()
+	logger := slog.New(slog.NewJSONHandler(output, ops))
+
+	return logger
+}
+
+func configurarLoggerOutput() io.Writer {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		panic(fmt.Sprintf("Error al obtener el directorio de trabajo: %v", err))
+	}
+
+	now := time.Now()
+	nowStr := now.Format("2006-01-02T15-04-05")
+
+	logFile, err := os.OpenFile(workingDir+"/tp-"+nowStr+".log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		panic(err)
+	}
+
+	return io.MultiWriter(os.Stdout, logFile)
 }
 
 func ErrAttr(err error) slog.Attr {

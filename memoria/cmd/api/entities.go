@@ -17,6 +17,7 @@ type Config struct {
 	ScriptsPath    string `json:"scripts_path"`
 }
 
+// Creo que esto no lo estamos usando
 type MetricasProceso struct {
 	AccesosTablaDePaginas    int `json:"accesos_tabla_de_paginas"`
 	InstruccionesSolicitadas int `json:"instrucciones_solicitadas"`

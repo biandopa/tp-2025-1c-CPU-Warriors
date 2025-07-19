@@ -10,7 +10,7 @@ import (
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
-// Recibe la conexion de la memoria (es unica)
+// ConexionInicialMemoria Recibe la conexion de la memoria (es unica)
 func (h *Handler) ConexionInicialMemoria(archivoNombre, tamanioProceso string) {
 	h.Log.Debug("Conexión Inicial",
 		log.StringAttr("archivo", archivoNombre),
@@ -27,7 +27,7 @@ func (h *Handler) ConexionInicialMemoria(archivoNombre, tamanioProceso string) {
 	}
 
 	url := fmt.Sprintf("http://%s:%d/kernel/acceso", h.Config.IpMemory, h.Config.PortMemory)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	resp, err := h.HttpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		h.Log.Error("Error enviando mensaje a memoria",
 			log.ErrAttr(err),
@@ -37,16 +37,16 @@ func (h *Handler) ConexionInicialMemoria(archivoNombre, tamanioProceso string) {
 	}
 
 	if resp != nil {
-		h.Log.Info("Respuesta del servidor",
+		h.Log.Debug("Respuesta del servidor",
 			log.StringAttr("status", resp.Status),
 			log.StringAttr("body", string(body)),
 		)
 	} else {
-		h.Log.Info("Respuesta del servidor: nil")
+		h.Log.Debug("Respuesta del servidor: nil")
 	}
 }
 
-// Recibe la lista de IOs
+// ConexionInicialIO Recibe la lista de IOs
 func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var ioInfo IOIdentificacion
@@ -65,22 +65,103 @@ func (h *Handler) ConexionInicialIO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ioInfo.Estado = true
-	ioIdentificacion = append(ioIdentificacion, ioInfo)
+	ioInfo.ProcesoID = -1 // Inicializar sin proceso asignado
 
+	ioIdentificacionMutex.Lock()
+	ioIdentificacion = append(ioIdentificacion, ioInfo)
+	ioIdentificacionMutex.Unlock()
+
+	ioIdentificacionMutex.RLock()
 	h.Log.DebugContext(ctx, "Lista de IOs conectadas",
 		log.AnyAttr("IOsConectadas", ioIdentificacion),
 	)
+	ioIdentificacionMutex.RUnlock()
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }
 
-// Recibe la lista de IOs
+// DesconexionIO maneja la desconexión de un dispositivo IO
+func (h *Handler) DesconexionIO(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var ioInfo IOIdentificacion
+
+	// Leer el cuerpo de la solicitud
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&ioInfo)
+	if err != nil {
+		h.Log.ErrorContext(ctx, "Error al decodificar ioIdentificacion para desconexión",
+			log.ErrAttr(err),
+		)
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("Error al decodificar ioIdentificacion"))
+		return
+	}
+
+	h.Log.DebugContext(ctx, "Desconexión de dispositivo IO",
+		log.StringAttr("dispositivo", ioInfo.Nombre),
+		log.StringAttr("ip", ioInfo.IP),
+		log.IntAttr("puerto", ioInfo.Puerto),
+	)
+
+	// Encontrar y remover el dispositivo de la lista
+	var dispositivoEncontrado *IOIdentificacion
+	ioIdentificacionMutex.Lock()
+	for i, device := range ioIdentificacion {
+		if device.Nombre == ioInfo.Nombre && device.IP == ioInfo.IP && device.Puerto == ioInfo.Puerto {
+			dispositivoEncontrado = &device
+			// Remover el dispositivo de la lista
+			ioIdentificacion = append(ioIdentificacion[:i], ioIdentificacion[i+1:]...)
+			break
+		}
+	}
+	ioIdentificacionMutex.Unlock()
+
+	if dispositivoEncontrado != nil {
+		// Si había un proceso usando este dispositivo, enviarlo a EXIT
+		if dispositivoEncontrado.ProcesoID >= 0 {
+			h.Log.Debug(fmt.Sprintf("## (%d) - Proceso enviado a EXIT por desconexión de IO: %s",
+				dispositivoEncontrado.ProcesoID, dispositivoEncontrado.Nombre))
+			go h.Planificador.FinalizarProcesoEnCualquierCola(dispositivoEncontrado.ProcesoID)
+		}
+
+		// Si había procesos en la cola de espera y no hay otro dispositivo con el mismo nombre, finalizarlos también
+		var existeOtroIO bool
+		ioIdentificacionMutex.RLock()
+		for _, device := range ioIdentificacion {
+			if device.Nombre == dispositivoEncontrado.Nombre {
+				existeOtroIO = true
+				break
+			}
+		}
+		ioIdentificacionMutex.RUnlock()
+
+		if !existeOtroIO {
+			ioWaitQueuesMutex.Lock()
+			waitQ := ioWaitQueues[dispositivoEncontrado.Nombre]
+
+			for _, waitInfo := range waitQ {
+				h.Log.Debug(fmt.Sprintf("## (%d) - Proceso enviado a EXIT por desconexión de IO", waitInfo.PID))
+				go h.Planificador.FinalizarProcesoEnCualquierCola(waitInfo.PID)
+			}
+			ioWaitQueuesMutex.Unlock()
+		}
+	}
+
+	ioIdentificacionMutex.RLock()
+	h.Log.DebugContext(ctx, "Estado actual de IOs conectadas después de desconexión",
+		log.AnyAttr("IOsConectadas", ioIdentificacion),
+	)
+	ioIdentificacionMutex.RUnlock()
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
+}
+
+// ConexionInicialCPU Recibe la lista de IOs
 func (h *Handler) ConexionInicialCPU(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	identificacionCPU := &planificadores.CpuIdentificacion{}
-
-	h.Log.DebugContext(ctx, "Me llego la conexion de un CPU??")
 
 	// Leer el cuerpo de la solicitud
 	decoder := json.NewDecoder(r.Body)
