@@ -437,7 +437,7 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 
 		// Si hubo error al ejecutar el ciclo u otro problema, quitar de ExecQueue
 		if motivo != "Proceso ejecutado exitosamente" {
-			p.Log.Error("Error al ejecutar proceso en CPU",
+			p.Log.Debug("Error al ejecutar proceso en CPU",
 				log.IntAttr("PID", procesoExec.PCB.PID),
 				log.StringAttr("motivo", motivo),
 			)
