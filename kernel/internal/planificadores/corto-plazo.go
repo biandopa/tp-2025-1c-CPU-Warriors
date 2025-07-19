@@ -423,7 +423,9 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 
 		// Enviar proceso a la CPU
 		newPC, motivo := cpuElegida.DispatchProcess()
-		procesoExec.PCB.PC = newPC
+		if procesoExec != nil && procesoExec.PCB != nil {
+			procesoExec.PCB.PC = newPC
+		}
 
 		// Si hubo error al ejecutar el ciclo u otro problema, quitar de ExecQueue
 		if motivo != "Proceso ejecutado exitosamente" {

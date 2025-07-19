@@ -259,15 +259,8 @@ func (p *Service) FinalizarProceso(pid int) {
 		log.AnyAttr("metricas_tiempo", proceso.PCB.MetricasTiempo),
 	)
 
-	// 7. Liberar PCB
-	proceso.PCB = nil // Libero el PCB asociado al proceso
-
-	// 8. Checkear si hay procesos suspendidos que puedan volver a memoria
+	// 7. Checkear si hay procesos suspendidos que puedan volver a memoria
 	p.CheckearEspacioEnMemoria()
-
-	/*// 9. Le avisamos al channel de que puede ejecutar el algoritmo de largo plazo
-	p.canalNuevoProcesoReady <- struct{}{}
-	p.canalRafagaActualizada <- struct{}{}*/
 }
 
 // FinalizarProcesoEnCualquierCola busca un proceso en todas las colas y lo finaliza
