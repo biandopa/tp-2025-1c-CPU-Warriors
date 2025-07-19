@@ -9,21 +9,23 @@ import (
 )
 
 const (
-	configFilePath = "./configs/config.json"
+	configFilePath = "./configs/"
 )
 
 func main() {
-	h := api.NewHandler(configFilePath)
-
 	// El primer argumento es el archivo de configuración y el segundo es el tamaño del proceso
-	if len(os.Args) < 3 {
-		h.Log.Error(fmt.Sprintf("Faltan %d argumentos.", len(os.Args)))
-		panic("Faltan argumentos para inicializar el módulo Kernel.")
+	if len(os.Args) < 4 {
+		fmt.Println("Faltan argumentos. Uso: go run kernel.go <archivo_nombre> <tamanio_proceso> <config_id>")
+		os.Exit(1)
 	}
 
 	archivoNombre := os.Args[1]
 	tamanioProceso := os.Args[2] // Tamaño en bytes
+	configID := os.Args[3]       // ID de configuración
 
+	configFile := configFilePath + configID + ".json"
+
+	h := api.NewHandler(configFile)
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/io/conexion-inicial", h.ConexionInicialIO)    //IO LISTA --> Kernel
