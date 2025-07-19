@@ -29,10 +29,12 @@ cd cpu && go run cpu.go 8004
 ```
 
 **Terminal 4 - IO:**
-Su argumento es el nombre del dispositivo IO que se utilizará (por ejemplo, `impresora`).
+Sus argumentos son:
+- El nombre del dispositivo IO que se utilizará (por ejemplo, `impresora`).
+- El puerto en el que escuchará las peticiones de la CPU (debe cíncidir con el nombre de la config).
 
 ```bash
-cd io && go run io.go impresora
+cd io && go run io.go impresora 8005
 ```
 
 

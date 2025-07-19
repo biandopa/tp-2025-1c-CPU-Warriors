@@ -13,18 +13,26 @@ import (
 )
 
 const (
-	configFilePath = "./configs/config.json"
+	configFilePath = "./configs/"
 )
 
 func main() {
-	//para que tome el argumento debe ingresarse asi "go run io.go NOMBRE"
+	//para que tome el argumento debe ingresarse asi "go run io.go NOMBRE PUERTO"
+	if len(os.Args) < 2 {
+		fmt.Println("Error: Missing required arguments 'NOMBRE' and 'PORT'. Usage: go run io.go {{NOMBRE}} {{PORT}}")
+		os.Exit(1)
+	}
+
 	nombreIO := os.Args[1]
 	if nombreIO == "" {
 		slog.Error("El nombre del IO no puede estar vacío")
 		os.Exit(1)
 	}
 
-	h := api.NewHandler(configFilePath, nombreIO)
+	puerto := os.Args[2]
+	configFile := configFilePath + puerto + ".json"
+
+	h := api.NewHandler(configFile, nombreIO)
 
 	h.Log.Debug("Inicializando interfaz IO",
 		log.StringAttr("nombreIO", nombreIO),
