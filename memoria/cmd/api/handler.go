@@ -2,6 +2,7 @@ package api
 
 import (
 	"log/slog"
+	"sync"
 
 	"github.com/sisoputnfrba/tp-golang/utils/config"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -12,6 +13,7 @@ type Handler struct {
 	Config                 *Config
 	EspacioDeUsuario       []byte
 	MetricasProcesos       map[int]*MetricasProceso
+	mutexInstrucciones     *sync.RWMutex
 	Instrucciones          map[int][]Instruccion
 	FrameTable             []bool
 	TablasProcesos         []*TablasProceso
@@ -42,5 +44,6 @@ func NewHandler(configFile string) *Handler {
 		FrameTable:             make([]bool, configStruct.MemorySize/configStruct.PageSize),
 		TablasProcesos:         make([]*TablasProceso, 0),
 		ProcesoPorPosicionSwap: make([]int, 0),
+		mutexInstrucciones:     &sync.RWMutex{},
 	}
 }

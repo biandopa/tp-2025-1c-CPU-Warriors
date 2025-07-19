@@ -61,6 +61,8 @@ func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 		log.AnyAttr("proceso", proceso),
 	)
 
+	h.mutexInstrucciones.RLock()
+	defer h.mutexInstrucciones.RUnlock()
 	// Verificamos si el proceso tiene almacenadas instrucciones
 	if _, exists := h.Instrucciones[proceso.PID]; !exists {
 		h.Log.Debug("No hay instrucciones almacenadas para el proceso",

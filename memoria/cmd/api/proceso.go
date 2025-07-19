@@ -80,7 +80,9 @@ func (h *Handler) finalizarProcesoFuncionAuxiliar(pid string) {
 	}
 	//3ero borrar las instrucciones
 
+	h.mutexInstrucciones.Lock()
 	delete(h.Instrucciones, pidInt)
+	h.mutexInstrucciones.Unlock()
 }
 
 func (h *Handler) borrarProcesoPorPID(pid string) error {

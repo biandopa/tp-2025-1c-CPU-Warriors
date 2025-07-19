@@ -254,9 +254,11 @@ func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http
 		return
 	}
 
+	h.mutexInstrucciones.Lock()
 	if h.Instrucciones[pidInt] == nil {
 		h.Instrucciones[pidInt] = make([]Instruccion, 0)
 	}
+	h.mutexInstrucciones.Unlock()
 
 	// Busca el archivo en el sistema
 	file, err := os.OpenFile(h.Config.ScriptsPath+filePath, os.O_RDONLY, os.ModePerm)
@@ -298,7 +300,9 @@ func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http
 			instruccion.Parametros = valores[1:]
 		}
 
+		h.mutexInstrucciones.Lock()
 		h.Instrucciones[pidInt] = append(h.Instrucciones[pidInt], instruccion)
+		h.mutexInstrucciones.Unlock()
 	}
 
 	h.Log.Debug("Carga de Proceso en Memoria de Sistema Exitosa",
