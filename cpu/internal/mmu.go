@@ -391,7 +391,7 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 		nroPag, _ := m.calcularNumeroPagina(pageID)
 
 		// Log obligatorio: Limpieza de memoria
-		m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+		m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
 			pid, nroPag, frame))
 	}
 
@@ -545,7 +545,7 @@ func (m *MMU) evictCacheClock() {
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
 			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
 				entry.PID, nroPag, frame))
 
 			// Enviar información a memoria y salir
@@ -585,7 +585,7 @@ func (m *MMU) evictCacheClock() {
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
 			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
 				entry.PID, nroPag, frame))
 
 			// Enviar información a memoria y salir
@@ -633,7 +633,7 @@ func (m *MMU) evictCacheClockM() {
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
 			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
 				entry.PID, nroPag, frame))
 
 			// Enviar información a memoria y salir
@@ -671,7 +671,7 @@ func (m *MMU) evictCacheClockM() {
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
 			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
 				entry.PID, nroPag, frame))
 
 			// Enviar información a memoria y salir
@@ -710,7 +710,7 @@ func (m *MMU) evictCacheClockM() {
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
 			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %s - Frame: %d",
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
 				entry.PID, nroPag, frame))
 
 			// Enviar información a memoria y salir
