@@ -8,33 +8,36 @@ asegurando que todos los módulos funcionen correctamente y cumplan con los requ
 ### **1. Correr Todos los Módulos (En diferentes Tabs de la terminal)**
 
 **Terminal 1 - Memoria:**
+Su argumento es el nombre del archivo de configuración (por ejemplo, `PLANI-CORTO-2`).
 
 ```bash
-cd memoria && go run memoria.go
+cd memoria && go run memoria.go PLANI-CORTO-2
 ```
 
 **Terminal 2 - Kernel:**
-Su argumento es el directorio de almacenamiento de las intrucciones del proceso a ejecutar y
-el tamaño de la memoria asignada al proceso.
+Sus argumentos son:
+- El nombre del script a ejecutar (por ejemplo, `proceso1`).
+- El tamaño de la memoria asignada al proceso.
+- El nombre del archivo de configuración (por ejemplo, `PLANI-CORTO-2`).
 
 ```bash
-cd kernel && go run kernel.go examples/proceso1 10
+cd kernel && go run kernel.go proceso1 10 PLANI-CORTO-2
 ```
 
 **Terminal 3 - CPU:**
-Su argumento es el puerto en el que escuchará las peticiones de Memoria.
+Su argumento es el nombre del archivo de configuración.
 
 ```bash
-cd cpu && go run cpu.go 8004
+cd cpu && go run cpu.go PLANI-CORTO-2
 ```
 
 **Terminal 4 - IO:**
 Sus argumentos son:
-- El nombre del dispositivo IO que se utilizará (por ejemplo, `impresora`).
+- El nombre del dispositivo IO que se utilizará (por ejemplo, `DISCO`).
 - El puerto en el que escuchará las peticiones de la CPU (debe cíncidir con el nombre de la config).
 
 ```bash
-cd io && go run io.go impresora 8005
+cd io && go run io.go DISCO 8015
 ```
 
 
