@@ -212,13 +212,17 @@ func (p *Service) ordenarColaReadySjf() {
 // * R(n) = Lo que realmente ejecutó de la ráfaga anterior en la CPU
 // * Est(n+1) = El estimado de la próxima ráfaga
 func (p *Service) calcularSiguienteEstimacion(proceso *internal.Proceso) float64 {
-	// Si es la primera vez que se ejecuta, usar estimación inicial
-	rafagaAnterior := float64(p.SjfConfig.InitialEstimate)
-	if proceso.PCB.RafagaAnterior != nil {
-		rafagaAnterior = float64(proceso.PCB.RafagaAnterior.Milliseconds()) // Convertir a ms
+	// Para procesos que nunca ejecutaron, usar directamente la estimación inicial
+	if proceso.PCB.RafagaAnterior == nil {
+		p.Log.Debug("Proceso nuevo - usando estimación inicial",
+			log.IntAttr("pid", proceso.PCB.PID),
+			log.AnyAttr("estimacion_inicial", float64(p.SjfConfig.InitialEstimate)),
+		)
+		return float64(p.SjfConfig.InitialEstimate)
 	}
 
-	// Aplicar fórmula: Est(n+1) = α * R(n) + (1-α) * Est(n)
+	// Para procesos con historial, aplicar la fórmula SJF
+	rafagaAnterior := float64(proceso.PCB.RafagaAnterior.Milliseconds())
 	alpha := p.SjfConfig.Alpha
 	estimacionAnterior := proceso.PCB.EstimacionAnterior
 
