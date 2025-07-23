@@ -74,7 +74,7 @@ func (p *Service) IntentarBuscarCPUDisponible() *cpu.Cpu {
 		defer p.mutexCPUsConectadas.Unlock()
 
 		for i := range p.CPUsConectadas {
-			if p.CPUsConectadas[i].Estado {
+			if p.CPUsConectadas[i].Estado && p.CPUsConectadas[i].Proceso.PID == -1 {
 				p.CPUsConectadas[i].Estado = false
 				p.Log.Debug("CPU adquirida (no bloqueante)",
 					log.StringAttr("cpu_id", p.CPUsConectadas[i].ID))

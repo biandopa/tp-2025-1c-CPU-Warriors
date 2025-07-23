@@ -96,8 +96,66 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		MedianoPlazoConfig: &MedianoPlazoConfig{
 			SuspensionTime: suspTime,
 		},
-		CPUSemaphore: make(chan struct{}, 100), // Inicializamos el semáforo vacío, se llenará cuando se conecten CPUs.
+		CPUSemaphore: make(chan struct{}, 100), // Inicializamos el semáforo vacío, se llenará cuando se conecten CPUp.
 		// Buffer máximo de 100 CPUs
 		HttpClient: httpClient,
 	}
+}
+
+func (p *Service) BuscarProcesoEnCualquierCola(pid int) *internal.Proceso {
+	p.mutexNewQueue.RLock()
+	for _, proc := range p.Planificador.NewQueue {
+		if proc.PCB.PID == pid {
+			p.mutexNewQueue.RUnlock()
+			return proc
+		}
+	}
+	p.mutexNewQueue.RUnlock()
+
+	p.mutexReadyQueue.RLock()
+	for _, proc := range p.Planificador.ReadyQueue {
+		if proc.PCB.PID == pid {
+			p.mutexReadyQueue.RUnlock()
+			return proc
+		}
+	}
+	p.mutexReadyQueue.RUnlock()
+
+	p.mutexBlockQueue.RLock()
+	for _, proc := range p.Planificador.BlockQueue {
+		if proc.PCB.PID == pid {
+			p.mutexBlockQueue.RUnlock()
+			return proc
+		}
+	}
+	p.mutexBlockQueue.RUnlock()
+
+	p.mutexExecQueue.RLock()
+	for _, proc := range p.Planificador.ExecQueue {
+		if proc.PCB.PID == pid {
+			p.mutexExecQueue.RUnlock()
+			return proc
+		}
+	}
+	p.mutexExecQueue.RUnlock()
+
+	p.mutexSuspBlockQueue.RLock()
+	for _, proc := range p.Planificador.SuspBlockQueue {
+		if proc.PCB.PID == pid {
+			p.mutexSuspBlockQueue.RUnlock()
+			return proc
+		}
+	}
+	p.mutexSuspBlockQueue.RUnlock()
+
+	p.mutexSuspReadyQueue.RLock()
+	for _, proc := range p.Planificador.SuspReadyQueue {
+		if proc.PCB.PID == pid {
+			p.mutexSuspReadyQueue.RUnlock()
+			return proc
+		}
+	}
+	p.mutexSuspReadyQueue.RUnlock()
+
+	return nil // No se encontró el proceso en ninguna cola
 }

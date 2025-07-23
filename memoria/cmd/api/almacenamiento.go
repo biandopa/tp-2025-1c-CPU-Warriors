@@ -328,7 +328,7 @@ func (h *Handler) PasarProcesoASwap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(time.Duration(h.Config.SwapDelay))
+	time.Sleep(time.Duration(h.Config.SwapDelay) * time.Millisecond)
 	h.PasarProcesoASwapAuxiliar(pid)
 
 	// Devolvemos una respuesta exitosa
@@ -436,7 +436,7 @@ func (h *Handler) SacarProcesoDeSwap(pid string) {
 		)
 		return
 	}
-	time.Sleep(time.Duration(h.Config.SwapDelay))
+	time.Sleep(time.Duration(h.Config.SwapDelay) * time.Millisecond)
 }
 
 // CompactarSwap Se encarga de compactar tanto la swap como elk bitmap de la swap
@@ -690,7 +690,8 @@ func (h *Handler) ContienePIDEnSwap(pid int) bool {
 // ActualizarPaginaCompleta Recibe la llamada de CPU para realizar la actualizacion de una página que se encontraba en caché
 func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Request) {
 	var (
-		body map[string]CacheData // La key es el índice de la página, el valor es un CacheData con PID y Data
+		body             map[string]CacheData // La key es el índice de la página, el valor es un CacheData con PID y Data
+		cantAccesosTabla int
 	)
 
 	// Leo el cuerpo de la solicitud y guardo el valor del body en la variable
@@ -730,6 +731,7 @@ func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Reques
 		}
 		tablaMetricas.CantidadDeEscritura++
 
+		cantAccesosTabla += len(indices)
 		frame, found := buscarMarcoPorPaginaAux(tablaMetricas, indices)
 		if !found {
 			h.Log.Error("Marco no encontrado para la página",
@@ -743,6 +745,9 @@ func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Reques
 		h.Log.Debug(fmt.Sprintf("## PID: %s - Actualización de página completa - Dir. Física: %d - Tamaño: %d",
 			pid, frame*h.Config.PageSize, len(data)))
 	}
+
+	// Aplicamos el retardo de memoria configurado * cantidad de accesos a tablas
+	time.Sleep(time.Duration(h.Config.MemoryDelay*cantAccesosTabla) * time.Millisecond)
 
 	// Enviamos una respuesta exitosa
 	w.Header().Set("Content-Type", "application/json")
@@ -779,7 +784,7 @@ func (h *Handler) LeerPagina(w http.ResponseWriter, r *http.Request) {
 	h.Log.Debug("LeerPagina",
 		log.AnyAttr("lecturaMemoria", lecturaMemoria))
 
-	time.Sleep(time.Duration(h.Config.MemoryDelay))
+	time.Sleep(time.Duration(h.Config.MemoryDelay) * time.Millisecond)
 
 	// Enviamos la respuesta al cliente con el contenido leído
 	w.Header().Set("Content-Type", "application/json")
@@ -835,7 +840,7 @@ func (h *Handler) EscribirPagina(w http.ResponseWriter, r *http.Request) {
 	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
 		escritura.PID, escritura.ValorAEscribir, escritura.Frame*h.Config.PageSize+escritura.Offset, len(escritura.ValorAEscribir)))
 
-	time.Sleep(time.Duration(h.Config.MemoryDelay))
+	time.Sleep(time.Duration(h.Config.MemoryDelay) * time.Millisecond)
 
 	// Devolvemos un status 200 OK
 	w.WriteHeader(http.StatusOK)
@@ -936,6 +941,10 @@ func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 	}
 
 	responseBytes, _ := json.Marshal(response)
+
+	// Aplicar retardo de memoria según la cantidad de accesos a tablas (por niveles)
+	time.Sleep(time.Duration(h.Config.MemoryDelay*len(indices)) * time.Millisecond)
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(responseBytes)

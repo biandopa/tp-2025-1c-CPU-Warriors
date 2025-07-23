@@ -168,6 +168,15 @@ func (p *Service) avisarAMemoriaSwap(proceso *internal.Proceso) {
 func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
 	colaString := strings.ToLower(cola)
 	switch colaString {
+	case "exec":
+		p.mutexExecQueue.RLock()
+		for _, proc := range p.Planificador.ExecQueue {
+			if proc.PCB.PID == pid {
+				p.mutexExecQueue.RUnlock()
+				return proc
+			}
+		}
+		p.mutexExecQueue.RUnlock()
 	case "suspended_blocked":
 		p.mutexSuspBlockQueue.RLock()
 		for _, proc := range p.Planificador.SuspBlockQueue {

@@ -28,7 +28,7 @@ func (h *Handler) crearProceso(nombreArchivo, tamanioProceso string) *internal.P
 			MetricasEstado:     map[internal.Estado]int{},
 			Tamanio:            tamanioProceso,
 			NombreArchivo:      nombreArchivo,
-			EstimacionAnterior: float64(h.Config.InitialEstimate),
+			EstimacionAnterior: float64(h.Config.InitialEstimate * 1000), // Convertir a milisegundos
 		},
 	}
 
@@ -118,6 +118,15 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 			return
 
 		} else {
+			// Buscar proceso en EXEC
+			if proceso := h.Planificador.BuscarProcesoEnCola(syscall.PID, "EXEC"); proceso == nil {
+				h.Log.Debug("Proceso no encontrado en EXEC",
+					log.IntAttr("pid", syscall.PID),
+				)
+
+				return
+			}
+
 			//Existe y está libre, pasar a blocked y además manda la señal
 			timeSleep, err := strconv.Atoi(syscall.Args[1])
 			if err != nil {

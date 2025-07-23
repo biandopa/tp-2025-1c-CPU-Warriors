@@ -52,6 +52,9 @@ func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 	h.Log.Info(fmt.Sprintf("## PID: %d - Obtener instrucción: %d - Instrucción: %s",
 		proceso.PID, proceso.PC, instruccion))
 
+	// Aplicar retardo
+	time.Sleep(time.Duration(h.Config.MemoryDelay) * time.Millisecond)
+
 	// Leemos la instrucción asociada al proceso. Usamos el PC como index del array y luego la enviamos al cliente
 	body, _ := json.Marshal(instruccion)
 
