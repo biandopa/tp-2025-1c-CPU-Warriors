@@ -36,7 +36,6 @@ func main() {
 	h.EnviarIdentificacion(identificadorCPU)
 
 	// Recepción de valores
-	mux.HandleFunc("POST /memoria/instrucciones", h.RecibirInstrucciones)  // Memoria --> CPU
 	mux.HandleFunc("POST /kernel/procesos", h.RecibirProcesos)             // Kernel --> CPU
 	mux.HandleFunc("POST /kernel/interrupciones", h.RecibirInterrupciones) // Kernel --> CPU
 

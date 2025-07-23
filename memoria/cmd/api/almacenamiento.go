@@ -33,6 +33,20 @@ type CacheData struct {
 	Data string `json:"data"`
 }
 
+// TablasProceso Estructura en la cual guardamos las metricas y la tabla de paginas
+type TablasProceso struct {
+	PID             string      `json:"pid"`
+	Tamanio         int         `json:"tamanio_proceso"`
+	TablasDePaginas interface{} `json:"tabla_de_paginas"`
+
+	CantidadAccesosATablas           int `json:"cantidad_accesos_a_tablas"`
+	CantidadInstruccionesSolicitadas int `json:"cantidad_instrucciones_solicitadas"`
+	CantidadBajadasSwap              int `json:"cantidad_bajadas_swap"`
+	CantidadSubidasMemoriaPrincipal  int `json:"cantidad_subidas_memoria_principal"`
+	CantidadDeEscritura              int `json:"cantidad_de_escritura"`
+	CantidadDeLectura                int `json:"cantidad_de_lectura"`
+}
+
 // ConsultarEspacioEInicializar recibe una consulta sobre el espacio libre en memoria. (Lo recibe cuando el proceso pasa al ready ya que ahi empeiza a ocupar memoria)
 // En caso de que haya espacio, se inicializa el proceso, se responde con un mensaje de éxito y el tamaño disponible.
 // En caso contrario, se responde con un mensaje de error.
@@ -87,12 +101,13 @@ func (h *Handler) ConsultarEspacioEInicializar(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusOK)
 }
 
-// Redondea para arriba al dividir el (tamanio de proceso / paginas), esto es xq no le puedo asignar una pagina y media o es 1 o son 2
+// DivRedondeoArriba Redondea para arriba al dividir el (tamanio de proceso / paginas), esto es xq no le puedo
+// asignar una página y media o es 1 o son 2
 func DivRedondeoArriba(numerador, denominador int) int {
 	return (numerador + denominador - 1) / denominador
 }
 
-// Cuenta cuantas paginas libres hay y las devuelve en un int la cantidad
+// ContarLibres Cuenta cuantas páginas libres hay y las devuelve en un int la cantidad
 func (h *Handler) ContarLibres() int {
 	libres := 0
 	for _, ocupado := range h.FrameTable {
@@ -103,9 +118,10 @@ func (h *Handler) ContarLibres() int {
 	return libres
 }
 
-// Si hay espacio en ConsultarEspacioEInicializar entonces entra aca
-// Verifica si el proceso existe (Salde suspBLocked es decir de Swap) crea solo la tabla de paginas
-// Si el proceso no exisita en memoria le crea un TablasProceso, donde ademas le crea la tabla de paginas vacia y le asigna los frames
+// AsignarMemoriaDeUsuario Si hay espacio en ConsultarEspacioEInicializar entonces entra aca
+// Verifica si el proceso existe (Salde suspBLocked es decir de Swap) crea solo la tabla de páginas
+// Si el proceso no exisita en memoria le crea un TablasProceso, donde además le genere la tabla de páginas
+// vacia y le asigna los frames
 func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 	if paginasAOcupar != 0 {
 		framesLibres := h.MarcosLibres(paginasAOcupar)
@@ -185,7 +201,7 @@ func (h *Handler) escribirMarcoEnSwap(archivo *os.File, marco int) error {
 	return nil
 }
 
-// Busca la tablaProceso dentro de la lista de TablasProcesos por pid
+// BuscarProcesoPorPID Busca la tablaProceso dentro de la lista de TablasProcesos por pid
 func (h *Handler) BuscarProcesoPorPID(pid string) (*TablasProceso, error) {
 	for _, proceso := range h.TablasProcesos {
 		if proceso.PID == pid {
@@ -195,21 +211,7 @@ func (h *Handler) BuscarProcesoPorPID(pid string) (*TablasProceso, error) {
 	return nil, fmt.Errorf("proceso con PID %s no encontrado", pid)
 }
 
-// Estructura en la cual guardamos las metricas y la tabla de paginas
-type TablasProceso struct {
-	PID             string      `json:"pid"`
-	Tamanio         int         `json:"tamanio_proceso"`
-	TablasDePaginas interface{} `json:"tabla_de_paginas"`
-
-	CantidadAccesosATablas           int `json:"cantidad_accesos_a_tablas"`
-	CantidadInstruccionesSolicitadas int `json:"cantidad_instrucciones_solicitadas"`
-	CantidadBajadasSwap              int `json:"cantidad_bajadas_swap"`
-	CantidadSubidasMemoriaPrincipal  int `json:"cantidad_subidas_memoria_principal"`
-	CantidadDeEscritura              int `json:"cantidad_de_escritura"`
-	CantidadDeLectura                int `json:"cantidad_de_lectura"`
-}
-
-// Le pasamos cuantas paginas necesitamos y nos devuelve una lista de cuales debemos usar
+// MarcosLibres Le pasamos cuantas paginas necesitamos y nos devuelve una lista de cuales debemos usar
 func (h *Handler) MarcosLibres(paginasNecesarias int) []int {
 	libres := make([]int, 0)
 	for i, ocupado := range h.FrameTable {
@@ -223,7 +225,7 @@ func (h *Handler) MarcosLibres(paginasNecesarias int) []int {
 	return libres
 }
 
-// Carga las instrucciones en la memoria del sistema, tener en cuenta que esta no es limitada en cuanto a espacio
+// CargarProcesoEnMemoriaDeSistema Carga las instrucciones en la memoria del sistema, tener en cuenta que esta no es limitada en cuanto a espacio
 func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx = r.Context()
@@ -313,7 +315,7 @@ func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusOK)
 }
 
-// Recibe la llamada del Kernel cuando un proceso se suspendio, y lo pasa  Swap usando PasarProcesoASwapAuxiliar
+// PasarProcesoASwap Recibe la llamada del Kernel cuando un proceso se suspendio, y lo pasa  Swap usando PasarProcesoASwapAuxiliar
 func (h *Handler) PasarProcesoASwap(w http.ResponseWriter, r *http.Request) {
 	var (
 		// Leemos el PID
@@ -333,10 +335,10 @@ func (h *Handler) PasarProcesoASwap(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// Recibe el PID, con eso utiliza BuscarProcesoPorPID para traer la tablaProceso
-// Con ObtenerMarcosDeLaTabla obtiene los marcos, libera el bitmap de  memoriaDeUsuario
+// PasarProcesoASwapAuxiliar Recibe el PID, con eso utiliza BuscarProcesoPorPID para traer la tablaProceso
+// Con ObtenerMarcosDeLaTabla obtiene los marcos, libera el bitmap de memoriaDeUsuario
 // escribirMarcoEnSwap escribe efectivamente en swap los marcos que le pasamos
-// por ultimo actualizamos las metricas
+// por último actualizamos las metricas
 func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 	procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
 	h.Log.Debug("PasarProcesoASwapAuxiliar",
@@ -381,7 +383,7 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 	tablaMetricas.CantidadBajadasSwap++
 }
 
-// Le pasamos la tabla de paginas y nos devuelve los marcos ocupados en esa tabla
+// ObtenerMarcosDeLaTabla Le pasamos la tabla de paginas y nos devuelve los marcos ocupados en esa tabla
 func (h *Handler) ObtenerMarcosDeLaTabla(tabla interface{}) []int {
 	var marcos []int
 
@@ -405,7 +407,7 @@ func (h *Handler) ObtenerMarcosDeLaTabla(tabla interface{}) []int {
 	return marcos
 }
 
-// Es llamada desde AsignarMemoriaDeUsuario si el proceso sale del bloque a ready
+// SacarProcesoDeSwap Es llamada desde AsignarMemoriaDeUsuario si el proceso sale del bloque a ready
 // se encarga de buscar en swap ese proceso y actualizar la memoria de usuario
 func (h *Handler) SacarProcesoDeSwap(pid string) {
 	pidDeSwap, _ := strconv.Atoi(pid)
@@ -435,15 +437,9 @@ func (h *Handler) SacarProcesoDeSwap(pid string) {
 		return
 	}
 	time.Sleep(time.Duration(h.Config.SwapDelay))
-
-	// Devolvemos una respuesta exitosa
-
-	//UBicar ESTO
-	//w.WriteHeader(http.StatusOK)
-	//_, _ = w.Write([]byte("OK"))
 }
 
-// Se encarga de compactar tanto la swap como elk bitmap de la swap
+// CompactarSwap Se encarga de compactar tanto la swap como elk bitmap de la swap
 func (h *Handler) CompactarSwap(pidAEliminar string) error {
 	pageSize := h.Config.PageSize
 	pidInt, _ := strconv.Atoi(pidAEliminar)
@@ -497,7 +493,7 @@ func (h *Handler) CompactarSwap(pidAEliminar string) error {
 	return nil
 }
 
-// Carga las paginas desde Swap a memmoria de usuario
+// CargarPaginasEnMemoriaDesdeSwap Carga las paginas desde Swap a memmoria de usuario
 func (h *Handler) CargarPaginasEnMemoriaDesdeSwap(posicionesSwap []int, marcosDestino []int) error {
 	if len(posicionesSwap) != len(marcosDestino) {
 		return fmt.Errorf("la cantidad de posiciones y marcos no coincide")
@@ -539,7 +535,7 @@ func (h *Handler) CargarPaginasEnMemoriaDesdeSwap(posicionesSwap []int, marcosDe
 	return nil
 }
 
-// Busca en el "Bitmap" del Swap y devuelve en que posciones del swap esta
+// PosicionesDeProcesoEnSwap Busca en el "Bitmap" del Swap y devuelve en que posciones del swap esta
 func (h *Handler) PosicionesDeProcesoEnSwap(pid int) []int {
 	posiciones := make([]int, 0)
 	for i, p := range h.ProcesoPorPosicionSwap {
@@ -550,7 +546,7 @@ func (h *Handler) PosicionesDeProcesoEnSwap(pid int) []int {
 	return posiciones
 }
 
-// Recibe la llamada del Kernel para hacer el dump, usa DumpProcesoFuncionAuxiliar
+// DumpProceso Recibe la llamada del Kernel para hacer el dump, usa DumpProcesoFuncionAuxiliar
 func (h *Handler) DumpProceso(w http.ResponseWriter, r *http.Request) {
 	var (
 		// Leemos el PID
@@ -581,7 +577,7 @@ func (h *Handler) DumpProceso(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("Dump del proceso creado exitosamente"))
 }
 
-// Busca con el pid la tabla asociada para luego hacer el dump
+// DumpProcesoFuncionAuxiliar Busca con el pid la tabla asociada para luego hacer el dump
 func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) error {
 	h.Log.Debug("DumpFuncionAuxiliar",
 		log.AnyAttr("pid", pid))
@@ -681,7 +677,7 @@ func (h *Handler) DumpProcesoFuncionAuxiliar(pid string) error {
 	return nil
 }
 
-// Busca si el PID se encuentra en el bitmap de swap
+// ContienePIDEnSwap Busca si el PID se encuentra en el bitmap de swap
 func (h *Handler) ContienePIDEnSwap(pid int) bool {
 	for _, valor := range h.ProcesoPorPosicionSwap {
 		if valor == pid {
@@ -691,7 +687,7 @@ func (h *Handler) ContienePIDEnSwap(pid int) bool {
 	return false
 }
 
-// Recibe la llamada de CPU para realizar la actualizacion de una pagina que se encontraba en cache
+// ActualizarPaginaCompleta Recibe la llamada de CPU para realizar la actualizacion de una página que se encontraba en caché
 func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Request) {
 	var (
 		body map[string]CacheData // La key es el índice de la página, el valor es un CacheData con PID y Data
@@ -753,7 +749,7 @@ func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Reques
 	_, _ = w.Write([]byte(`{Ok}`))
 }
 
-// Recibe la instruccion READ de CPU
+// LeerPagina Recibe la instruccion READ de CPU
 func (h *Handler) LeerPagina(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx     = r.Context()
@@ -798,12 +794,12 @@ func (h *Handler) LeerPagina(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(responseBody)
 }
 
-// Limpia los espacios nules para hacer la lectura mas legible
+// limpiarNulos Limpia los espacios nules para hacer la lectura más legible
 func (h *Handler) limpiarNulos(cadena string) string {
 	return strings.ReplaceAll(cadena, "\x00", "")
 }
 
-// Recibe la instruccion WRITE de CPU
+// EscribirPagina Recibe la instruccion WRITE de CPU
 func (h *Handler) EscribirPagina(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx       = r.Context()
@@ -846,7 +842,7 @@ func (h *Handler) EscribirPagina(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("OK"))
 }
 
-// funcion que se encarga de crear la tabla de paginas
+// CrearTabla funcion que se encarga de crear la tabla de paginas
 func (h *Handler) CrearTabla(niveles int, entradasPorElemento int) interface{} {
 	if niveles <= 0 {
 		return nil
@@ -869,24 +865,6 @@ func (h *Handler) CrearTabla(niveles int, entradasPorElemento int) interface{} {
 		log.AnyAttr("myVar", tabla))
 
 	return tabla
-}
-
-func (h *Handler) AccesoATabla(w http.ResponseWriter, r *http.Request) {
-	var (
-		// Leemos el PID
-		pid = r.URL.Query().Get("pid")
-	)
-
-	if pid == "" {
-		h.Log.Error("PID no proporcionado")
-		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
-		return
-	}
-	tabla, _ := h.BuscarProcesoPorPID(pid)
-	//TO DO:
-	//CORREGIR VER COMO LO PASA LA MMU
-	buscarMarcoPorPaginaAux(tabla, []int{0, 0, 1})
-
 }
 
 // BuscarMarcoPorPagina busca el marco correspondiente a una página dada en la tabla de páginas del proceso.
@@ -985,7 +963,7 @@ func buscarMarcoPorPaginaAux(tabla *TablasProceso, indices []int) (int, bool) {
 	return 0, false
 }
 
-// Llena el ultimo nivel de la tabla para que apunte a los frames que debe ocupar
+// LlenarTablaConValores Llena el ultimo nivel de la tabla para que apunte a los frames que debe ocupar
 // en caso de no ocupar todos pondra en -1 los que no use
 func (h *Handler) LlenarTablaConValores(tabla interface{}, valores []int) {
 	var index int
@@ -1015,64 +993,7 @@ func (h *Handler) LlenarTablaConValores(tabla interface{}, valores []int) {
 	recorrer(tabla)
 }
 
-// Esta no la estamos usando ---
-func (h *Handler) ConsultarDireccionLogica(w http.ResponseWriter, r *http.Request) {
-	var (
-		// Leemos el PID y la dirección lógica de la consulta
-		pid       = r.URL.Query().Get("pid")
-		dirLogica = r.URL.Query().Get("dir-logica")
-	)
-
-	if pid == "" {
-		h.Log.Error("PID no proporcionado")
-		http.Error(w, "PID no proporcionado", http.StatusBadRequest)
-		return
-	}
-	if dirLogica == "" {
-		h.Log.Error("Dirección lógica no proporcionada")
-		http.Error(w, "Dirección lógica no proporcionada", http.StatusBadRequest)
-		return
-	}
-
-	dirLogicaInt, _ := strconv.Atoi(dirLogica)
-	tablaProceso, _ := h.BuscarProcesoPorPID(pid)
-
-	// Calcular número de página
-	nroPagina := dirLogicaInt / h.Config.PageSize
-	indices := []int{nroPagina}
-
-	//entrada_nivel_X = floor(nro_página  / cant_entradas_tabla ^ (N - X)) % cant_entradas_tabla
-	for i := 0; i < h.Config.NumberOfLevels; i++ {
-		entradaNivel := (nroPagina / (pow(h.Config.EntriesPerPage, h.Config.NumberOfLevels-i))) % h.Config.EntriesPerPage
-		indices = append(indices, entradaNivel)
-	}
-
-	h.Log.Debug("ConsultarDireccionLogica",
-		log.AnyAttr("indices", indices),
-	)
-
-	frame, found := buscarMarcoPorPaginaAux(tablaProceso, indices)
-	if !found {
-		h.Log.Error("Error al buscar frame y offset",
-			log.StringAttr("pid", pid),
-			log.IntAttr("dir_logica", dirLogicaInt),
-		)
-		http.Error(w, "error al buscar frame y offset", http.StatusInternalServerError)
-		return
-	}
-
-	response := map[string]interface{}{
-		"pagina": nroPagina,
-		"frame":  frame,
-	}
-
-	responseBytes, _ := json.Marshal(response)
-
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(responseBytes)
-}
-
-// Funcion que llama la MMU para solicitar los datos de config para luego poder hacer las traducciones
+// RetornarPageSizeYEntries Funcion que llama la MMU para solicitar los datos de config para luego poder hacer las traducciones
 func (h *Handler) RetornarPageSizeYEntries(w http.ResponseWriter, _ *http.Request) {
 	response := map[string]int{
 		"page_size":        h.Config.PageSize,
