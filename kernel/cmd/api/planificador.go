@@ -41,6 +41,20 @@ func (h *Handler) crearProceso(nombreArchivo, tamanioProceso string) *internal.P
 	// Inicializar contador de estado NEW
 	proceso.PCB.MetricasEstado[internal.EstadoNew] = 1
 
+	// Inicializar métricas de tiempo para el resto de estados
+	for _, estado := range []internal.Estado{
+		internal.EstadoReady,
+		internal.EstadoExec,
+		internal.EstadoBloqueado,
+		internal.EstadoSuspReady,
+		internal.EstadoSuspBloqueado,
+		internal.EstadoExit,
+	} {
+		proceso.PCB.MetricasTiempo[estado] = &internal.EstadoTiempo{
+			TiempoAcumulado: 0,
+		}
+	}
+
 	return proceso
 }
 

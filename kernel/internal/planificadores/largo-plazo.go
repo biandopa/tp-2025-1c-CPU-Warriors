@@ -239,13 +239,13 @@ func (p *Service) FinalizarProceso(pid int) {
 		p.LiberarCPU(cpuFound) // Usar función centralizada que incluye notificación al planificador
 	}
 
-	// 6. Cambiar el estado del proceso a EXIT (las métricas de EXEC ya están actualizadas por actualizarRafagaAnterior)
-	proceso.PCB.MetricasEstado[internal.EstadoExit]++
 	if proceso.PCB.MetricasTiempo[internal.EstadoExit] == nil {
 		proceso.PCB.MetricasTiempo[internal.EstadoExit] = &internal.EstadoTiempo{}
 	}
 	proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoInicio = time.Now()
-	proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoAcumulado = proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado
+
+	// 6. Cambiar el estado del proceso a EXIT (las métricas de EXEC ya están actualizadas por actualizarRafagaAnterior)
+	proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoAcumulado = time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoInicio)
 	proceso.PCB.MetricasEstado[internal.EstadoExec]++
 	proceso.PCB.MetricasEstado[internal.EstadoExit]++
 
@@ -260,9 +260,24 @@ func (p *Service) FinalizarProceso(pid int) {
 
 	// Log obligatorio: Métricas de Estado
 	//"## (<PID>) - Métricas de estado: NEW (NEW_COUNT) (NEW_TIME), READY (READY_COUNT) (READY_TIME), …"
-	p.Log.Info(fmt.Sprintf("## (%d) - Métricas de estado", proceso.PCB.PID),
-		log.AnyAttr("metricas_estado", proceso.PCB.MetricasEstado),
-		log.AnyAttr("metricas_tiempo", proceso.PCB.MetricasTiempo),
+	p.Log.Info(fmt.Sprintf("## (%d) - Métricas de estado: NEW %d %d, READY %d %d, "+
+		"EXEC %d %d, BLOCKED %d %d, SUSP. BLOCKED %d %d, SUSP. READY %d %d, EXIT %d %d",
+		proceso.PCB.PID,
+		proceso.PCB.MetricasEstado[internal.EstadoNew],
+		proceso.PCB.MetricasTiempo[internal.EstadoNew].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoReady],
+		proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoExec],
+		proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoBloqueado],
+		proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoSuspBloqueado],
+		proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoSuspReady],
+		proceso.PCB.MetricasTiempo[internal.EstadoSuspReady].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoExit],
+		proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoAcumulado.Milliseconds(),
+	),
 	)
 
 	// 8. Checkear si hay procesos suspendidos que puedan volver a memoria
@@ -412,9 +427,24 @@ func (p *Service) FinalizarProcesoEnCualquierCola(pid int) {
 	p.Log.Info(fmt.Sprintf("## (%d) Finaliza el proceso", proceso.PCB.PID))
 
 	// Log obligatorio: Métricas de Estado
-	p.Log.Info(fmt.Sprintf("## (%d) - Métricas de estado", proceso.PCB.PID),
-		log.AnyAttr("metricas_estado", proceso.PCB.MetricasEstado),
-		log.AnyAttr("metricas_tiempo", proceso.PCB.MetricasTiempo),
+	p.Log.Info(fmt.Sprintf("## (%d) - Métricas de estado: NEW %d %d, READY %d %d, "+
+		"EXEC %d %d, BLOCKED %d %d, SUSP. BLOCKED %d %d, SUSP. READY %d %d, EXIT %d %d",
+		proceso.PCB.PID,
+		proceso.PCB.MetricasEstado[internal.EstadoNew],
+		proceso.PCB.MetricasTiempo[internal.EstadoNew].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoReady],
+		proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoExec],
+		proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoBloqueado],
+		proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoSuspBloqueado],
+		proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoSuspReady],
+		proceso.PCB.MetricasTiempo[internal.EstadoSuspReady].TiempoAcumulado.Milliseconds(),
+		proceso.PCB.MetricasEstado[internal.EstadoExit],
+		proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoAcumulado.Milliseconds(),
+	),
 	)
 
 	// 4. Checkear si hay procesos suspendidos que puedan volver a memoria

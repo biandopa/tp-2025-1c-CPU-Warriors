@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/sisoputnfrba/tp-golang/cpu/internal"
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -52,7 +51,6 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 
 	switch tipo {
 	case "NOOP":
-		time.Sleep(h.Config.CacheDelay * time.Millisecond)
 		nuevoPC++
 		returnControl = true
 
