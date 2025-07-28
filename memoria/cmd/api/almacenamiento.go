@@ -339,8 +339,16 @@ func (h *Handler) PasarProcesoASwap(w http.ResponseWriter, r *http.Request) {
 // Con ObtenerMarcosDeLaTabla obtiene los marcos, libera el bitmap de memoriaDeUsuario
 // escribirMarcoEnSwap escribe efectivamente en swap los marcos que le pasamos
 // por último actualizamos las metricas
-func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
-	procesYTablaAsociada, _ := h.BuscarProcesoPorPID(pid)
+func (h *Handler) PasarProcesoASwapAuxiliar(pid string) bool {
+	var terminoOK bool
+
+	procesYTablaAsociada, err := h.BuscarProcesoPorPID(pid)
+	if err != nil {
+		h.Log.Error("Error al buscar proceso por PID",
+			log.StringAttr("pid", pid),
+			log.ErrAttr(err))
+		return terminoOK
+	}
 	h.Log.Debug("PasarProcesoASwapAuxiliar",
 		log.AnyAttr("procesYTablaAsociada", procesYTablaAsociada.TablasDePaginas))
 
@@ -381,6 +389,8 @@ func (h *Handler) PasarProcesoASwapAuxiliar(pid string) {
 	}
 	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
 	tablaMetricas.CantidadBajadasSwap++
+	terminoOK = true
+	return terminoOK
 }
 
 // ObtenerMarcosDeLaTabla Le pasamos la tabla de paginas y nos devuelve los marcos ocupados en esa tabla
