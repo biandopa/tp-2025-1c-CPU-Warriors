@@ -60,13 +60,22 @@ func (p *Service) RealizarDumpMemory(pid int) {
 func (p *Service) moverProcesoExecABlocked(pid int) error {
 	var proceso *internal.Proceso
 
-	// Remover de EXEC
+	// Remover de EXEC usando función segura
 	p.mutexExecQueue.Lock()
-	for i, proc := range p.Planificador.ExecQueue {
+	for _, proc := range p.Planificador.ExecQueue {
 		if proc.PCB.PID == pid {
 			proceso = proc
-			p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:i], p.Planificador.ExecQueue[i+1:]...)
 			break
+		}
+	}
+
+	if proceso != nil {
+		var removido bool
+		p.Planificador.ExecQueue, removido = p.removerDeCola(pid, p.Planificador.ExecQueue)
+		if !removido {
+			p.Log.Error("🚨Proceso no encontrado en ExecQueue durante dump_memory",
+				log.IntAttr("pid", pid),
+			)
 		}
 	}
 	p.mutexExecQueue.Unlock()
@@ -102,13 +111,22 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 func (p *Service) moverProcesoBlockedAReady(pid int) error {
 	var proceso *internal.Proceso
 
-	// Remover de BLOCKED
+	// Remover de BLOCKED usando función segura
 	p.mutexBlockQueue.Lock()
-	for i, proc := range p.Planificador.BlockQueue {
+	for _, proc := range p.Planificador.BlockQueue {
 		if proc.PCB.PID == pid {
 			proceso = proc
-			p.Planificador.BlockQueue = append(p.Planificador.BlockQueue[:i], p.Planificador.BlockQueue[i+1:]...)
 			break
+		}
+	}
+
+	if proceso != nil {
+		var removido bool
+		p.Planificador.BlockQueue, removido = p.removerDeCola(pid, p.Planificador.BlockQueue)
+		if !removido {
+			p.Log.Error("🚨 Proceso no encontrado en BlockQueue durante moverProcesoBlockedAReady",
+				log.IntAttr("pid", pid),
+			)
 		}
 	}
 	p.mutexBlockQueue.Unlock()
@@ -145,13 +163,23 @@ func (p *Service) moverProcesoBlockedAReady(pid int) error {
 func (p *Service) moverProcesoBlockedAExit(pid int) error {
 	var proceso *internal.Proceso
 
-	// Remover de BLOCKED
+	// Remover de BLOCKED usando función segura
 	p.mutexBlockQueue.Lock()
-	for i, proc := range p.Planificador.BlockQueue {
+	for _, proc := range p.Planificador.BlockQueue {
 		if proc.PCB.PID == pid {
 			proceso = proc
-			p.Planificador.BlockQueue = append(p.Planificador.BlockQueue[:i], p.Planificador.BlockQueue[i+1:]...)
 			break
+		}
+	}
+
+	// Eliminar usando
+	if proceso != nil {
+		var removido bool
+		p.Planificador.BlockQueue, removido = p.removerDeCola(pid, p.Planificador.BlockQueue)
+		if !removido {
+			p.Log.Error("🚨 Proceso no encontrado en BlockQueue durante moverProcesoBlockedAExit",
+				log.IntAttr("pid", pid),
+			)
 		}
 	}
 	p.mutexBlockQueue.Unlock()
@@ -161,10 +189,13 @@ func (p *Service) moverProcesoBlockedAExit(pid int) error {
 	}
 
 	// Actualizar métricas de tiempo para BLOCKED
-	if proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] != nil {
-		proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoAcumulado +=
-			time.Since(proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoInicio)
+	if proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] == nil {
+		proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] = &internal.EstadoTiempo{
+			TiempoAcumulado: 0,
+		}
 	}
+	proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoAcumulado +=
+		time.Since(proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoInicio)
 
 	// Agregar a EXIT
 	p.Planificador.ExitQueue = append(p.Planificador.ExitQueue, proceso)

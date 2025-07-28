@@ -29,7 +29,7 @@ func (p *Service) SuspenderProcesoBloqueado() {
 			if sigueBloqueado {
 				//Mover de blocked a suspended blocked
 				p.mutexBlockQueue.Lock()
-				quitarDeCola(&p.Planificador.BlockQueue, proceso)
+				p.removerDeCola(proceso.PCB.PID, p.Planificador.BlockQueue)
 				p.mutexBlockQueue.Unlock()
 
 				p.mutexSuspBlockQueue.Lock()
@@ -74,7 +74,13 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 	p.mutexSuspBlockQueue.Unlock()
 	if estabaSuspendido {
 		p.mutexSuspBlockQueue.Lock()
-		quitarDeCola(&p.Planificador.SuspBlockQueue, proceso)
+		var removido bool
+		p.Planificador.SuspBlockQueue, removido = p.removerDeCola(proceso.PCB.PID, p.Planificador.SuspBlockQueue)
+		if !removido {
+			p.Log.Debug("🚨 Proceso no encontrado en SuspBlockQueue durante ManejarFinIO",
+				log.IntAttr("pid", proceso.PCB.PID),
+			)
+		}
 		p.mutexSuspBlockQueue.Unlock()
 
 		p.mutexSuspReadyQueue.Lock()
@@ -104,10 +110,19 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 		//Proceso estaba en BLOCKED → READY
 		//Esto no se si tiene que estar aca, puede ser logica repetida
 		p.mutexBlockQueue.Lock()
-		quitarDeCola(&p.Planificador.BlockQueue, proceso)
-		if proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] != nil {
-			proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoAcumulado += time.Since(proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoInicio)
+		var removido bool
+		p.Planificador.BlockQueue, removido = p.removerDeCola(proceso.PCB.PID, p.Planificador.BlockQueue)
+		if !removido {
+			p.Log.Debug("🚨 Proceso no encontrado en BlockQueue durante ManejarFinIO",
+				log.IntAttr("pid", proceso.PCB.PID),
+			)
 		}
+		if proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] == nil {
+			proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] = &internal.EstadoTiempo{
+				TiempoAcumulado: 0,
+			}
+		}
+		proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoAcumulado += time.Since(proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoInicio)
 		p.mutexBlockQueue.Unlock()
 
 		p.mutexReadyQueue.Lock()
@@ -142,15 +157,6 @@ func estaEnCola(p *internal.Proceso, cola []*internal.Proceso) bool {
 		}
 	}
 	return false
-}
-
-func quitarDeCola(cola *[]*internal.Proceso, p *internal.Proceso) {
-	for i, proc := range *cola {
-		if proc.PCB.PID == p.PCB.PID {
-			*cola = append((*cola)[:i], (*cola)[i+1:]...)
-			return
-		}
-	}
 }
 
 // avisarAMemoriaSwap notifica a memoria que debe realizar el swap del proceso

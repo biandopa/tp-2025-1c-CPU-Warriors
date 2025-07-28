@@ -8,6 +8,7 @@ import (
 	"github.com/sisoputnfrba/tp-golang/kernel/internal"
 	"github.com/sisoputnfrba/tp-golang/kernel/pkg/cpu"
 	"github.com/sisoputnfrba/tp-golang/kernel/pkg/memoria"
+	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
 
 type Service struct {
@@ -158,4 +159,34 @@ func (p *Service) BuscarProcesoEnCualquierCola(pid int) *internal.Proceso {
 	p.mutexSuspReadyQueue.RUnlock()
 
 	return nil // No se encontró el proceso en ninguna cola
+}
+
+// removerDeCola remueve un proceso de cualquier cola de forma segura y devuelve la nueva cola
+// IMPORTANTE: El mutex debe estar ya bloqueado por quien llama esta función
+func (p *Service) removerDeCola(pid int, cola []*internal.Proceso) ([]*internal.Proceso, bool) {
+	// Crear una nueva cola sin el proceso a eliminar
+	var nuevaQueue []*internal.Proceso
+	procesoRemovido := false
+
+	for _, proc := range cola {
+		if proc.PCB.PID != pid {
+			nuevaQueue = append(nuevaQueue, proc)
+		} else {
+			procesoRemovido = true
+			p.Log.Debug("Proceso removido de cola de forma segura",
+				log.IntAttr("pid", pid),
+				log.IntAttr("queue_size_before", len(cola)),
+				log.IntAttr("queue_size_after", len(nuevaQueue)),
+			)
+		}
+	}
+
+	if !procesoRemovido {
+		p.Log.Debug("Proceso NO encontrado en la cola para remover",
+			log.IntAttr("pid", pid),
+			log.IntAttr("queue_size", len(cola)),
+		)
+	}
+
+	return nuevaQueue, procesoRemovido
 }

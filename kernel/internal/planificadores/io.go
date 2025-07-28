@@ -63,12 +63,21 @@ func (p *Service) BloquearPorIO(pid int) error {
 	var proceso *internal.Proceso
 
 	p.mutexExecQueue.Lock()
-	for i, proc := range p.Planificador.ExecQueue {
+	for _, proc := range p.Planificador.ExecQueue {
 		if proc.PCB.PID == pid {
 			proceso = proc
-			// Remover de EXEC
-			p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:i], p.Planificador.ExecQueue[i+1:]...)
 			break
+		}
+	}
+
+	// Remover de EXEC usando función segura
+	if proceso != nil {
+		var removido bool
+		p.Planificador.ExecQueue, removido = p.removerDeCola(pid, p.Planificador.ExecQueue)
+		if !removido {
+			p.Log.Error("🚨 Proceso no encontrado en ExecQueue durante BloquearPorIO",
+				log.IntAttr("pid", pid),
+			)
 		}
 	}
 	p.mutexExecQueue.Unlock()
