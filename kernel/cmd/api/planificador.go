@@ -90,12 +90,11 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		log.AnyAttr("syscall", syscall),
 	)
 
-	//Log obligatorio: Syscall recibida
-	//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
-	h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
-
 	switch syscall.Instruccion {
 	case "INIT_PROC":
+		//Log obligatorio: Syscall recibida
+		//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
+		h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
 
 		// Verifico que tenga los argumentos necesarios
 		if len(syscall.Args) < 2 {
@@ -140,6 +139,10 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 
 				return
 			}
+
+			//Log obligatorio: Syscall recibida (solo si el proceso está en EXEC)
+			//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
+			h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
 
 			//Existe y está libre, pasar a blocked y además manda la señal
 			timeSleep, err := strconv.Atoi(syscall.Args[1])
@@ -220,10 +223,18 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "DUMP_MEMORY":
+		//Log obligatorio: Syscall recibida
+		//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
+		h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
+
 		/* Se bloquea el proceso. En caso de error, se envía a la cola de Exit. Caso contrario, se pasa a Ready*/
 		go h.Planificador.RealizarDumpMemory(syscall.PID)
 
 	case "EXIT":
+		//Log obligatorio: Syscall recibida
+		//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
+		h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
+
 		go h.Planificador.FinalizarProceso(syscall.PID)
 
 	default:
