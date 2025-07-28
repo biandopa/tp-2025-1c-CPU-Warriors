@@ -156,6 +156,10 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 				TablasDePaginas: tabla,
 			}
 			h.TablasProcesos = append(h.TablasProcesos, tablaProceso)
+
+			//Log obligatorio: Creación de Proceso
+			//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
+			h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
 		}
 	} else {
 		tablaProceso := &TablasProceso{
@@ -163,14 +167,15 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 			Tamanio: paginasAOcupar * h.Config.PageSize,
 		}
 		h.TablasProcesos = append(h.TablasProcesos, tablaProceso)
+
+		//Log obligatorio: Creación de Proceso
+		//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
+		h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
 	}
 
 	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
 	tablaMetricas.CantidadSubidasMemoriaPrincipal++
 
-	//Log obligatorio: Creación de Proceso
-	//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
-	h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
 }
 
 // Recibe el archivo Swap y el marco que debe pasar a Swap y lo escribe en el swap
