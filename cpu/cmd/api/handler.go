@@ -12,11 +12,12 @@ import (
 )
 
 type Handler struct {
-	Log        *slog.Logger
-	Config     *Config
-	Service    *internal.Service
-	Memoria    *memoria.Memoria
-	HttpClient *http.Client
+	Log          *slog.Logger
+	Config       *Config
+	Service      *internal.Service
+	Memoria      *memoria.Memoria
+	HttpClient   *http.Client
+	TiempoInicio time.Time
 }
 
 func NewHandler(configFile string) *Handler {

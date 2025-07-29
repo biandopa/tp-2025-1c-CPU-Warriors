@@ -84,9 +84,6 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 		return fmt.Errorf("proceso con PID %d no encontrado en EXEC", pid)
 	}
 
-	// Actualizar ráfaga anterior antes de mover a BLOCKED (IMPORTANTE para SRT - incluye métricas de tiempo EXEC)
-	p.actualizarRafagaAnterior(proceso)
-
 	// Agregar a BLOCKED
 	p.mutexBlockQueue.Lock()
 	p.Planificador.BlockQueue = append(p.Planificador.BlockQueue, proceso)
