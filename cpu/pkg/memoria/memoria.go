@@ -230,6 +230,78 @@ func (m *Memoria) Read(pid int, direccion string, tamanio int, pageConfig PageCo
 	return respuesta.Contenido, nil
 }
 
+// Read envía una petición de lectura por pagina a memoria (La usa la cache)
+func (m *Memoria) ReadCompleto(pid int, direccion string, pageConfig PageConfig) (string, error) {
+	// Convertir dirección física a frame y offset
+	dirFisicaInt, err := strconv.Atoi(direccion)
+	if err != nil {
+		return "", fmt.Errorf("error al convertir dirección física: %w", err)
+	}
+
+	frame := dirFisicaInt / pageConfig.PageSize
+	offset := dirFisicaInt % pageConfig.PageSize
+
+	// Crear petición compatible con memoria
+	peticion := LecturaEscrituraBody{
+		PID:    strconv.Itoa(pid),
+		Frame:  frame,
+		Offset: offset,
+	}
+
+	body, err := json.Marshal(peticion)
+	if err != nil {
+		m.Log.Error("Error al serializar petición READ",
+			log.IntAttr("pid", pid),
+			log.StringAttr("direccion", direccion),
+			log.ErrAttr(err),
+		)
+		return "", fmt.Errorf("error al serializar petición READ: %w", err)
+	}
+
+	url := fmt.Sprintf("http://%s:%d/cpu/lectura-completa", m.IP, m.Puerto)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		m.Log.Error("Error enviando petición read a memoria",
+			log.StringAttr("ip", m.IP),
+			log.IntAttr("puerto", m.Puerto),
+			log.IntAttr("pid", pid),
+			log.StringAttr("direccion", direccion),
+			log.ErrAttr(err),
+		)
+		return "", fmt.Errorf("error al enviar petición read: %w", err)
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		m.Log.Error("Memoria respondió con error en read",
+			log.StringAttr("status", resp.Status),
+			log.IntAttr("status_code", resp.StatusCode),
+		)
+		return "", fmt.Errorf("memoria respondió con error: %s", resp.Status)
+	}
+
+	// Decodificar respuesta de lectura
+	var respuesta struct {
+		Contenido string `json:"contenido"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&respuesta); err != nil {
+		m.Log.Error("Error al decodificar respuesta read",
+			log.ErrAttr(err),
+		)
+		return "", fmt.Errorf("error al decodificar respuesta: %w", err)
+	}
+
+	m.Log.Debug("READ exitoso",
+		log.IntAttr("pid", pid),
+		log.StringAttr("direccion", direccion),
+		log.StringAttr("datos_leidos", respuesta.Contenido),
+	)
+
+	return respuesta.Contenido, nil
+}
+
 // FetchInstruccion obtiene una instrucción de memoria
 func (m *Memoria) FetchInstruccion(pid int, pc int) (Instruccion, error) {
 	var instruccion Instruccion
@@ -362,7 +434,7 @@ func (m *Memoria) ConsultarPageSize() (PageConfig, error) {
 	return info, nil
 }
 
-func (m *Memoria) GuardarPagsEnMemoria(info map[string]map[string]interface{}) error {
+func (m *Memoria) GuardarPagsEnMemoria(info map[string]interface{}) error {
 	url := fmt.Sprintf("http://%s:%d/cpu/actualizar-pag-completa", m.IP, m.Puerto)
 
 	body := new(bytes.Buffer)
