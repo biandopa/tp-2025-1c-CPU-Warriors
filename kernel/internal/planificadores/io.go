@@ -79,6 +79,11 @@ func (p *Service) BloquearPorIO(pid int) error {
 				log.IntAttr("pid", pid),
 			)
 		}
+
+		if proceso.PCB.MetricasTiempo[internal.EstadoExec] != nil {
+			proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+				time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
+		}
 	}
 	p.mutexExecQueue.Unlock()
 

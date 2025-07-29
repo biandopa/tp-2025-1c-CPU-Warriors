@@ -103,62 +103,62 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 	}
 }
 
-func (p *Service) BuscarProcesoEnCualquierCola(pid int) *internal.Proceso {
+func (p *Service) BuscarProcesoEnCualquierCola(pid int) (*internal.Proceso, internal.Estado) {
 	p.mutexNewQueue.RLock()
 	for _, proc := range p.Planificador.NewQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB.PID == pid {
 			p.mutexNewQueue.RUnlock()
-			return proc
+			return proc, internal.EstadoNew
 		}
 	}
 	p.mutexNewQueue.RUnlock()
 
 	p.mutexReadyQueue.RLock()
 	for _, proc := range p.Planificador.ReadyQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB.PID == pid {
 			p.mutexReadyQueue.RUnlock()
-			return proc
+			return proc, internal.EstadoReady
 		}
 	}
 	p.mutexReadyQueue.RUnlock()
 
 	p.mutexBlockQueue.RLock()
 	for _, proc := range p.Planificador.BlockQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB.PID == pid {
 			p.mutexBlockQueue.RUnlock()
-			return proc
+			return proc, internal.EstadoBloqueado
 		}
 	}
 	p.mutexBlockQueue.RUnlock()
 
 	p.mutexExecQueue.RLock()
 	for _, proc := range p.Planificador.ExecQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB.PID == pid {
 			p.mutexExecQueue.RUnlock()
-			return proc
+			return proc, internal.EstadoExec
 		}
 	}
 	p.mutexExecQueue.RUnlock()
 
 	p.mutexSuspBlockQueue.RLock()
 	for _, proc := range p.Planificador.SuspBlockQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB.PID == pid {
 			p.mutexSuspBlockQueue.RUnlock()
-			return proc
+			return proc, internal.EstadoSuspReady
 		}
 	}
 	p.mutexSuspBlockQueue.RUnlock()
 
 	p.mutexSuspReadyQueue.RLock()
 	for _, proc := range p.Planificador.SuspReadyQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB.PID == pid {
 			p.mutexSuspReadyQueue.RUnlock()
-			return proc
+			return proc, internal.EstadoSuspReady
 		}
 	}
 	p.mutexSuspReadyQueue.RUnlock()
 
-	return nil // No se encontró el proceso en ninguna cola
+	return nil, "" // No se encontró el proceso en ninguna cola
 }
 
 // removerDeCola remueve un proceso de cualquier cola de forma segura y devuelve la nueva cola
@@ -169,7 +169,7 @@ func (p *Service) removerDeCola(pid int, cola []*internal.Proceso) ([]*internal.
 	procesoRemovido := false
 
 	for _, proc := range cola {
-		if proc.PCB.PID != pid {
+		if proc != nil && proc.PCB.PID != pid {
 			nuevaQueue = append(nuevaQueue, proc)
 		} else {
 			procesoRemovido = true

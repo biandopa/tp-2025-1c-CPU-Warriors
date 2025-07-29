@@ -45,6 +45,12 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 				procesoElegido := p.Planificador.ReadyQueue[0]
 				p.Planificador.ReadyQueue = p.Planificador.ReadyQueue[1:]
 
+				// Actualizar métricas de tiempo
+				if procesoElegido.PCB.MetricasTiempo[internal.EstadoReady] != nil {
+					procesoElegido.PCB.MetricasTiempo[internal.EstadoReady].TiempoAcumulado +=
+						time.Since(procesoElegido.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio)
+				}
+
 				// Crear una copia del proceso para la goroutine
 				procesoCopia := *procesoElegido
 
@@ -53,12 +59,6 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 				// Agregar inmediatamente a ExecQueue de forma síncrona
 				p.mutexExecQueue.Lock()
 				p.Planificador.ExecQueue = append(p.Planificador.ExecQueue, procesoElegido)
-
-				// Actualizar métricas de tiempo
-				if procesoElegido.PCB.MetricasTiempo[internal.EstadoReady] == nil {
-					procesoElegido.PCB.MetricasTiempo[internal.EstadoReady].TiempoAcumulado +=
-						time.Since(procesoElegido.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio)
-				}
 
 				if procesoElegido.PCB.MetricasTiempo[internal.EstadoExec] == nil {
 					procesoElegido.PCB.MetricasTiempo[internal.EstadoExec] = &internal.EstadoTiempo{}
@@ -340,6 +340,13 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) *cpu.Cpu {
 			log.IntAttr("pid", proceso.PCB.PID),
 		)
 	}
+
+	// Actualizar métricas de Exec
+	if proceso.PCB.MetricasTiempo[internal.EstadoExec] != nil {
+		proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+			time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
+	}
+
 	p.mutexExecQueue.Unlock()
 
 	// Devolver a ReadyQueue con protección de mutex
@@ -409,12 +416,6 @@ func (p *Service) buscarCPUPorPID(pid int) *cpu.Cpu {
 
 // asignarProcesoACPU asigna un proceso a una CPU específica
 func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu.Cpu) {
-	// Mover proceso de READY a EXEC
-	timeReady := proceso.PCB.MetricasTiempo[internal.EstadoReady]
-	if timeReady != nil {
-		timeReady.TiempoAcumulado += time.Since(timeReady.TiempoInicio)
-	}
-
 	// Actualizar la CPU con el proceso
 	// Ejecutar en goroutine para no bloquear el planificador
 
@@ -424,6 +425,12 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 			log.AnyAttr("proceso", proceso),
 		)
 		return
+	}
+
+	// Actualizar métricas de tiempo
+	if proceso.PCB.MetricasTiempo[internal.EstadoReady] != nil {
+		proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoAcumulado +=
+			time.Since(proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio)
 	}
 
 	// IMPORTANTE: Usar orden consistente de mutex (ExecQueue -> CPUsConectadas) para evitar deadlocks

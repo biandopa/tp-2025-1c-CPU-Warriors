@@ -12,15 +12,13 @@ import (
 // Bloquea el proceso, solicita el dump a memoria, y luego lo desbloquea o envía a EXIT
 func (p *Service) RealizarDumpMemory(pid int) {
 	// Mover el proceso de EXEC a BLOCKED
-	go func() {
-		if err := p.moverProcesoExecABlocked(pid); err != nil {
-			p.Log.Error("Error al mover proceso de EXEC a BLOCKED",
-				log.IntAttr("pid", pid),
-				log.ErrAttr(err),
-			)
-			return
-		}
-	}()
+	if err := p.moverProcesoExecABlocked(pid); err != nil {
+		p.Log.Error("Error al mover proceso de EXEC a BLOCKED",
+			log.IntAttr("pid", pid),
+			log.ErrAttr(err),
+		)
+		return
+	}
 
 	// Realizar el dump de memoria de forma asíncrona
 	go func() {
@@ -38,7 +36,7 @@ func (p *Service) RealizarDumpMemory(pid int) {
 					log.ErrAttr(err),
 				)
 			} else {
-				go p.FinalizarProceso(pid)
+				p.FinalizarProcesoEnCualquierCola(pid)
 			}
 
 		} else {
@@ -77,7 +75,13 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 				log.IntAttr("pid", pid),
 			)
 		}
+
+		if proceso.PCB.MetricasTiempo[internal.EstadoExec] != nil {
+			proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+				time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
+		}
 	}
+
 	p.mutexExecQueue.Unlock()
 
 	if proceso == nil {
