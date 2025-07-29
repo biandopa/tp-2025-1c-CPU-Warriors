@@ -185,10 +185,6 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 		//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
 		h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
 	}
-
-	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
-	tablaMetricas.CantidadSubidasMemoriaPrincipal++
-
 }
 
 // Recibe el archivo Swap y el marco que debe pasar a Swap y lo escribe en el swap
@@ -443,6 +439,8 @@ func (h *Handler) SacarProcesoDeSwap(pid string) {
 	posicionEnSwap := h.PosicionesDeProcesoEnSwap(pidDeSwap)
 
 	procesYTablaAsociadaDeSwap, _ := h.BuscarProcesoPorPID(pid)
+	procesYTablaAsociadaDeSwap.CantidadSubidasMemoriaPrincipal++
+
 	marcosDelProcesoDeSwap := h.ObtenerMarcosDeLaTabla(procesYTablaAsociadaDeSwap.TablasDePaginas)
 
 	//ir escribiendo cada frame en memoria
@@ -771,7 +769,7 @@ func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Reques
 
 	/* Log obligatorio: Escritura / lectura en espacio de usuario
 	"## PID: <PID> - <Escritura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>"*/
-	h.Log.Info(fmt.Sprintf("## PID: %s - ESCRITURA %s - Dir. Física: %d - Tamaño: %d",
+	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
 		pid, data, frame*h.Config.PageSize, len(data)))
 
 	h.Log.Debug(fmt.Sprintf("## PID: %s - Actualización de página completa - Dir. Física: %d - Tamaño: %d",
@@ -911,9 +909,10 @@ func (h *Handler) EscribirPagina(w http.ResponseWriter, r *http.Request) {
 
 	tablaMetricas, _ := h.BuscarProcesoPorPID(escritura.PID)
 	tablaMetricas.CantidadDeEscritura++
+
 	/* Log obligatorio: Escritura / lectura en espacio de usuario
 	"## PID: <PID> - <Escritura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>"*/
-	h.Log.Info(fmt.Sprintf("## PID: %s - ESCRITURA %s - Dir. Física: %d - Tamaño: %d",
+	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
 		escritura.PID, escritura.ValorAEscribir, escritura.Frame*h.Config.PageSize+escritura.Offset, len(escritura.ValorAEscribir)))
 
 	time.Sleep(time.Duration(h.Config.MemoryDelay) * time.Millisecond)
