@@ -245,7 +245,7 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 	// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %d", pid, nroPagina))
 
-	datos, err := m.Memoria.Read(pid, dirFisica, tamanio, memoria.PageConfig{
+	datos, err := m.Memoria.ReadCompleto(pid, dirFisica, memoria.PageConfig{
 		PageSize:       m.PageSize,
 		Entries:        m.CantEntriesMem,
 		NumberOfLevels: m.NumberOfLevels,
@@ -256,6 +256,8 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 
 	// Agregar a caché
 	m.agregarACache(pid, entriesKey, datos, false)
+	offset := dirLogicaInt % m.PageSize
+	datos = datos[offset : offset+tamanio]
 
 	// Log obligatorio: Página ingresada en Caché
 	// "PID: <PID> - Cache Add - Pagina: <NUMERO_PAGINA>"
@@ -316,7 +318,10 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 
 		m.CacheMutex.Lock()
 		// Actualizar datos en caché
-		m.Cache.Entries[index].Data = datos
+		offset := dirLogicaInt % m.PageSize
+		dataAActualizar := []byte(m.Cache.Entries[index].Data)
+		copy(dataAActualizar[offset:offset+len(datos)], datos)
+		m.Cache.Entries[index].Data = string(dataAActualizar)
 		m.Cache.Entries[index].LastAccess = time.Now()
 		m.Cache.Entries[index].Reference = true
 		m.Cache.Entries[index].Modified = true // Marcar como modificado
@@ -329,6 +334,20 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 	// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %s", pid, nroPaginaStr))
 
+	datosDeLectura, err := m.Memoria.ReadCompleto(pid, dirFisica, memoria.PageConfig{
+		PageSize:       m.PageSize,
+		Entries:        m.CantEntriesMem,
+		NumberOfLevels: m.NumberOfLevels,
+	})
+
+	if len(datosDeLectura) != 0 {
+		offset := dirLogicaInt % m.PageSize
+		dataAActualizar := []byte(datosDeLectura)
+		copy(dataAActualizar[offset:offset+len(datos)], datos)
+		datos = string(dataAActualizar)
+	}
+
+	m.Log.Info(fmt.Sprintf("QUE DATO TENGO %s", datos))
 	m.agregarACache(pid, entriesKey, datos, true)
 
 	// Log obligatorio: Página ingresada en Caché
@@ -343,7 +362,7 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 	m.Log.Debug("Limpiando memoria del proceso",
 		log.IntAttr("pid", pid))
 
-	dataToSave := map[string]map[string]interface{}{}
+	dataToSave := map[string]interface{}{}
 	pags := make([]string, 0)
 
 	// Limpiar TLB - eliminar todas las entradas del proceso
@@ -367,10 +386,12 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 		if entry.Modified {
 			m.Log.Debug("Escribiendo página modificada a memoria antes de limpiar",
 				log.StringAttr("page_id", entry.PageID))
-			dataToSave[entry.PageID] = map[string]interface{}{
-				"pid":  strconv.Itoa(entry.PID),
-				"data": entry.Data,
+			dataToSave = map[string]interface{}{
+				"pid":                strconv.Itoa(entry.PID),
+				"data":               entry.Data,
+				"entradas_por_nivel": entry.PageID,
 			}
+
 			pags = append(pags, entry.PageID)
 		}
 		// Eliminar entrada de caché
@@ -520,16 +541,17 @@ func (m *MMU) evictCacheClock() {
 	m.CacheMutex.Lock()
 	defer m.CacheMutex.Unlock()
 
-	dataAAlmacenar := map[string]map[string]interface{}{}
+	dataAAlmacenar := map[string]interface{}{}
 	newArrayCache := m.reordenarCacheEntries()
 
 	// La primera iteración comienza desde el puntero del CLOCK y va buscando entradas con el bit de uso en 0.
 	for i, entry := range newArrayCache {
 		if !entry.Reference {
 			// Se agrega la data a almacenar
-			dataAAlmacenar[entry.PageID] = map[string]interface{}{
-				"pid":  strconv.Itoa(entry.PID),
-				"data": entry.Data,
+			dataAAlmacenar = map[string]interface{}{
+				"pid":                strconv.Itoa(entry.PID),
+				"data":               entry.Data,
+				"entradas_por_nivel": entry.PageID,
 			}
 
 			// Eliminar la entrada de la caché
@@ -567,9 +589,10 @@ func (m *MMU) evictCacheClock() {
 	for i, entry := range newArrayCache {
 		if !entry.Reference {
 			// Se agrega la data a almacenar
-			dataAAlmacenar[entry.PageID] = map[string]interface{}{
-				"pid":  strconv.Itoa(entry.PID),
-				"data": entry.Data,
+			dataAAlmacenar = map[string]interface{}{
+				"pid":                strconv.Itoa(entry.PID),
+				"data":               entry.Data,
+				"entradas_por_nivel": entry.PageID,
 			}
 
 			// Eliminar la entrada de la caché
@@ -607,7 +630,7 @@ func (m *MMU) evictCacheClockM() {
 	m.CacheMutex.Lock()
 	defer m.CacheMutex.Unlock()
 
-	dataAAlmacenar := map[string]map[string]interface{}{}
+	dataAAlmacenar := map[string]interface{}{}
 	newArrayCache := m.reordenarCacheEntries()
 
 	// La primera iteración comienza desde el puntero del CLOCK y va buscando entradas con el bit
@@ -615,9 +638,10 @@ func (m *MMU) evictCacheClockM() {
 	for i, entry := range newArrayCache {
 		if !entry.Reference && !entry.Modified {
 			// Se agrega la data a almacenar
-			dataAAlmacenar[entry.PageID] = map[string]interface{}{
-				"pid":  strconv.Itoa(entry.PID),
-				"data": entry.Data,
+			dataAAlmacenar = map[string]interface{}{
+				"pid":                strconv.Itoa(entry.PID),
+				"data":               entry.Data,
+				"entradas_por_nivel": entry.PageID,
 			}
 
 			// Eliminar la entrada de la caché
