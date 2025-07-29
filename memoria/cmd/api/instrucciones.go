@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
@@ -57,6 +58,9 @@ func (h *Handler) RecibirInstruccion(w http.ResponseWriter, r *http.Request) {
 
 	// Leemos la instrucción asociada al proceso. Usamos el PC como index del array y luego la enviamos al cliente
 	body, _ := json.Marshal(instruccion)
+	paginaString := strconv.Itoa(proceso.PID)
+	tablaMetricas, _ := h.BuscarProcesoPorPID(paginaString)
+	tablaMetricas.CantidadInstruccionesSolicitadas++
 
 	// Respond with success
 	w.WriteHeader(http.StatusOK)

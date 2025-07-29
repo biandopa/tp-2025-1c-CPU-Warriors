@@ -29,8 +29,9 @@ type LecturaEscrituraBody struct {
 }
 
 type CacheData struct {
-	PID  string `json:"pid"`
-	Data string `json:"data"`
+	PID              string `json:"pid"`
+	Data             string `json:"data"`
+	EntradasPorNivel string `json:"entradas_por_nivel"`
 }
 
 // TablasProceso Estructura en la cual guardamos las metricas y la tabla de paginas
@@ -151,26 +152,43 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 			h.SacarProcesoDeSwap(pid)
 		} else {
 			tablaProceso := &TablasProceso{
-				PID:             pid,
-				Tamanio:         paginasAOcupar * h.Config.PageSize,
-				TablasDePaginas: tabla,
+				PID:                              pid,
+				Tamanio:                          paginasAOcupar * h.Config.PageSize,
+				TablasDePaginas:                  tabla,
+				CantidadAccesosATablas:           0,
+				CantidadInstruccionesSolicitadas: 0,
+				CantidadBajadasSwap:              0,
+				CantidadSubidasMemoriaPrincipal:  0,
+				CantidadDeEscritura:              0,
+				CantidadDeLectura:                0,
 			}
 			h.TablasProcesos = append(h.TablasProcesos, tablaProceso)
+
+			//Log obligatorio: Creación de Proceso
+			//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
+			h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
 		}
 	} else {
 		tablaProceso := &TablasProceso{
-			PID:     pid,
-			Tamanio: paginasAOcupar * h.Config.PageSize,
+			PID:                              pid,
+			Tamanio:                          paginasAOcupar * h.Config.PageSize,
+			CantidadAccesosATablas:           0,
+			CantidadInstruccionesSolicitadas: 0,
+			CantidadBajadasSwap:              0,
+			CantidadSubidasMemoriaPrincipal:  0,
+			CantidadDeEscritura:              0,
+			CantidadDeLectura:                0,
 		}
 		h.TablasProcesos = append(h.TablasProcesos, tablaProceso)
+
+		//Log obligatorio: Creación de Proceso
+		//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
+		h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
 	}
 
 	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
 	tablaMetricas.CantidadSubidasMemoriaPrincipal++
 
-	//Log obligatorio: Creación de Proceso
-	//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
-	h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
 }
 
 // Recibe el archivo Swap y el marco que debe pasar a Swap y lo escribe en el swap
@@ -700,7 +718,7 @@ func (h *Handler) ContienePIDEnSwap(pid int) bool {
 // ActualizarPaginaCompleta Recibe la llamada de CPU para realizar la actualizacion de una página que se encontraba en caché
 func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Request) {
 	var (
-		body             map[string]CacheData // La key es el índice de la página, el valor es un CacheData con PID y Data
+		body             CacheData // La key es el índice de la página, el valor es un CacheData con PID y Data
 		cantAccesosTabla int
 	)
 
@@ -712,49 +730,52 @@ func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	for entradasNivel, cacheData := range body {
-		pid := cacheData.PID
-		data := cacheData.Data
+	pid := body.PID
+	data := body.Data
 
-		var indices = make([]int, 0)
-		indicesSplit := strings.Split(entradasNivel, "-")
-		for _, indice := range indicesSplit {
-			paginaInt, err := strconv.Atoi(indice)
-			if err != nil {
-				h.Log.Error("Error al convertir entrada de nivel a entero",
-					log.ErrAttr(err),
-					log.StringAttr("entrada", indice),
-				)
-				http.Error(w, "error al convertir entrada de nivel a entero", http.StatusBadRequest)
-				return
-			}
-			indices = append(indices, paginaInt)
-		}
-
-		tablaMetricas, err := h.BuscarProcesoPorPID(pid)
+	var indices = make([]int, 0)
+	indicesSplit := strings.Split(body.EntradasPorNivel, "-")
+	for _, indice := range indicesSplit {
+		paginaInt, err := strconv.Atoi(indice)
 		if err != nil {
-			h.Log.Error("Error al buscar proceso por PID",
-				log.StringAttr("pid", pid),
-				log.ErrAttr(err))
-			http.Error(w, "proceso no encontrado", http.StatusNotFound)
+			h.Log.Error("Error al convertir entrada de nivel a entero",
+				log.ErrAttr(err),
+				log.StringAttr("entrada", indice),
+			)
+			http.Error(w, "error al convertir entrada de nivel a entero", http.StatusBadRequest)
 			return
 		}
-		tablaMetricas.CantidadDeEscritura++
-
-		cantAccesosTabla += len(indices)
-		frame, found := buscarMarcoPorPaginaAux(tablaMetricas, indices)
-		if !found {
-			h.Log.Error("Marco no encontrado para la página",
-				log.AnyAttr("indices", indices),
-				log.StringAttr("pid", pid))
-			http.Error(w, "marco no encontrado para la página", http.StatusNotFound)
-			return
-		}
-		copy(h.EspacioDeUsuario[frame*h.Config.PageSize:(frame+1)*h.Config.PageSize], data)
-
-		h.Log.Debug(fmt.Sprintf("## PID: %s - Actualización de página completa - Dir. Física: %d - Tamaño: %d",
-			pid, frame*h.Config.PageSize, len(data)))
+		indices = append(indices, paginaInt)
 	}
+
+	tablaMetricas, err := h.BuscarProcesoPorPID(pid)
+	if err != nil {
+		h.Log.Error("Error al buscar proceso por PID",
+			log.StringAttr("pid", pid),
+			log.ErrAttr(err))
+		http.Error(w, "proceso no encontrado", http.StatusNotFound)
+		return
+	}
+	tablaMetricas.CantidadDeEscritura++
+
+	cantAccesosTabla += len(indices)
+	frame, found := buscarMarcoPorPaginaAux(tablaMetricas, indices)
+	if !found {
+		h.Log.Error("Marco no encontrado para la página",
+			log.AnyAttr("indices", indices),
+			log.StringAttr("pid", pid))
+		http.Error(w, "marco no encontrado para la página", http.StatusNotFound)
+		return
+	}
+	copy(h.EspacioDeUsuario[frame*h.Config.PageSize:(frame+1)*h.Config.PageSize], data)
+
+	/* Log obligatorio: Escritura / lectura en espacio de usuario
+	"## PID: <PID> - <Escritura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>"*/
+	h.Log.Info(fmt.Sprintf("## PID: %s - ESCRITURA %s - Dir. Física: %d - Tamaño: %d",
+		pid, data, frame*h.Config.PageSize, len(data)))
+
+	h.Log.Debug(fmt.Sprintf("## PID: %s - Actualización de página completa - Dir. Física: %d - Tamaño: %d",
+		pid, frame*h.Config.PageSize, len(data)))
 
 	// Aplicamos el retardo de memoria configurado * cantidad de accesos a tablas
 	time.Sleep(time.Duration(h.Config.MemoryDelay*cantAccesosTabla) * time.Millisecond)
@@ -787,6 +808,51 @@ func (h *Handler) LeerPagina(w http.ResponseWriter, r *http.Request) {
 	"## PID: <PID> - <Lectura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>"*/
 	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
 		lectura.PID, lecturaMemoria, lectura.Frame*h.Config.PageSize+lectura.Offset, lectura.Tamanio))
+
+	tablaMetricas, _ := h.BuscarProcesoPorPID(lectura.PID)
+	tablaMetricas.CantidadDeLectura++
+
+	h.Log.Debug("LeerPagina",
+		log.AnyAttr("lecturaMemoria", lecturaMemoria))
+
+	time.Sleep(time.Duration(h.Config.MemoryDelay) * time.Millisecond)
+
+	// Enviamos la respuesta al cliente con el contenido leído
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{
+		"contenido": lecturaMemoria,
+	}
+
+	responseBody, _ := json.Marshal(response)
+	// Agrego el status Code 200 a la respuesta
+	w.WriteHeader(http.StatusOK)
+	// Envío la respuesta al cliente
+	_, _ = w.Write(responseBody)
+}
+
+// LeerPaginaCompleta Recibe la instruccion READ desde Cache
+func (h *Handler) LeerPaginaCompleta(w http.ResponseWriter, r *http.Request) {
+	var (
+		ctx     = r.Context()
+		lectura = LecturaEscrituraBody{}
+	)
+	// Leo el cuerpo de la solicitud y guardo el valor del body en la variable
+	if err := json.NewDecoder(r.Body).Decode(&lectura); err != nil {
+		h.Log.ErrorContext(ctx, "Error al decodificar interrupción",
+			log.ErrAttr(err))
+		http.Error(w, "error al decodificar mensaje", http.StatusInternalServerError)
+		return
+	}
+
+	dl := lectura.Frame * h.Config.PageSize
+	//if tamanioALeer mayor a cero
+	lecturaMemoria := string(h.EspacioDeUsuario[dl:(dl + h.Config.PageSize)])
+
+	lecturaMemoria = h.limpiarNulos(lecturaMemoria)
+	/* Log obligatorio: Escritura / lectura en espacio de usuario
+	"## PID: <PID> - <Lectura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>"*/
+	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
+		lectura.PID, lecturaMemoria, lectura.Frame*h.Config.PageSize, h.Config.PageSize))
 
 	tablaMetricas, _ := h.BuscarProcesoPorPID(lectura.PID)
 	tablaMetricas.CantidadDeLectura++
@@ -847,7 +913,7 @@ func (h *Handler) EscribirPagina(w http.ResponseWriter, r *http.Request) {
 	tablaMetricas.CantidadDeEscritura++
 	/* Log obligatorio: Escritura / lectura en espacio de usuario
 	"## PID: <PID> - <Escritura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>"*/
-	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
+	h.Log.Info(fmt.Sprintf("## PID: %s - ESCRITURA %s - Dir. Física: %d - Tamaño: %d",
 		escritura.PID, escritura.ValorAEscribir, escritura.Frame*h.Config.PageSize+escritura.Offset, len(escritura.ValorAEscribir)))
 
 	time.Sleep(time.Duration(h.Config.MemoryDelay) * time.Millisecond)
