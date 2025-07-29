@@ -347,7 +347,7 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 		datos = string(dataAActualizar)
 	}
 
-	m.Log.Info(fmt.Sprintf("QUE DATO TENGO %s", datos))
+	//m.Log.Info(fmt.Sprintf("QUE DATO TENGO %s", datos))
 	m.agregarACache(pid, entriesKey, datos, true)
 
 	// Log obligatorio: Página ingresada en Caché
@@ -363,7 +363,6 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 		log.IntAttr("pid", pid))
 
 	dataToSave := map[string]interface{}{}
-	pags := make([]string, 0)
 
 	// Limpiar TLB - eliminar todas las entradas del proceso
 	m.TLBMutex.Lock()
@@ -392,7 +391,21 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 				"entradas_por_nivel": entry.PageID,
 			}
 
-			pags = append(pags, entry.PageID)
+			//pags = append(pags, entry.PageID)
+
+			// Enviar información a memoria
+			response, _ := m.Memoria.BuscarFrame(pid, entry.PageID)
+			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
+
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+				pid, nroPag, response.Frame))
+
+			if err := m.Memoria.GuardarPagsEnMemoria(dataToSave); err != nil {
+				m.Log.Error("Error al guardar páginas en memoria",
+					log.ErrAttr(err),
+				)
+			}
 		}
 		// Eliminar entrada de caché
 		m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
@@ -400,27 +413,6 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 			log.StringAttr("page_id", entry.PageID))
 	}
 	m.CacheMutex.Unlock()
-
-	// Enviar información a memoria
-
-	for _, pageID := range pags {
-		frame := 0
-		// Obtenemos el frame asociado a la página
-		response, _ := m.Memoria.BuscarFrame(pid, pageID)
-		frame = response.Frame
-
-		nroPag, _ := m.calcularNumeroPagina(pageID)
-
-		// Log obligatorio: Limpieza de memoria
-		m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-			pid, nroPag, frame))
-	}
-
-	if err := m.Memoria.GuardarPagsEnMemoria(dataToSave); err != nil {
-		m.Log.Error("Error al guardar páginas en memoria",
-			log.ErrAttr(err),
-		)
-	}
 
 	m.Log.Debug("Limpieza de memoria completada",
 		log.IntAttr("pid", pid))
@@ -559,16 +551,13 @@ func (m *MMU) evictCacheClock() {
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
-			frame := 0
 			// Obtenemos el frame asociado a la página
 			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
-			frame = response.Frame
-
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
 			// Log obligatorio: Limpieza de memoria
 			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				entry.PID, nroPag, frame))
+				entry.PID, nroPag, response.Frame))
 
 			// Enviar información a memoria y salir
 			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
@@ -600,16 +589,13 @@ func (m *MMU) evictCacheClock() {
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
-			frame := 0
 			// Obtenemos el frame asociado a la página
 			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
-			frame = response.Frame
-
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
 			// Log obligatorio: Limpieza de memoria
 			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				entry.PID, nroPag, frame))
+				entry.PID, nroPag, response.Frame))
 
 			// Enviar información a memoria y salir
 			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
@@ -649,16 +635,13 @@ func (m *MMU) evictCacheClockM() {
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
-			frame := 0
 			// Obtenemos el frame asociado a la página
 			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
-			frame = response.Frame
-
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
 			// Log obligatorio: Limpieza de memoria
 			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				entry.PID, nroPag, frame))
+				entry.PID, nroPag, response.Frame))
 
 			// Enviar información a memoria y salir
 			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
@@ -677,9 +660,10 @@ func (m *MMU) evictCacheClockM() {
 	for i, entry := range newArrayCache {
 		if !entry.Reference {
 			// Se agrega la data a almacenar
-			dataAAlmacenar[entry.PageID] = map[string]interface{}{
-				"pid":  strconv.Itoa(entry.PID),
-				"data": entry.Data,
+			dataAAlmacenar = map[string]interface{}{
+				"pid":                strconv.Itoa(entry.PID),
+				"data":               entry.Data,
+				"entradas_por_nivel": entry.PageID,
 			}
 
 			// Eliminar la entrada de la caché
@@ -687,16 +671,13 @@ func (m *MMU) evictCacheClockM() {
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
-			frame := 0
 			// Obtenemos el frame asociado a la página
 			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
-			frame = response.Frame
-
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
 			// Log obligatorio: Limpieza de memoria
 			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				entry.PID, nroPag, frame))
+				entry.PID, nroPag, response.Frame))
 
 			// Enviar información a memoria y salir
 			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
@@ -716,9 +697,10 @@ func (m *MMU) evictCacheClockM() {
 	for i, entry := range newArrayCache {
 		if !entry.Reference {
 			// Se agrega la data a almacenar
-			dataAAlmacenar[entry.PageID] = map[string]interface{}{
-				"pid":  strconv.Itoa(entry.PID),
-				"data": entry.Data,
+			dataAAlmacenar = map[string]interface{}{
+				"pid":                strconv.Itoa(entry.PID),
+				"data":               entry.Data,
+				"entradas_por_nivel": entry.PageID,
 			}
 
 			// Eliminar la entrada de la caché
@@ -726,16 +708,13 @@ func (m *MMU) evictCacheClockM() {
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
-			frame := 0
 			// Obtenemos el frame asociado a la página
 			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
-			frame = response.Frame
-
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
 			// Log obligatorio: Limpieza de memoria
 			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				entry.PID, nroPag, frame))
+				entry.PID, nroPag, response.Frame))
 
 			// Enviar información a memoria y salir
 			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
