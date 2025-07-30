@@ -235,12 +235,6 @@ func estimacionRestante(p *internal.Proceso) float64 {
 	return p.EstimacionRafaga - float64(tiempoEnExec)
 }
 
-func (p *Service) recalcularRafaga(proceso *internal.Proceso, rafagaReal float64) {
-	alpha := p.SjfConfig.Alpha
-	proceso.UltimaRafagaEstimada = proceso.EstimacionRafaga
-	proceso.EstimacionRafaga = alpha*rafagaReal + (1-alpha)*proceso.UltimaRafagaEstimada
-}
-
 func (p *Service) procesoADesalojar(nuevaEstimacion float64) int {
 	maxTiempoRestante := -1.0
 	indiceProceso := -1
@@ -347,8 +341,6 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) *cpu.Cpu {
 			time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
 	}
 
-	p.mutexExecQueue.Unlock()
-
 	// Devolver a ReadyQueue con protección de mutex
 	p.mutexReadyQueue.Lock()
 
@@ -375,8 +367,6 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) *cpu.Cpu {
 	proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoReady]++
 
-	p.mutexReadyQueue.Unlock()
-
 	//Log obligatorio: Cambio de estado
 	// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado READY", proceso.PCB.PID))
@@ -384,6 +374,9 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) *cpu.Cpu {
 	p.Log.Debug("Proceso desalojado por SRT",
 		log.IntAttr("PID", proceso.PCB.PID),
 	)
+
+	p.mutexExecQueue.Unlock()
+	p.mutexReadyQueue.Unlock()
 
 	// Notificar que hay un nuevo proceso en ReadyQueue
 	p.canalNuevoProcesoReady <- struct{}{}
@@ -450,10 +443,6 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 	cpuAsignada.Proceso.PID = proceso.PCB.PID
 	cpuAsignada.Proceso.PC = proceso.PCB.PC
 
-	// Liberar mutex en orden inverso (LIFO) para evitar deadlocks
-	p.mutexCPUsConectadas.Unlock()
-	p.mutexExecQueue.Unlock()
-
 	//Log obligatorio: Cambio de estado
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado READY al estado EXEC", proceso.PCB.PID))
 
@@ -488,4 +477,8 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 			)
 		}
 	}(cpuAsignada, proceso)
+
+	// Liberar mutex en orden inverso (LIFO) para evitar deadlocks
+	p.mutexCPUsConectadas.Unlock()
+	p.mutexExecQueue.Unlock()
 }

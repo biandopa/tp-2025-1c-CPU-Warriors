@@ -97,21 +97,20 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		MedianoPlazoConfig: &MedianoPlazoConfig{
 			SuspensionTime: suspTime,
 		},
-		CPUSemaphore: make(chan struct{}, 100), // Inicializamos el semáforo vacío, se llenará cuando se conecten CPUp.
-		// Buffer máximo de 100 CPUs
-		HttpClient: httpClient,
+		CPUSemaphore: make(chan struct{}, 10), // Inicializamos el semáforo vacío, se llenará cuando se conecten CPUs. Buffer máximo de 10 CPUs
+		HttpClient:   httpClient,
 	}
 }
 
 func (p *Service) BuscarProcesoEnCualquierCola(pid int) (*internal.Proceso, internal.Estado) {
-	p.mutexNewQueue.RLock()
-	for _, proc := range p.Planificador.NewQueue {
+	p.mutexExecQueue.RLock()
+	for _, proc := range p.Planificador.ExecQueue {
 		if proc != nil && proc.PCB.PID == pid {
-			p.mutexNewQueue.RUnlock()
-			return proc, internal.EstadoNew
+			p.mutexExecQueue.RUnlock()
+			return proc, internal.EstadoExec
 		}
 	}
-	p.mutexNewQueue.RUnlock()
+	p.mutexExecQueue.RUnlock()
 
 	p.mutexReadyQueue.RLock()
 	for _, proc := range p.Planificador.ReadyQueue {
@@ -122,6 +121,15 @@ func (p *Service) BuscarProcesoEnCualquierCola(pid int) (*internal.Proceso, inte
 	}
 	p.mutexReadyQueue.RUnlock()
 
+	p.mutexNewQueue.RLock()
+	for _, proc := range p.Planificador.NewQueue {
+		if proc != nil && proc.PCB.PID == pid {
+			p.mutexNewQueue.RUnlock()
+			return proc, internal.EstadoNew
+		}
+	}
+	p.mutexNewQueue.RUnlock()
+
 	p.mutexBlockQueue.RLock()
 	for _, proc := range p.Planificador.BlockQueue {
 		if proc != nil && proc.PCB.PID == pid {
@@ -131,20 +139,11 @@ func (p *Service) BuscarProcesoEnCualquierCola(pid int) (*internal.Proceso, inte
 	}
 	p.mutexBlockQueue.RUnlock()
 
-	p.mutexExecQueue.RLock()
-	for _, proc := range p.Planificador.ExecQueue {
-		if proc != nil && proc.PCB.PID == pid {
-			p.mutexExecQueue.RUnlock()
-			return proc, internal.EstadoExec
-		}
-	}
-	p.mutexExecQueue.RUnlock()
-
 	p.mutexSuspBlockQueue.RLock()
 	for _, proc := range p.Planificador.SuspBlockQueue {
 		if proc != nil && proc.PCB.PID == pid {
 			p.mutexSuspBlockQueue.RUnlock()
-			return proc, internal.EstadoSuspReady
+			return proc, internal.EstadoSuspBloqueado
 		}
 	}
 	p.mutexSuspBlockQueue.RUnlock()
