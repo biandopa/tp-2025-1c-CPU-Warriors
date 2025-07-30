@@ -621,6 +621,7 @@ func (m *MMU) evictCacheClockM() {
 
 	// La primera iteración comienza desde el puntero del CLOCK y va buscando entradas con el bit
 	// de uso y el bit de modificado en 0.
+	// U = 0 y M = 0
 	for i, entry := range newArrayCache {
 		if !entry.Reference && !entry.Modified {
 			// Se agrega la data a almacenar
@@ -657,8 +658,9 @@ func (m *MMU) evictCacheClockM() {
 	}
 
 	// La segunda iteración comienza desde el principio y busca entradas con el bit de uso ya setteado en 0 anteriormente.
+	// U = 0 y M = 1
 	for i, entry := range newArrayCache {
-		if !entry.Reference {
+		if !entry.Reference && entry.Modified {
 			// Se agrega la data a almacenar
 			dataAAlmacenar = map[string]interface{}{
 				"pid":                strconv.Itoa(entry.PID),
@@ -694,8 +696,46 @@ func (m *MMU) evictCacheClockM() {
 	}
 
 	// La tercera iteración busca entradas con el bit de uso en 0 (setteado anteriormente)
+	// U = 0 y M = 0
 	for i, entry := range newArrayCache {
-		if !entry.Reference {
+		if !entry.Reference && !entry.Modified {
+			// Se agrega la data a almacenar
+			dataAAlmacenar = map[string]interface{}{
+				"pid":                strconv.Itoa(entry.PID),
+				"data":               entry.Data,
+				"entradas_por_nivel": entry.PageID,
+			}
+
+			// Eliminar la entrada de la caché
+			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			m.Log.Debug("Entrada caché evictada (CLOCK)",
+				log.StringAttr("page_id", entry.PageID))
+
+			// Obtenemos el frame asociado a la página
+			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
+			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
+
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+				entry.PID, nroPag, response.Frame))
+
+			// Enviar información a memoria y salir
+			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
+				m.Log.Error("Error al guardar páginas en memoria",
+					log.ErrAttr(err),
+				)
+			}
+
+			// Actualizar el puntero del CLOCK
+			m.Cache.Clock = i
+			return
+		}
+	}
+
+	// La tercera iteración busca entradas con el bit de uso en 0 (setteado anteriormente)
+	// U = 0 y M = 1
+	for i, entry := range newArrayCache {
+		if !entry.Reference && entry.Modified {
 			// Se agrega la data a almacenar
 			dataAAlmacenar = map[string]interface{}{
 				"pid":                strconv.Itoa(entry.PID),
