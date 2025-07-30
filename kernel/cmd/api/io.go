@@ -88,7 +88,7 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 
 	if proceso != nil {
 		//Aviso al kernel que el proceso termino su IO para que revise si esta suspendido
-		h.Planificador.ManejarFinIO(proceso)
+		go h.Planificador.ManejarFinIO(proceso)
 	} else {
 		h.Log.Debug("Proceso no encontrado en ninguna cola al finalizar IO",
 			log.IntAttr("PID", ioIdentificacionPeticion.ProcesoID),

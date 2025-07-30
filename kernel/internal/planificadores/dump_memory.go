@@ -30,14 +30,14 @@ func (p *Service) RealizarDumpMemory(pid int) {
 				log.ErrAttr(err),
 			)
 
-			if err = p.moverProcesoBlockedAExit(pid); err != nil {
+			/*if err = p.moverProcesoBlockedAExit(pid); err != nil {
 				p.Log.Error("Error al mover proceso de BLOCKED a EXIT",
 					log.IntAttr("pid", pid),
 					log.ErrAttr(err),
 				)
-			} else {
-				p.FinalizarProcesoEnCualquierCola(pid)
-			}
+			} else {*/
+			go p.FinalizarProcesoEnCualquierCola(pid)
+			//}
 
 		} else {
 			// Si es exitoso, mover el proceso de BLOCKED a READY
@@ -82,16 +82,14 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 		}
 	}
 
-	p.mutexExecQueue.Unlock()
-
 	if proceso == nil {
+		p.mutexExecQueue.Unlock()
 		return fmt.Errorf("proceso con PID %d no encontrado en EXEC", pid)
 	}
 
 	// Agregar a BLOCKED
 	p.mutexBlockQueue.Lock()
 	p.Planificador.BlockQueue = append(p.Planificador.BlockQueue, proceso)
-	p.mutexBlockQueue.Unlock()
 
 	// Inicializar métricas de tiempo para BLOCKED
 	if proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] == nil {
@@ -101,6 +99,8 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 	proceso.PCB.MetricasEstado[internal.EstadoBloqueado]++
 
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado BLOCKED", proceso.PCB.PID))
+	p.mutexBlockQueue.Unlock()
+	p.mutexExecQueue.Unlock()
 
 	// Notificar al planificador de mediano plazo
 	p.CanalNuevoProcBlocked <- proceso
@@ -130,9 +130,9 @@ func (p *Service) moverProcesoBlockedAReady(pid int) error {
 			)
 		}
 	}
-	p.mutexBlockQueue.Unlock()
 
 	if proceso == nil {
+		p.mutexBlockQueue.Unlock()
 		return fmt.Errorf("proceso con PID %d no encontrado en BLOCKED", pid)
 	}
 
@@ -151,9 +151,10 @@ func (p *Service) moverProcesoBlockedAReady(pid int) error {
 	}
 	proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoReady]++
-	p.mutexReadyQueue.Unlock()
 
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado READY", proceso.PCB.PID))
+	p.mutexReadyQueue.Unlock()
+	p.mutexBlockQueue.Unlock()
 
 	p.canalNuevoProcesoReady <- struct{}{} // Notificar al planificador de corto plazo
 
@@ -183,9 +184,9 @@ func (p *Service) moverProcesoBlockedAExit(pid int) error {
 			)
 		}
 	}
-	p.mutexBlockQueue.Unlock()
 
 	if proceso == nil {
+		p.mutexBlockQueue.Unlock()
 		return fmt.Errorf("proceso con PID %d no encontrado en BLOCKED", pid)
 	}
 
@@ -209,6 +210,7 @@ func (p *Service) moverProcesoBlockedAExit(pid int) error {
 	proceso.PCB.MetricasEstado[internal.EstadoExit]++
 
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado EXIT", proceso.PCB.PID))
+	p.mutexBlockQueue.Unlock()
 
 	return nil
 }
