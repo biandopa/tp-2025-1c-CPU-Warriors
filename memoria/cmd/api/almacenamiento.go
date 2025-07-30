@@ -36,16 +36,15 @@ type CacheData struct {
 
 // TablasProceso Estructura en la cual guardamos las metricas y la tabla de paginas
 type TablasProceso struct {
-	PID             string      `json:"pid"`
-	Tamanio         int         `json:"tamanio_proceso"`
-	TablasDePaginas interface{} `json:"tabla_de_paginas"`
-
-	CantidadAccesosATablas           int `json:"cantidad_accesos_a_tablas"`
-	CantidadInstruccionesSolicitadas int `json:"cantidad_instrucciones_solicitadas"`
-	CantidadBajadasSwap              int `json:"cantidad_bajadas_swap"`
-	CantidadSubidasMemoriaPrincipal  int `json:"cantidad_subidas_memoria_principal"`
-	CantidadDeEscritura              int `json:"cantidad_de_escritura"`
-	CantidadDeLectura                int `json:"cantidad_de_lectura"`
+	PID                              string      `json:"pid"`
+	Tamanio                          int         `json:"tamanio_proceso"`
+	TablasDePaginas                  interface{} `json:"tabla_de_paginas"`
+	CantidadAccesosATablas           int         `json:"cantidad_accesos_a_tablas"`
+	CantidadInstruccionesSolicitadas int         `json:"cantidad_instrucciones_solicitadas"`
+	CantidadBajadasSwap              int         `json:"cantidad_bajadas_swap"`
+	CantidadSubidasMemoriaPrincipal  int         `json:"cantidad_subidas_memoria_principal"`
+	CantidadDeEscritura              int         `json:"cantidad_de_escritura"`
+	CantidadDeLectura                int         `json:"cantidad_de_lectura"`
 }
 
 // ConsultarEspacioEInicializar recibe una consulta sobre el espacio libre en memoria. (Lo recibe cuando el proceso pasa al ready ya que ahi empeiza a ocupar memoria)
