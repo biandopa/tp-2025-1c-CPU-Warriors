@@ -24,13 +24,10 @@ func (p *Service) SuspenderProcesoBloqueado() {
 			//Si el proceso sigue bloqueado, lo suspendemos
 			p.mutexBlockQueue.Lock()
 			sigueBloqueado := estaEnCola(proceso, p.Planificador.BlockQueue)
-			p.mutexBlockQueue.Unlock()
 
 			if sigueBloqueado {
 				//Mover de blocked a suspended blocked
-				p.mutexBlockQueue.Lock()
 				p.removerDeCola(proceso.PCB.PID, p.Planificador.BlockQueue)
-				p.mutexBlockQueue.Unlock()
 
 				p.mutexSuspBlockQueue.Lock()
 				p.Planificador.SuspBlockQueue = append(p.Planificador.SuspBlockQueue, proceso)
@@ -57,6 +54,7 @@ func (p *Service) SuspenderProcesoBloqueado() {
 				p.CheckearEspacioEnMemoria()
 
 			}
+			p.mutexBlockQueue.Unlock()
 		}()
 	}
 }
@@ -71,9 +69,7 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 
 	p.mutexSuspBlockQueue.Lock()
 	estabaSuspendido := estaEnCola(proceso, p.Planificador.SuspBlockQueue)
-	p.mutexSuspBlockQueue.Unlock()
 	if estabaSuspendido {
-		p.mutexSuspBlockQueue.Lock()
 		var removido bool
 		p.Planificador.SuspBlockQueue, removido = p.removerDeCola(proceso.PCB.PID, p.Planificador.SuspBlockQueue)
 		if !removido {
@@ -81,7 +77,6 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 				log.IntAttr("pid", proceso.PCB.PID),
 			)
 		}
-		p.mutexSuspBlockQueue.Unlock()
 
 		p.mutexSuspReadyQueue.Lock()
 		p.Planificador.SuspReadyQueue = append(p.Planificador.SuspReadyQueue, proceso)
@@ -141,6 +136,7 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 		// Notificar planificador corto plazo
 		p.canalNuevoProcesoReady <- struct{}{}
 	}
+	p.mutexSuspBlockQueue.Unlock()
 }
 
 func estaEnCola(p *internal.Proceso, cola []*internal.Proceso) bool {

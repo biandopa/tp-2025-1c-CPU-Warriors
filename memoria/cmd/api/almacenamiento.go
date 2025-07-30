@@ -36,16 +36,15 @@ type CacheData struct {
 
 // TablasProceso Estructura en la cual guardamos las metricas y la tabla de paginas
 type TablasProceso struct {
-	PID             string      `json:"pid"`
-	Tamanio         int         `json:"tamanio_proceso"`
-	TablasDePaginas interface{} `json:"tabla_de_paginas"`
-
-	CantidadAccesosATablas           int `json:"cantidad_accesos_a_tablas"`
-	CantidadInstruccionesSolicitadas int `json:"cantidad_instrucciones_solicitadas"`
-	CantidadBajadasSwap              int `json:"cantidad_bajadas_swap"`
-	CantidadSubidasMemoriaPrincipal  int `json:"cantidad_subidas_memoria_principal"`
-	CantidadDeEscritura              int `json:"cantidad_de_escritura"`
-	CantidadDeLectura                int `json:"cantidad_de_lectura"`
+	PID                              string      `json:"pid"`
+	Tamanio                          int         `json:"tamanio_proceso"`
+	TablasDePaginas                  interface{} `json:"tabla_de_paginas"`
+	CantidadAccesosATablas           int         `json:"cantidad_accesos_a_tablas"`
+	CantidadInstruccionesSolicitadas int         `json:"cantidad_instrucciones_solicitadas"`
+	CantidadBajadasSwap              int         `json:"cantidad_bajadas_swap"`
+	CantidadSubidasMemoriaPrincipal  int         `json:"cantidad_subidas_memoria_principal"`
+	CantidadDeEscritura              int         `json:"cantidad_de_escritura"`
+	CantidadDeLectura                int         `json:"cantidad_de_lectura"`
 }
 
 // ConsultarEspacioEInicializar recibe una consulta sobre el espacio libre en memoria. (Lo recibe cuando el proceso pasa al ready ya que ahi empeiza a ocupar memoria)
@@ -185,10 +184,6 @@ func (h *Handler) AsignarMemoriaDeUsuario(paginasAOcupar int, pid string) {
 		//  “## PID: <PID> - Proceso Creado - Tamaño: <TAMAÑO>”
 		h.Log.Info(fmt.Sprintf("“## PID: %s - Proceso Creado - Tamaño: %d", pid, paginasAOcupar*h.Config.PageSize))
 	}
-
-	tablaMetricas, _ := h.BuscarProcesoPorPID(pid)
-	tablaMetricas.CantidadSubidasMemoriaPrincipal++
-
 }
 
 // Recibe el archivo Swap y el marco que debe pasar a Swap y lo escribe en el swap
@@ -443,6 +438,8 @@ func (h *Handler) SacarProcesoDeSwap(pid string) {
 	posicionEnSwap := h.PosicionesDeProcesoEnSwap(pidDeSwap)
 
 	procesYTablaAsociadaDeSwap, _ := h.BuscarProcesoPorPID(pid)
+	procesYTablaAsociadaDeSwap.CantidadSubidasMemoriaPrincipal++
+
 	marcosDelProcesoDeSwap := h.ObtenerMarcosDeLaTabla(procesYTablaAsociadaDeSwap.TablasDePaginas)
 
 	//ir escribiendo cada frame en memoria
@@ -771,7 +768,7 @@ func (h *Handler) ActualizarPaginaCompleta(w http.ResponseWriter, r *http.Reques
 
 	/* Log obligatorio: Escritura / lectura en espacio de usuario
 	"## PID: <PID> - <Escritura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>"*/
-	h.Log.Info(fmt.Sprintf("## PID: %s - ESCRITURA %s - Dir. Física: %d - Tamaño: %d",
+	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
 		pid, data, frame*h.Config.PageSize, len(data)))
 
 	h.Log.Debug(fmt.Sprintf("## PID: %s - Actualización de página completa - Dir. Física: %d - Tamaño: %d",
@@ -911,9 +908,10 @@ func (h *Handler) EscribirPagina(w http.ResponseWriter, r *http.Request) {
 
 	tablaMetricas, _ := h.BuscarProcesoPorPID(escritura.PID)
 	tablaMetricas.CantidadDeEscritura++
+
 	/* Log obligatorio: Escritura / lectura en espacio de usuario
 	"## PID: <PID> - <Escritura> - Dir. Física: <DIRECCIÓN_FÍSICA> - Tamaño: <TAMAÑO>"*/
-	h.Log.Info(fmt.Sprintf("## PID: %s - ESCRITURA %s - Dir. Física: %d - Tamaño: %d",
+	h.Log.Info(fmt.Sprintf("## PID: %s - %s - Dir. Física: %d - Tamaño: %d",
 		escritura.PID, escritura.ValorAEscribir, escritura.Frame*h.Config.PageSize+escritura.Offset, len(escritura.ValorAEscribir)))
 
 	time.Sleep(time.Duration(h.Config.MemoryDelay) * time.Millisecond)
