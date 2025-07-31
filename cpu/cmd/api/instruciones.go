@@ -65,8 +65,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		datos := args[1]
 
 		// Usar la MMU para escribir con caché. Si la caché no está habilitada, se escribe directamente en memoria
-		direccionFisica, err := h.Service.MMU.EscribirConCache(pid, direccionLogica, datos)
-		if err != nil {
+		if err := h.Service.MMU.EscribirConCache(pid, direccionLogica, datos); err != nil {
 			h.Log.Error("Error al escribir en memoria",
 				log.ErrAttr(err),
 				log.IntAttr("pid", pid),
@@ -74,13 +73,6 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 				log.StringAttr("datos", datos))
 			return false, pc
 		}
-
-		//Log obligatorio: Lectura/Escritura Memoria
-		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
-		//Log obligatorio: Lectura/Escritura Memoria
-		//"PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>".
-		h.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
-			pid, direccionFisica, datos))
 
 		nuevoPC++
 		returnControl = true
@@ -104,10 +96,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		}
 
 		// Usar la MMU para leer con caché. Si la caché no está habilitada, se lee directamente en memoria
-		var direccionFisica string
-		var datoLeido string
-		datoLeido, direccionFisica, err = h.Service.MMU.LeerConCache(pid, direccionLogica, tamanio)
-		if err != nil {
+		if err = h.Service.MMU.LeerConCache(pid, direccionLogica, tamanio); err != nil {
 			h.Log.Error("Error al leer de memoria",
 				log.ErrAttr(err),
 				log.IntAttr("pid", pid),
@@ -115,12 +104,6 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 				log.IntAttr("tamanio", tamanio))
 			return false, pc
 		}
-
-		//Log obligatorio: Lectura/Escritura Memoria
-		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
-
-		h.Log.Info(fmt.Sprintf("## PID: %d - Acción: LEER - Dirección Física: %s - Valor: %s",
-			pid, direccionFisica, datoLeido))
 
 		nuevoPC++
 		returnControl = true

@@ -180,14 +180,8 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 
 // LeerConCache realiza una operación de lectura usando la caché si está habilitada.
 // Retorna el dato leído, la dirección física traducida y el número de página.
-func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, string, error) {
+func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) error {
 	time.Sleep(m.Retardo) // Simular retardo de caché
-
-	// Traducir dirección lógica a física para obtener el número de página
-	dirFisica, err := m.TraducirDireccion(pid, dirLogica)
-	if err != nil {
-		return "", "", err
-	}
 
 	// Calcular número de página
 	dirLogicaInt, _ := strconv.Atoi(dirLogica)
@@ -198,8 +192,13 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 	// Verificar si la caché está habilitada
 	if m.Cache.MaxEntries == 0 {
 		m.Log.Debug("Caché deshabilitada, accediendo directamente a memoria",
-			log.IntAttr("pid", pid),
-			log.StringAttr("direccion", dirFisica))
+			log.IntAttr("pid", pid))
+
+		// Traducir dirección lógica a física para obtener el número de página
+		dirFisica, err := m.TraducirDireccion(pid, dirLogica)
+		if err != nil {
+			return err
+		}
 
 		// Acceso directo a memoria
 		datoLeido, err := m.Memoria.Read(pid, dirFisica, tamanio, memoria.PageConfig{
@@ -207,10 +206,19 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 			Entries:        m.CantEntriesMem,
 			NumberOfLevels: m.NumberOfLevels,
 		})
+
 		if err != nil {
-			return "", dirFisica, err
+			return err
 		}
-		return datoLeido, dirFisica, nil
+
+		offset := dirLogicaInt % m.PageSize
+		datos := datoLeido[offset : offset+tamanio]
+
+		//Log obligatorio: Lectura/Escritura Memoria
+		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+		m.Log.Info(fmt.Sprintf("## PID: %d - Acción: LEER - Dirección Física: %s - Valor: %s",
+			pid, dirFisica, datos))
+		return nil
 	}
 
 	// Buscar en caché primero
@@ -236,7 +244,7 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 			}
 
 			// Retornar datos de la caché
-			return valorALeer, dirFisica, nil
+			return nil
 		}
 	}
 	m.CacheMutex.RUnlock()
@@ -245,37 +253,42 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 	// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %d", pid, nroPagina))
 
+	// Traducir dirección lógica a física para obtener el número de página
+	dirFisica, err := m.TraducirDireccion(pid, dirLogica)
+	if err != nil {
+		return err
+	}
+
 	datos, err := m.Memoria.ReadCompleto(pid, dirFisica, memoria.PageConfig{
 		PageSize:       m.PageSize,
 		Entries:        m.CantEntriesMem,
 		NumberOfLevels: m.NumberOfLevels,
 	})
 	if err != nil {
-		return "", dirFisica, err
+		return err
 	}
 
 	// Agregar a caché
 	m.agregarACache(pid, entriesKey, datos, false)
-	offset := dirLogicaInt % m.PageSize
-	datos = datos[offset : offset+tamanio]
-
 	// Log obligatorio: Página ingresada en Caché
 	// "PID: <PID> - Cache Add - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Add - Pagina: %d", pid, nroPagina))
 
-	return datos, dirFisica, nil
+	offset := dirLogicaInt % m.PageSize
+	datos = datos[offset : offset+tamanio]
+
+	//Log obligatorio: Lectura/Escritura Memoria
+	//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+	m.Log.Info(fmt.Sprintf("## PID: %d - Acción: LEER - Dirección Física: %s - Valor: %s",
+		pid, dirFisica, datos))
+
+	return nil
 }
 
 // EscribirConCache realiza una operación de escritura usando la caché si está habilitada.
 // Retorna la dirección física traducida y un error si ocurre.
-func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error) {
+func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) error {
 	time.Sleep(m.Retardo) // Simular retardo de caché
-
-	// Traducir dirección lógica a física para obtener el número de página
-	dirFisica, err := m.TraducirDireccion(pid, dirLogica)
-	if err != nil {
-		return "", err
-	}
 
 	// Calcular número de página
 	dirLogicaInt, _ := strconv.Atoi(dirLogica)
@@ -287,15 +300,27 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 	// Verificar si la caché está habilitada
 	if m.Cache.MaxEntries == 0 {
 		m.Log.Debug("Caché deshabilitada, escribiendo directamente a memoria",
-			log.IntAttr("pid", pid),
-			log.StringAttr("direccion", dirFisica))
+			log.IntAttr("pid", pid))
+
+		// Traducir dirección lógica a física para obtener el número de página
+		dirFisica, err := m.TraducirDireccion(pid, dirLogica)
+		if err != nil {
+			return err
+		}
 
 		// Acceso directo a memoria
-		return dirFisica, m.Memoria.Write(pid, dirFisica, datos, memoria.PageConfig{
+		if err = m.Memoria.Write(pid, dirFisica, datos, memoria.PageConfig{
 			PageSize:       m.PageSize,
 			Entries:        m.CantEntriesMem,
 			NumberOfLevels: m.NumberOfLevels,
-		})
+		}); err != nil {
+			return err
+		}
+
+		//Log obligatorio: Lectura/Escritura Memoria
+		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+		m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+			pid, dirFisica, datos))
 	}
 
 	// Buscar en caché primero
@@ -327,12 +352,18 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 		m.Cache.Entries[index].Modified = true // Marcar como modificado
 		m.CacheMutex.Unlock()
 
-		return dirFisica, nil
+		return nil
 	}
 
 	// Log obligatorio: Página faltante en Caché
 	// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %s", pid, nroPaginaStr))
+
+	// Traducir dirección lógica a física para obtener el número de página
+	dirFisica, err := m.TraducirDireccion(pid, dirLogica)
+	if err != nil {
+		return err
+	}
 
 	datosDeLectura, err := m.Memoria.ReadCompleto(pid, dirFisica, memoria.PageConfig{
 		PageSize:       m.PageSize,
@@ -347,6 +378,11 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 		datos = string(dataAActualizar)
 	}
 
+	//Log obligatorio: Lectura/Escritura Memoria
+	//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+	m.Log.Info(fmt.Sprintf("## PID: %d - Acción: LEER - Dirección Física: %s - Valor: %s",
+		pid, dirFisica, datos))
+
 	//m.Log.Info(fmt.Sprintf("QUE DATO TENGO %s", datos))
 	m.agregarACache(pid, entriesKey, datos, true)
 
@@ -354,7 +390,7 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 	// "PID: <PID> - Cache Add - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Add - Pagina: %s", pid, nroPaginaStr))
 
-	return dirFisica, nil
+	return nil
 }
 
 // LimpiarMemoriaProceso limpia TLB y caché cuando un proceso termina o es desalojado
@@ -398,15 +434,23 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 				frame = tlbData.Frame
 			}
 
-			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				pid, nroPag, frame))
-
 			if err := m.Memoria.GuardarPagsEnMemoria(dataToSave); err != nil {
 				m.Log.Error("Error al guardar páginas en memoria",
 					log.ErrAttr(err),
 				)
 			}
+
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+				pid, nroPag, frame))
+
+			// Traducir dirección lógica a física (es la página completa)
+			direccionFisica := strconv.Itoa(frame * m.PageSize)
+
+			//Log obligatorio: Lectura/Escritura Memoria
+			//"PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>".
+			m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+				pid, direccionFisica, entry.Data))
 		}
 		// Eliminar entrada de caché
 		m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
@@ -578,6 +622,14 @@ func (m *MMU) evictCacheClock() {
 				// Log obligatorio: Limpieza de memoria
 				m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
 					entry.PID, nroPag, response.Frame))
+
+				// Traducir dirección lógica a física (es la página completa)
+				direccionFisica := strconv.Itoa(response.Frame * m.PageSize)
+
+				//Log obligatorio: Lectura/Escritura Memoria
+				//"PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>".
+				m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+					entry.PID, direccionFisica, entry.Data))
 			}
 
 			// Eliminar la entrada de la caché
@@ -622,6 +674,14 @@ func (m *MMU) evictCacheClock() {
 				// Log obligatorio: Limpieza de memoria
 				m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
 					entry.PID, nroPag, response.Frame))
+
+				// Traducir dirección lógica a física (es la página completa)
+				direccionFisica := strconv.Itoa(response.Frame * m.PageSize)
+
+				//Log obligatorio: Lectura/Escritura Memoria
+				//"PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>".
+				m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+					entry.PID, direccionFisica, entry.Data))
 			}
 
 			// Eliminar la entrada de la caché
@@ -695,6 +755,14 @@ func (m *MMU) evictCacheClockM() {
 			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
 				entry.PID, nroPag, response.Frame))
 
+			// Traducir dirección lógica a física (es la página completa)
+			direccionFisica := strconv.Itoa(response.Frame * m.PageSize)
+
+			//Log obligatorio: Lectura/Escritura Memoria
+			//"PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>".
+			m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+				entry.PID, direccionFisica, entry.Data))
+
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
 			return
@@ -751,6 +819,14 @@ func (m *MMU) evictCacheClockM() {
 			// Log obligatorio: Limpieza de memoria
 			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
 				entry.PID, nroPag, response.Frame))
+
+			// Traducir dirección lógica a física (es la página completa)
+			direccionFisica := strconv.Itoa(response.Frame * m.PageSize)
+
+			//Log obligatorio: Lectura/Escritura Memoria
+			//"PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>".
+			m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+				entry.PID, direccionFisica, entry.Data))
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i

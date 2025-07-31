@@ -328,7 +328,7 @@ func (h *Handler) CargarProcesoEnMemoriaDeSistema(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusOK)
 }
 
-// PasarProcesoASwap Recibe la llamada del Kernel cuando un proceso se suspendio, y lo pasa  Swap usando PasarProcesoASwapAuxiliar
+// PasarProcesoASwap Recibe la llamada del Kernel cuando un proceso se suspendio, y lo pasa a Swap usando PasarProcesoASwapAuxiliar
 func (h *Handler) PasarProcesoASwap(w http.ResponseWriter, r *http.Request) {
 	var (
 		// Leemos el PID
