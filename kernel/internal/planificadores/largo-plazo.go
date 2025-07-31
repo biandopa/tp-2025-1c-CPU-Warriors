@@ -55,7 +55,8 @@ func (p *Service) PlanificadorLargoPlazo() {
 func (p *Service) PlanificadorLargoPlazoFIFO(proceso *internal.Proceso) {
 
 	p.mutexNewQueue.Lock()
-	p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
+	//	p.Planificador.NewQueue = append([]*internal.Proceso{proceso}, p.Planificador.NewQueue...)
+	p.Planificador.NewQueue = append(p.Planificador.NewQueue, proceso)
 	p.mutexNewQueue.Unlock()
 
 }
@@ -135,7 +136,7 @@ func (p *Service) CheckearEspacioEnMemoria() {
 			break
 		}
 	}
-	p.mutexSuspReadyQueue.Unlock()
+	//p.mutexSuspReadyQueue.Unlock()
 
 	if len(p.Planificador.SuspReadyQueue) == 0 {
 		p.mutexNewQueue.Lock()
@@ -186,6 +187,7 @@ func (p *Service) CheckearEspacioEnMemoria() {
 		}
 		p.mutexNewQueue.Unlock()
 	}
+	p.mutexSuspReadyQueue.Unlock()
 }
 
 func (p *Service) FinalizarProceso(pid int) {
