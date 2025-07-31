@@ -364,17 +364,6 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 
 	dataToSave := map[string]interface{}{}
 
-	// Limpiar TLB - eliminar todas las entradas del proceso
-	m.TLBMutex.Lock()
-	for key, entry := range m.TLB.Entries {
-		// Limpiamos toda la TLB
-		delete(m.TLB.Entries, key)
-		m.Log.Debug("Entrada TLB eliminada",
-			log.StringAttr("key", key),
-			log.IntAttr("frame", entry.Frame))
-	}
-	m.TLBMutex.Unlock()
-
 	// Limpiar caché - escribir páginas modificadas a memoria y eliminar entradas del proceso
 	m.CacheMutex.Lock()
 	for i := len(m.Cache.Entries) - 1; i >= 0; i-- {
@@ -393,13 +382,21 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 
 			//pags = append(pags, entry.PageID)
 
-			// Enviar información a memoria
-			response, _ := m.Memoria.BuscarFrame(pid, entry.PageID)
+			frame := 0
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
+			// Buscar frame asociado a la página en la TLB
+			tlbData := m.TLB.Entries[entry.PageID]
+			if tlbData == nil {
+				// Enviar información a memoria
+				response, _ := m.Memoria.BuscarFrame(pid, entry.PageID)
+				frame = response.Frame
+			} else {
+				frame = tlbData.Frame
+			}
 
 			// Log obligatorio: Limpieza de memoria
 			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				pid, nroPag, response.Frame))
+				pid, nroPag, frame))
 
 			if err := m.Memoria.GuardarPagsEnMemoria(dataToSave); err != nil {
 				m.Log.Error("Error al guardar páginas en memoria",
@@ -413,6 +410,17 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 			log.StringAttr("page_id", entry.PageID))
 	}
 	m.CacheMutex.Unlock()
+
+	// Limpiar TLB - eliminar todas las entradas del proceso
+	m.TLBMutex.Lock()
+	for key, entryTLB := range m.TLB.Entries {
+		// Limpiamos toda la TLB
+		delete(m.TLB.Entries, key)
+		m.Log.Debug("Entrada TLB eliminada",
+			log.StringAttr("key", key),
+			log.IntAttr("frame", entryTLB.Frame))
+	}
+	m.TLBMutex.Unlock()
 
 	m.Log.Debug("Limpieza de memoria completada",
 		log.IntAttr("pid", pid))
