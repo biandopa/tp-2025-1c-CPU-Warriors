@@ -389,6 +389,10 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 			if tlbData == nil {
 				// Enviar información a memoria
 				response, _ := m.Memoria.BuscarFrame(pid, entry.PageID)
+				// Log obligatorio: Obtener Marco desde tabla de páginas
+				// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+				m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d", pid, nroPag, frame))
+
 				frame = response.Frame
 			} else {
 				frame = tlbData.Frame
@@ -559,8 +563,9 @@ func (m *MMU) evictCacheClock() {
 				response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
 				nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
-				// Log obligatorio: Limpieza de memoria
-				m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+				// Log obligatorio: Obtener Marco desde tabla de páginas
+				// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+				m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d",
 					entry.PID, nroPag, response.Frame))
 
 				// Enviar información a memoria y salir
@@ -569,6 +574,10 @@ func (m *MMU) evictCacheClock() {
 						log.ErrAttr(err),
 					)
 				}
+
+				// Log obligatorio: Limpieza de memoria
+				m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+					entry.PID, nroPag, response.Frame))
 			}
 
 			// Eliminar la entrada de la caché
@@ -599,8 +608,9 @@ func (m *MMU) evictCacheClock() {
 				response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
 				nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
-				// Log obligatorio: Limpieza de memoria
-				m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+				// Log obligatorio: Obtener Marco desde tabla de páginas
+				// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+				m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d",
 					entry.PID, nroPag, response.Frame))
 
 				// Enviar información a memoria y salir
@@ -609,6 +619,9 @@ func (m *MMU) evictCacheClock() {
 						log.ErrAttr(err),
 					)
 				}
+				// Log obligatorio: Limpieza de memoria
+				m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+					entry.PID, nroPag, response.Frame))
 			}
 
 			// Eliminar la entrada de la caché
@@ -667,8 +680,9 @@ func (m *MMU) evictCacheClockM() {
 			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
-			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+			// Log obligatorio: Obtener Marco desde tabla de páginas
+			// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+			m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d",
 				entry.PID, nroPag, response.Frame))
 
 			// Enviar información a memoria y salir
@@ -677,6 +691,9 @@ func (m *MMU) evictCacheClockM() {
 					log.ErrAttr(err),
 				)
 			}
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+				entry.PID, nroPag, response.Frame))
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
@@ -720,8 +737,9 @@ func (m *MMU) evictCacheClockM() {
 			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
-			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+			// Log obligatorio: Obtener Marco desde tabla de páginas
+			// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+			m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d",
 				entry.PID, nroPag, response.Frame))
 
 			// Enviar información a memoria y salir
@@ -730,6 +748,9 @@ func (m *MMU) evictCacheClockM() {
 					log.ErrAttr(err),
 				)
 			}
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+				entry.PID, nroPag, response.Frame))
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
