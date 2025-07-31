@@ -999,6 +999,7 @@ func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 		indices = append(indices, paginaInt)
 	}
 
+	tablaProceso.CantidadAccesosATablas += len(indices)
 	frame, found := buscarMarcoPorPaginaAux(tablaProceso, indices)
 	if !found {
 		h.Log.Error("Error al buscar marco por página",
@@ -1027,7 +1028,6 @@ func (h *Handler) BuscarMarcoPorPagina(w http.ResponseWriter, r *http.Request) {
 func buscarMarcoPorPaginaAux(tabla *TablasProceso, indices []int) (int, bool) {
 	actual := tabla.TablasDePaginas
 	for i := 0; i < len(indices); i++ {
-		tabla.CantidadAccesosATablas++
 		switch nodo := actual.(type) {
 		case []interface{}:
 			if indices[i] < 0 || indices[i] >= len(nodo) {
