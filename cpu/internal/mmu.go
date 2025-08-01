@@ -321,6 +321,7 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) error {
 		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
 		m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
 			pid, dirFisica, datos))
+		return nil
 	}
 
 	// Buscar en caché primero
