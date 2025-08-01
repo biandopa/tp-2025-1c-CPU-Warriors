@@ -78,9 +78,7 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 					)
 
 					newPC, _ := cpuElegida.DispatchProcess()
-					if proceso != nil && proceso.PCB != nil {
-						proceso.PCB.PC = newPC
-					}
+					proceso.PCB.PC = newPC
 
 					// Liberar CPU usando semáforo
 					p.LiberarCPU(cpuElegida)
@@ -120,35 +118,59 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 			}
 		}
 
-		// Procesar todos los procesos en ReadyQueue
-		for len(p.Planificador.ReadyQueue) > 0 {
+		/*// CRÍTICO: Drainar notificaciones acumuladas antes de procesar
+		// Esto evita que múltiples notificaciones causen múltiples ciclos simultáneos
+		notificacionesDrenadas := 0
+		for {
+			select {
+			case <-p.canalNuevoProcesoReady:
+				notificacionesDrenadas++
+			default:
+				goto procesarCola // Salir del loop de drenaje
+			}
+		}*/
+
+		/*procesarCola:
+		if notificacionesDrenadas > 0 {
+			p.Log.Debug("Notificaciones drenadas antes de procesar",
+				log.IntAttr("notificaciones_drenadas", notificacionesDrenadas),
+			)
+		}*/
+
+		for {
+			p.mutexReadyQueue.Lock()
+			if len(p.Planificador.ReadyQueue) == 0 {
+				p.mutexReadyQueue.Unlock()
+				break
+			}
+
 			p.ordenarColaReadySjf() // Ordena la cola de ReadyQueue por ráfaga estimada
 
-			p.mutexReadyQueue.Lock()
 			procesoNuevo := p.Planificador.ReadyQueue[0]
-			p.Planificador.ReadyQueue = p.Planificador.ReadyQueue[1:]
+			//p.Planificador.ReadyQueue = p.Planificador.ReadyQueue[1:]
 			p.mutexReadyQueue.Unlock()
 
 			// Evaluar desalojo (independientemente de CPUs libres)
 			procesoADesalojar := p.evaluarDesalojo(procesoNuevo)
 			if procesoADesalojar != nil {
-				cpuLiberada := p.desalojarProceso(procesoADesalojar)
+				p.desalojarProceso(procesoADesalojar)
 
-				// Log obligatorio: Desalojo de SJF/SRT
-				//"## (<PID>) - Desalojado por algoritmo SJF/SRT"
-				p.Log.Info(fmt.Sprintf("## (%d) - Desalojado por algoritmo SJF/SRT", procesoADesalojar.PCB.PID))
+				//TODO: ver de agregar 1 solo mutex
 
-				// Solo asignar si la CPU fue liberada correctamente
-				if cpuLiberada != nil {
-					// Después del desalojo, asignar el nuevo proceso
-					p.asignarProcesoACPU(procesoNuevo, cpuLiberada)
+				// Después del desalojo, buscar CPU disponible a través del semáforo
+				cpuLibre := p.IntentarBuscarCPUDisponible()
+				if cpuLibre != nil {
+					p.asignarProcesoACPU(procesoNuevo, cpuLibre)
 				} else {
-					// Si no se pudo liberar la CPU, reencolar el proceso
-					p.Log.Debug("No se pudo liberar CPU para desalojo, reencolando proceso")
-					p.mutexReadyQueue.Lock()
-					p.Planificador.ReadyQueue = append([]*internal.Proceso{procesoNuevo}, p.Planificador.ReadyQueue...)
-					p.mutexReadyQueue.Unlock()
-					p.canalNuevoProcesoReady <- struct{}{}
+					// Esto no debería pasar tras un desalojo, reencolar para reintentar
+					p.Log.Error("🚨 No hay CPU disponible tras desalojo - estado inconsistente",
+						log.IntAttr("pid_nuevo", procesoNuevo.PCB.PID),
+						log.IntAttr("pid_desalojado", procesoADesalojar.PCB.PID),
+					)
+					/*
+						p.mutexReadyQueue.Lock()
+						p.Planificador.ReadyQueue = append([]*internal.Proceso{procesoNuevo}, p.Planificador.ReadyQueue...)
+						p.mutexReadyQueue.Unlock()*/
 					break
 				}
 			} else {
@@ -160,11 +182,18 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 					p.asignarProcesoACPU(procesoNuevo, cpuLibre)
 				} else {
 					// No hay CPUs libres y no se puede desalojar, reencolar y esperar
-					p.Log.Debug("No se puede desalojar ningún proceso con SRT y no hay CPUs libres, reencolando proceso...")
+					p.Log.Debug("No se puede desalojar ningún proceso con SRT y no hay CPUs libres, reencolando proceso...",
+						log.IntAttr("pid", procesoNuevo.PCB.PID),
+						log.IntAttr("procesos_en_exec", len(p.Planificador.ExecQueue)),
+					)
 					// Volver a poner el proceso en ReadyQueue para reintentar más tarde
 					p.mutexReadyQueue.Lock()
-					p.Planificador.ReadyQueue = append([]*internal.Proceso{procesoNuevo}, p.Planificador.ReadyQueue...)
+					p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, procesoNuevo)
 					p.mutexReadyQueue.Unlock()
+
+					// No renotificar inmediatamente para evitar loops infinitos
+					// El proceso será considerado en la próxima notificación natural
+					p.Log.Debug("Proceso reencolado, esperando próxima oportunidad de scheduling")
 					p.canalNuevoProcesoReady <- struct{}{} // Notificar que hay un nuevo proceso en ReadyQueue
 					break                                  // Salir del bucle y esperar por el próximo evento
 				}
@@ -190,17 +219,24 @@ func (p *Service) PlanificarCortoPlazoSjfSinDesalojo() {
 		}
 
 		// Procesar todos los procesos en ReadyQueue
-		for len(p.Planificador.ReadyQueue) > 0 {
+		for {
+			p.mutexReadyQueue.Lock()
+			if len(p.Planificador.ReadyQueue) == 0 {
+				p.mutexReadyQueue.Unlock()
+				break // Salir del bucle si no hay más procesos en ReadyQueue
+			}
+
 			p.ordenarColaReadySjf()
 			// Usar versión bloqueante para adquirir CPU
 			cpuLibre := p.BuscarCPUDisponible()
+			p.mutexReadyQueue.Unlock()
 
 			if cpuLibre != nil {
 				// Asignar el proceso con ráfaga más corta (el primero de ReadyQueue)
-				p.mutexReadyQueue.Lock()
+				//p.mutexReadyQueue.Lock()
 				procesoMasCorto := p.Planificador.ReadyQueue[0]
-				p.Planificador.ReadyQueue = p.Planificador.ReadyQueue[1:]
-				p.mutexReadyQueue.Unlock()
+				//p.Planificador.ReadyQueue = p.Planificador.ReadyQueue[1:]
+				//p.mutexReadyQueue.Unlock()
 
 				p.asignarProcesoACPU(procesoMasCorto, cpuLibre)
 			}
@@ -210,9 +246,6 @@ func (p *Service) PlanificarCortoPlazoSjfSinDesalojo() {
 
 // ordenarColaReadySfj ordena la cola de ReadyQueue por ráfaga estimada ascendente
 func (p *Service) ordenarColaReadySjf() {
-	p.mutexReadyQueue.Lock()
-	defer p.mutexReadyQueue.Unlock()
-
 	sort.Slice(p.Planificador.ReadyQueue, func(i, j int) bool {
 		return p.calcularSiguienteEstimacion(p.Planificador.ReadyQueue[i]) < p.calcularSiguienteEstimacion(p.Planificador.ReadyQueue[j])
 	})
@@ -341,30 +374,39 @@ func (p *Service) actualizarRafagaAnterior(proceso *internal.Proceso) {
 }
 
 // desalojarProceso desaloja un proceso de la CPU y lo devuelve a ReadyQueue
-func (p *Service) desalojarProceso(proceso *internal.Proceso) *cpu.Cpu {
+func (p *Service) desalojarProceso(proceso *internal.Proceso) {
 	// Encontrar y liberar la CPU
 	cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
 	if cpuFound != nil {
 		cpuFound.EnviarInterrupcion("Desalojo", false)
-		//p.LiberarCPU(cpuFound)
+
+		// Log obligatorio: Desalojo de SJF/SRT
+		//"## (<PID>) - Desalojado por algoritmo SJF/SRT"
+		p.Log.Info(fmt.Sprintf("## (%d) - Desalojado por algoritmo SJF/SRT", proceso.PCB.PID))
+
+		p.LiberarCPU(cpuFound)
+		p.Log.Debug("CPU liberada tras desalojo",
+			log.StringAttr("cpu_id", cpuFound.ID),
+			log.IntAttr("pid", proceso.PCB.PID),
+		)
 	} else {
 		p.Log.Error("No se encontró CPU para el proceso a desalojar",
 			log.IntAttr("pid", proceso.PCB.PID),
 		)
-		return nil
+		return
 	}
 
 	// Actualizar ráfaga anterior (incluye actualización de métricas de tiempo EXEC)
-	p.actualizarRafagaAnterior(proceso)
+	//p.actualizarRafagaAnterior(proceso)
 
 	// Remover de ExecQueue con protección de mutex
 	p.mutexExecQueue.Lock()
-	for i, proc := range p.Planificador.ExecQueue {
-		if proc.PCB.PID == proceso.PCB.PID {
-			p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:i],
-				p.Planificador.ExecQueue[i+1:]...)
-			break
-		}
+	var found bool
+	p.Planificador.ExecQueue, found = p.removerDeCola(proceso.PCB.PID, p.Planificador.ExecQueue)
+	if !found {
+		p.Log.Error("🚨 Proceso no encontrado en ExecQueue durante desalojo",
+			log.IntAttr("pid", proceso.PCB.PID),
+		)
 	}
 	p.mutexExecQueue.Unlock()
 
@@ -372,8 +414,6 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) *cpu.Cpu {
 	p.mutexReadyQueue.Lock()
 	p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
 
-	//Log obligatorio: Cambio de estado
-	// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
 	// Actualizar métricas de Ready
 	if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
 		proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
@@ -383,16 +423,26 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) *cpu.Cpu {
 
 	p.mutexReadyQueue.Unlock()
 
+	//Log obligatorio: Cambio de estado
+	// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado READY", proceso.PCB.PID))
 
 	p.Log.Debug("Proceso desalojado por SRT",
 		log.IntAttr("PID", proceso.PCB.PID),
 	)
 
-	// Notificar que hay un nuevo proceso en ReadyQueue
-	p.canalNuevoProcesoReady <- struct{}{}
-
-	return cpuFound
+	// Notificar que hay un nuevo proceso en ReadyQueue tras desalojo
+	select {
+	case p.canalNuevoProcesoReady <- struct{}{}:
+		p.Log.Debug("Notificación enviada al planificador tras desalojo",
+			log.IntAttr("pid", proceso.PCB.PID),
+		)
+	default:
+		// Canal lleno, no bloquear
+		p.Log.Debug("Canal de notificación lleno, no se bloquea tras desalojo",
+			log.IntAttr("pid", proceso.PCB.PID),
+		)
+	}
 }
 
 // buscarCPUPorPID busca una CPU que esté ejecutando un proceso específico por su PID
@@ -410,16 +460,8 @@ func (p *Service) buscarCPUPorPID(pid int) *cpu.Cpu {
 
 // asignarProcesoACPU asigna un proceso a una CPU específica
 func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu.Cpu) {
-	// Mover proceso de READY a EXEC
-	timeReady := proceso.PCB.MetricasTiempo[internal.EstadoReady]
-	if timeReady != nil {
-		timeReady.TiempoAcumulado += time.Since(timeReady.TiempoInicio)
-	}
-
-	// Actualizar la CPU con el proceso
-	// Ejecutar en goroutine para no bloquear el planificador
-
-	if cpuAsignada == nil || proceso.PCB == nil {
+	// Validaciones iniciales
+	if cpuAsignada == nil || proceso == nil || proceso.PCB == nil {
 		p.Log.Error("CPU o proceso inválido al asignar a CPU",
 			log.AnyAttr("cpu", cpuAsignada),
 			log.AnyAttr("proceso", proceso),
@@ -427,8 +469,33 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 		return
 	}
 
+	// Verificar que el proceso no esté ya en ExecQueue
+	p.mutexExecQueue.RLock()
+	for _, proc := range p.Planificador.ExecQueue {
+		if proc.PCB.PID == proceso.PCB.PID {
+			p.Log.Error("Proceso ya está en ExecQueue, no se puede asignar nuevamente",
+				log.IntAttr("pid", proceso.PCB.PID),
+			)
+			p.mutexExecQueue.RUnlock()
+			return
+		}
+	}
+	p.mutexExecQueue.RUnlock()
+
+	// Mover proceso de READY a EXEC
+	p.mutexReadyQueue.Lock()
+	p.Planificador.ReadyQueue, _ = p.removerDeCola(proceso.PCB.PID, p.Planificador.ReadyQueue)
+	timeReady := proceso.PCB.MetricasTiempo[internal.EstadoReady]
+	if timeReady != nil {
+		timeReady.TiempoAcumulado += time.Since(timeReady.TiempoInicio)
+	}
+	p.mutexReadyQueue.Unlock()
+
+	p.mutexCPUsConectadas.Lock()
 	cpuAsignada.Proceso.PID = proceso.PCB.PID
 	cpuAsignada.Proceso.PC = proceso.PCB.PC
+	cpuAsignada.Estado = false
+	p.mutexCPUsConectadas.Unlock()
 
 	// Agregar a ExecQueue
 	p.mutexExecQueue.Lock()
@@ -464,22 +531,21 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 				log.StringAttr("motivo", motivo),
 			)
 
-			// Remover de ExecQueue
-			p.mutexExecQueue.Lock()
-			var removido bool
-			p.Planificador.ExecQueue, removido = p.removerDeCola(procesoExec.PCB.PID, p.Planificador.ExecQueue)
-			if !removido {
-				p.Log.Error("Error al remover proceso de ExecQueue después de error en Dispatch",
-					log.IntAttr("PID", procesoExec.PCB.PID),
+			// Actualizar ráfaga anterior y estimación
+			//p.actualizarRafagaAnterior(procesoExec)
+
+			// Remover de ExecQueue solo si el proceso está allí
+			/*p.mutexExecQueue.Lock()
+			found := false
+			p.Planificador.ExecQueue, found = p.removerDeCola(procesoExec.PCB.PID, p.Planificador.ExecQueue)
+			if !found {
+				p.Log.Error("🚨 Proceso no encontrado en ExecQueue durante asignarProcesoACPU",
+					log.IntAttr("pid", procesoExec.PCB.PID),
 				)
 			}
-
-			// Actualizar ráfaga anterior y estimación
-			p.actualizarRafagaAnterior(procesoExec)
-
 			p.mutexExecQueue.Unlock()
 
-			// Volver a agregar a ReadyQueue
+			// Voler a agregar a ReadyQueue
 			p.mutexReadyQueue.Lock()
 			p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, procesoExec)
 			if procesoExec.PCB.MetricasTiempo[internal.EstadoReady] == nil {
@@ -487,12 +553,19 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 			}
 			procesoExec.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 			procesoExec.PCB.MetricasEstado[internal.EstadoReady]++
-			p.mutexReadyQueue.Unlock()
+			p.mutexReadyQueue.Unlock()*/
 
-			p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado READY", procesoExec.PCB.PID))
+			// Log obligatorio: Cambio de estado
+			// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+			//p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado READY", procesoExec.PCB.PID))
 
-			return
+			//p.canalNuevoProcesoReady <- struct{}{} // Notificar que hay un nuevo proceso en ReadyQueue
+
+			//return
 		}
+
+		// Actualizar ráfaga anterior y estimación
+		p.actualizarRafagaAnterior(procesoExec)
 
 		// Liberar CPU usando semáforo
 		p.LiberarCPU(cpuElegida)
