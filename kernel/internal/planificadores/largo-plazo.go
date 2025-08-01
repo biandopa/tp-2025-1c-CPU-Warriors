@@ -101,8 +101,15 @@ func (p *Service) CheckearEspacioEnMemoria() {
 			// Si el proceso se carga en memoria, lo muevo a la cola de ready
 			// y lo elimino de la cola de suspendidos ready
 
+			var removido bool
 			// Remover el proceso de la cola
-			p.Planificador.SuspReadyQueue, _ = p.removerDeCola(proceso.PCB.PID, p.Planificador.SuspReadyQueue)
+			p.Planificador.SuspReadyQueue, removido = p.removerDeCola(proceso.PCB.PID, p.Planificador.SuspReadyQueue)
+			if !removido {
+				p.Log.Debug("🚨 Proceso no encontrado en SuspReadyQueue durante CheckearEspacioEnMemoria",
+					log.IntAttr("pid", proceso.PCB.PID),
+				)
+				continue
+			}
 
 			if proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] == nil {
 				proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] = &internal.EstadoTiempo{}
@@ -147,8 +154,15 @@ func (p *Service) CheckearEspacioEnMemoria() {
 				// Si el proceso se carga en memoria, lo muevo a la cola de ready
 				// y lo elimino de la cola de new
 
+				var removido bool
 				// Remover el proceso de la cola usando índice
-				p.Planificador.NewQueue, _ = p.removerDeCola(proceso.PCB.PID, p.Planificador.NewQueue)
+				p.Planificador.NewQueue, removido = p.removerDeCola(proceso.PCB.PID, p.Planificador.NewQueue)
+				if !removido {
+					p.Log.Debug("🚨 Proceso no encontrado en NewQueue durante CheckearEspacioEnMemoria",
+						log.IntAttr("pid", proceso.PCB.PID),
+					)
+					continue
+				}
 
 				if proceso.PCB.MetricasTiempo[internal.EstadoNew] == nil {
 					proceso.PCB.MetricasTiempo[internal.EstadoNew] = &internal.EstadoTiempo{}
