@@ -138,8 +138,19 @@ func (p *Service) PlanificarCortoPlazoSjfDesalojo() {
 				//"## (<PID>) - Desalojado por algoritmo SJF/SRT"
 				p.Log.Info(fmt.Sprintf("## (%d) - Desalojado por algoritmo SJF/SRT", procesoADesalojar.PCB.PID))
 
-				// Después del desalojo, asignar el nuevo proceso
-				p.asignarProcesoACPU(procesoNuevo, cpuLiberada)
+				// Solo asignar si la CPU fue liberada correctamente
+				if cpuLiberada != nil {
+					// Después del desalojo, asignar el nuevo proceso
+					p.asignarProcesoACPU(procesoNuevo, cpuLiberada)
+				} else {
+					// Si no se pudo liberar la CPU, reencolar el proceso
+					p.Log.Debug("No se pudo liberar CPU para desalojo, reencolando proceso")
+					p.mutexReadyQueue.Lock()
+					p.Planificador.ReadyQueue = append([]*internal.Proceso{procesoNuevo}, p.Planificador.ReadyQueue...)
+					p.mutexReadyQueue.Unlock()
+					p.canalNuevoProcesoReady <- struct{}{}
+					break
+				}
 			} else {
 				// Si no hay desalojo, buscar CPU libre
 				cpuLibre := p.IntentarBuscarCPUDisponible()
@@ -453,19 +464,32 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 				log.StringAttr("motivo", motivo),
 			)
 
+			// Remover de ExecQueue
+			p.mutexExecQueue.Lock()
+			var removido bool
+			p.Planificador.ExecQueue, removido = p.removerDeCola(procesoExec.PCB.PID, p.Planificador.ExecQueue)
+			if !removido {
+				p.Log.Error("Error al remover proceso de ExecQueue después de error en Dispatch",
+					log.IntAttr("PID", procesoExec.PCB.PID),
+				)
+			}
+
 			// Actualizar ráfaga anterior y estimación
 			p.actualizarRafagaAnterior(procesoExec)
 
-			// Remover de ExecQueue
-			p.mutexExecQueue.Lock()
-			for i, proc := range p.Planificador.ExecQueue {
-				if proc.PCB.PID == procesoExec.PCB.PID {
-					p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:i],
-						p.Planificador.ExecQueue[i+1:]...)
-					break
-				}
-			}
 			p.mutexExecQueue.Unlock()
+
+			// Volver a agregar a ReadyQueue
+			p.mutexReadyQueue.Lock()
+			p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, procesoExec)
+			if procesoExec.PCB.MetricasTiempo[internal.EstadoReady] == nil {
+				procesoExec.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
+			}
+			procesoExec.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
+			procesoExec.PCB.MetricasEstado[internal.EstadoReady]++
+			p.mutexReadyQueue.Unlock()
+
+			p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado READY", procesoExec.PCB.PID))
 
 			return
 		}
