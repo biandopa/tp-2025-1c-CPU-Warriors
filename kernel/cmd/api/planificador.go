@@ -90,12 +90,12 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		log.AnyAttr("syscall", syscall),
 	)
 
+	//Log obligatorio: Syscall recibida
+	//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
+	h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
+
 	switch syscall.Instruccion {
 	case "INIT_PROC":
-		//Log obligatorio: Syscall recibida
-		//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
-		h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
-
 		// Verifico que tenga los argumentos necesarios
 		if len(syscall.Args) < 2 {
 			w.WriteHeader(http.StatusBadRequest)
@@ -140,10 +140,6 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			//Log obligatorio: Syscall recibida (solo si el proceso está en EXEC)
-			//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
-			h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
-
 			//Existe y está libre, pasar a blocked y además manda la señal
 			timeSleep, err := strconv.Atoi(syscall.Args[1])
 			if err != nil {
@@ -152,14 +148,6 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 				)
 				return
 			}
-
-			//Log obligatorio: Motivo de Bloqueo
-			//"## (<PID>) - Bloqueado por IO: <DISPOSITIVO_IO>"
-			h.Log.Info(fmt.Sprintf("## (%d) - Bloqueado por IO: %s", syscall.PID, ioBuscada))
-
-			//Log obligatorio: Cambio de estado
-			// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
-			h.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado BLOCKED", syscall.PID))
 
 			// Bloquear el proceso
 			err = h.Planificador.BloquearPorIO(syscall.PID)
@@ -174,6 +162,10 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 
 				return
 			}
+
+			//Log obligatorio: Motivo de Bloqueo
+			//"## (<PID>) - Bloqueado por IO: <DISPOSITIVO_IO>"
+			h.Log.Info(fmt.Sprintf("## (%d) - Bloqueado por IO: %s", syscall.PID, ioBuscada))
 
 			// Buscar el dispositivo IO y marcarlo como ocupado. Si todas las instancias de IO con el mismo nombre
 			// están ocupadas, se agrega a la cola de espera
@@ -223,17 +215,10 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "DUMP_MEMORY":
-		//Log obligatorio: Syscall recibida
-		//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
-		h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
-
 		/* Se bloquea el proceso. En caso de error, se envía a la cola de Exit. Caso contrario, se pasa a Ready*/
 		go h.Planificador.RealizarDumpMemory(syscall.PID)
 
 	case "EXIT":
-		//Log obligatorio: Syscall recibida
-		//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
-		h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
 
 		go h.Planificador.FinalizarProcesoEnCualquierCola(syscall.PID)
 
