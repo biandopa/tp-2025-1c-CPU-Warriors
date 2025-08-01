@@ -38,7 +38,7 @@ func (p *Service) RealizarDumpMemory(pid int) {
 					log.ErrAttr(err),
 				)
 			} else {
-				go p.FinalizarProceso(pid)
+				go p.FinalizarProcesoEnCualquierCola(pid)
 			}
 
 		} else {

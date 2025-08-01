@@ -127,6 +127,7 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		}
 		nuevoPC = pcAtoi
 		returnControl = true
+
 	case "INIT_PROC":
 		syscall := &internal.ProcesoSyscall{
 			PID:         pid,
