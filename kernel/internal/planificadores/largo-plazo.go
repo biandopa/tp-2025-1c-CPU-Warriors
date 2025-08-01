@@ -221,12 +221,16 @@ func (p *Service) FinalizarProceso(pid int) {
 		return
 	}
 
-	// 3. PRIMERO: Remover de ExecQueue antes de actualizar ráfaga (evita deadlock)
+	// 3. PRIMERO: Remover de ExecQueue
 	p.mutexExecQueue.Lock()
 	for i, proc := range p.Planificador.ExecQueue {
 		if proc.PCB.PID == pid {
 			// Sacar de la cola de exec
 			p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:i], p.Planificador.ExecQueue[i+1:]...)
+
+			proc.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+				time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
+
 			break
 		}
 	}
@@ -248,7 +252,7 @@ func (p *Service) FinalizarProceso(pid int) {
 
 	// 6. Cambiar el estado del proceso a EXIT (las métricas de EXEC ya están actualizadas por actualizarRafagaAnterior)
 	proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoAcumulado = time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoInicio)
-	proceso.PCB.MetricasEstado[internal.EstadoExec]++
+	//proceso.PCB.MetricasEstado[internal.EstadoExec]++
 	proceso.PCB.MetricasEstado[internal.EstadoExit]++
 
 	// 7. Loguear métricas
