@@ -633,7 +633,8 @@ func (m *MMU) evictCacheClock() {
 			}
 
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
@@ -685,7 +686,8 @@ func (m *MMU) evictCacheClock() {
 			}
 
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
@@ -710,7 +712,8 @@ func (m *MMU) evictCacheClockM() {
 	for i, entry := range newArrayCache {
 		if !entry.Reference && !entry.Modified {
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
@@ -731,8 +734,11 @@ func (m *MMU) evictCacheClockM() {
 				"entradas_por_nivel": entry.PageID,
 			}
 
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
+
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			//m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
@@ -775,7 +781,8 @@ func (m *MMU) evictCacheClockM() {
 	for i, entry := range newArrayCache {
 		if !entry.Reference && !entry.Modified {
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
@@ -797,7 +804,8 @@ func (m *MMU) evictCacheClockM() {
 			}
 
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
