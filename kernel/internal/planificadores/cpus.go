@@ -44,15 +44,13 @@ func (p *Service) BuscarCPUDisponible() *cpu.Cpu {
 // LiberarCPU libera una CPU de vuelta al pool de CPUs disponibles
 func (p *Service) LiberarCPU(cpuToRelease *cpu.Cpu) {
 	p.mutexCPUsConectadas.Lock()
+
 	cpuToRelease.Estado = true    // Marcar como libre
 	cpuToRelease.Proceso.PID = -1 // Limpiar el PID del proceso asociado
-	p.mutexCPUsConectadas.Unlock()
 
 	// Liberar el semáforo (release)
 	p.CPUSemaphore <- struct{}{}
-
-	p.Log.Debug("CPU liberada",
-		log.StringAttr("cpu_id", cpuToRelease.ID))
+	p.mutexCPUsConectadas.Unlock()
 
 	/*// Notificar al planificador de corto plazo que puede haber más trabajo
 	select {

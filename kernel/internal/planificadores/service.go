@@ -30,6 +30,7 @@ type Service struct {
 	mutexExecQueue         *sync.RWMutex
 	mutexSuspBlockQueue    *sync.RWMutex
 	mutexSuspReadyQueue    *sync.RWMutex
+	mutexSRT               *sync.RWMutex // Mutex para proteger el acceso a las colas de procesos
 	SjfConfig              *SjfConfig
 	MedianoPlazoConfig     *MedianoPlazoConfig
 	CPUSemaphore           chan struct{} // Semáforo contador para CPUs disponibles
@@ -94,6 +95,7 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		mutexSuspBlockQueue:    &sync.RWMutex{},
 		mutexSuspReadyQueue:    &sync.RWMutex{},
 		mutexCPUsConectadas:    &sync.RWMutex{},
+		mutexSRT:               &sync.RWMutex{}, // Mutex para proteger el acceso a las colas de procesos en SRT
 		MedianoPlazoConfig: &MedianoPlazoConfig{
 			SuspensionTime: suspTime,
 		},

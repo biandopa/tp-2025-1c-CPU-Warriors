@@ -307,10 +307,10 @@ func (p *Service) FinalizarProcesoEnCualquierCola(pid int) {
 		switch cola {
 		case internal.EstadoExec:
 			// Liberar CPU
-			cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
+			/*cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
 			if cpuFound != nil {
 				p.LiberarCPU(cpuFound)
-			}
+			}*/
 
 			p.mutexExecQueue.Lock()
 			p.Planificador.ExecQueue, _ = p.removerDeCola(pid, p.Planificador.ExecQueue)

@@ -85,7 +85,7 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 	}
 
 	// Actualizar ráfaga anterior antes de mover a BLOCKED (IMPORTANTE para SRT - incluye métricas de tiempo EXEC)
-	p.actualizarRafagaAnterior(proceso)
+	//p.actualizarRafagaAnterior(proceso)
 
 	// Agregar a BLOCKED
 	p.mutexBlockQueue.Lock()
