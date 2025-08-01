@@ -49,6 +49,10 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		returnControl bool // Retornamos false para indicar que el CPU debe devolver el control al kernel
 	)
 
+	// Log obligatorio: Instrucción Ejecutada
+	//“## PID: <PID> - Ejecutando: <INSTRUCCION> - <PARAMETROS>”.
+	h.Log.Info(fmt.Sprintf("## PID: %d - Ejecutando: %s - %s", pid, tipo, strings.Join(args, " ")))
+
 	switch tipo {
 	case "NOOP":
 		nuevoPC++
@@ -201,10 +205,6 @@ func (h *Handler) Execute(tipo string, args []string, pid, pc int) (bool, int) {
 		return returnControl, nuevoPC
 	}
 
-	// Log obligatorio: Instrucción Ejecutada
-	//“## PID: <PID> - Ejecutando: <INSTRUCCION> - <PARAMETROS>”.
-	h.Log.Info(fmt.Sprintf("## PID: %d - Ejecutando: %s - %s", pid, tipo, strings.Join(args, " ")))
-
 	return returnControl, nuevoPC
 }
 
@@ -259,14 +259,14 @@ func (h *Handler) Ciclo(proceso *Proceso) string {
 			)
 
 			// Obtener la interrupción para verificar si es de desalojo
-			interrupcion, _ := h.Service.ObtenerInterrupcion()
-			if interrupcion.Tipo == internal.InerrupcionDesalojo {
+			interrupcion, found := h.Service.ObtenerInterrupcion(proceso.PID)
+			if found && interrupcion.Tipo == internal.InerrupcionDesalojo && interrupcion.PID == proceso.PID {
 				h.Log.Debug("Interrupción de desalojo detectada, limpiando memoria",
 					log.IntAttr("pid", proceso.PID))
 				h.Service.LimpiarMemoriaProceso(proceso.PID)
-			}
 
-			return "Interrupción detectada, proceso pausado"
+				return "Interrupción detectada, proceso pausado"
+			}
 		}
 	}
 
