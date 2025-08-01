@@ -633,7 +633,8 @@ func (m *MMU) evictCacheClock() {
 			}
 
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
@@ -685,7 +686,8 @@ func (m *MMU) evictCacheClock() {
 			}
 
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
