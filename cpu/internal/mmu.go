@@ -180,14 +180,8 @@ func (m *MMU) TraducirDireccion(pid int, dirLogica string) (string, error) {
 
 // LeerConCache realiza una operación de lectura usando la caché si está habilitada.
 // Retorna el dato leído, la dirección física traducida y el número de página.
-func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, string, error) {
+func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) error {
 	time.Sleep(m.Retardo) // Simular retardo de caché
-
-	// Traducir dirección lógica a física para obtener el número de página
-	dirFisica, err := m.TraducirDireccion(pid, dirLogica)
-	if err != nil {
-		return "", "", err
-	}
 
 	// Calcular número de página
 	dirLogicaInt, _ := strconv.Atoi(dirLogica)
@@ -198,8 +192,13 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 	// Verificar si la caché está habilitada
 	if m.Cache.MaxEntries == 0 {
 		m.Log.Debug("Caché deshabilitada, accediendo directamente a memoria",
-			log.IntAttr("pid", pid),
-			log.StringAttr("direccion", dirFisica))
+			log.IntAttr("pid", pid))
+
+		// Traducir dirección lógica a física para obtener el número de página
+		dirFisica, err := m.TraducirDireccion(pid, dirLogica)
+		if err != nil {
+			return err
+		}
 
 		// Acceso directo a memoria
 		datoLeido, err := m.Memoria.Read(pid, dirFisica, tamanio, memoria.PageConfig{
@@ -207,10 +206,19 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 			Entries:        m.CantEntriesMem,
 			NumberOfLevels: m.NumberOfLevels,
 		})
+
 		if err != nil {
-			return "", dirFisica, err
+			return err
 		}
-		return datoLeido, dirFisica, nil
+
+		offset := dirLogicaInt % m.PageSize
+		datos := datoLeido[offset : offset+tamanio]
+
+		//Log obligatorio: Lectura/Escritura Memoria
+		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+		m.Log.Info(fmt.Sprintf("## PID: %d - Acción: LEER - Dirección Física: %s - Valor: %s",
+			pid, dirFisica, datos))
+		return nil
 	}
 
 	// Buscar en caché primero
@@ -236,7 +244,7 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 			}
 
 			// Retornar datos de la caché
-			return valorALeer, dirFisica, nil
+			return nil
 		}
 	}
 	m.CacheMutex.RUnlock()
@@ -245,37 +253,42 @@ func (m *MMU) LeerConCache(pid int, dirLogica string, tamanio int) (string, stri
 	// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %d", pid, nroPagina))
 
+	// Traducir dirección lógica a física para obtener el número de página
+	dirFisica, err := m.TraducirDireccion(pid, dirLogica)
+	if err != nil {
+		return err
+	}
+
 	datos, err := m.Memoria.ReadCompleto(pid, dirFisica, memoria.PageConfig{
 		PageSize:       m.PageSize,
 		Entries:        m.CantEntriesMem,
 		NumberOfLevels: m.NumberOfLevels,
 	})
 	if err != nil {
-		return "", dirFisica, err
+		return err
 	}
 
 	// Agregar a caché
 	m.agregarACache(pid, entriesKey, datos, false)
-	offset := dirLogicaInt % m.PageSize
-	datos = datos[offset : offset+tamanio]
-
 	// Log obligatorio: Página ingresada en Caché
 	// "PID: <PID> - Cache Add - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Add - Pagina: %d", pid, nroPagina))
 
-	return datos, dirFisica, nil
+	offset := dirLogicaInt % m.PageSize
+	datos = datos[offset : offset+tamanio]
+
+	//Log obligatorio: Lectura/Escritura Memoria
+	//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+	m.Log.Info(fmt.Sprintf("## PID: %d - Acción: LEER - Dirección Física: %s - Valor: %s",
+		pid, dirFisica, datos))
+
+	return nil
 }
 
 // EscribirConCache realiza una operación de escritura usando la caché si está habilitada.
 // Retorna la dirección física traducida y un error si ocurre.
-func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error) {
+func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) error {
 	time.Sleep(m.Retardo) // Simular retardo de caché
-
-	// Traducir dirección lógica a física para obtener el número de página
-	dirFisica, err := m.TraducirDireccion(pid, dirLogica)
-	if err != nil {
-		return "", err
-	}
 
 	// Calcular número de página
 	dirLogicaInt, _ := strconv.Atoi(dirLogica)
@@ -287,15 +300,27 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 	// Verificar si la caché está habilitada
 	if m.Cache.MaxEntries == 0 {
 		m.Log.Debug("Caché deshabilitada, escribiendo directamente a memoria",
-			log.IntAttr("pid", pid),
-			log.StringAttr("direccion", dirFisica))
+			log.IntAttr("pid", pid))
+
+		// Traducir dirección lógica a física para obtener el número de página
+		dirFisica, err := m.TraducirDireccion(pid, dirLogica)
+		if err != nil {
+			return err
+		}
 
 		// Acceso directo a memoria
-		return dirFisica, m.Memoria.Write(pid, dirFisica, datos, memoria.PageConfig{
+		if err = m.Memoria.Write(pid, dirFisica, datos, memoria.PageConfig{
 			PageSize:       m.PageSize,
 			Entries:        m.CantEntriesMem,
 			NumberOfLevels: m.NumberOfLevels,
-		})
+		}); err != nil {
+			return err
+		}
+
+		//Log obligatorio: Lectura/Escritura Memoria
+		//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+		m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+			pid, dirFisica, datos))
 	}
 
 	// Buscar en caché primero
@@ -327,12 +352,18 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 		m.Cache.Entries[index].Modified = true // Marcar como modificado
 		m.CacheMutex.Unlock()
 
-		return dirFisica, nil
+		return nil
 	}
 
 	// Log obligatorio: Página faltante en Caché
 	// "PID: <PID> - Cache Miss - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Miss - Pagina: %s", pid, nroPaginaStr))
+
+	// Traducir dirección lógica a física para obtener el número de página
+	dirFisica, err := m.TraducirDireccion(pid, dirLogica)
+	if err != nil {
+		return err
+	}
 
 	datosDeLectura, err := m.Memoria.ReadCompleto(pid, dirFisica, memoria.PageConfig{
 		PageSize:       m.PageSize,
@@ -347,6 +378,11 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 		datos = string(dataAActualizar)
 	}
 
+	//Log obligatorio: Lectura/Escritura Memoria
+	//“PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>”.
+	m.Log.Info(fmt.Sprintf("## PID: %d - Acción: LEER - Dirección Física: %s - Valor: %s",
+		pid, dirFisica, datos))
+
 	//m.Log.Info(fmt.Sprintf("QUE DATO TENGO %s", datos))
 	m.agregarACache(pid, entriesKey, datos, true)
 
@@ -354,7 +390,7 @@ func (m *MMU) EscribirConCache(pid int, dirLogica, datos string) (string, error)
 	// "PID: <PID> - Cache Add - Pagina: <NUMERO_PAGINA>"
 	m.Log.Info(fmt.Sprintf("PID: %d - Cache Add - Pagina: %s", pid, nroPaginaStr))
 
-	return dirFisica, nil
+	return nil
 }
 
 // LimpiarMemoriaProceso limpia TLB y caché cuando un proceso termina o es desalojado
@@ -363,17 +399,6 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 		log.IntAttr("pid", pid))
 
 	dataToSave := map[string]interface{}{}
-
-	// Limpiar TLB - eliminar todas las entradas del proceso
-	m.TLBMutex.Lock()
-	for key, entry := range m.TLB.Entries {
-		// Limpiamos toda la TLB
-		delete(m.TLB.Entries, key)
-		m.Log.Debug("Entrada TLB eliminada",
-			log.StringAttr("key", key),
-			log.IntAttr("frame", entry.Frame))
-	}
-	m.TLBMutex.Unlock()
 
 	// Limpiar caché - escribir páginas modificadas a memoria y eliminar entradas del proceso
 	m.CacheMutex.Lock()
@@ -393,19 +418,39 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 
 			//pags = append(pags, entry.PageID)
 
-			// Enviar información a memoria
-			response, _ := m.Memoria.BuscarFrame(pid, entry.PageID)
+			frame := 0
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
+			// Buscar frame asociado a la página en la TLB
+			tlbData := m.TLB.Entries[entry.PageID]
+			if tlbData == nil {
+				// Enviar información a memoria
+				response, _ := m.Memoria.BuscarFrame(pid, entry.PageID)
+				// Log obligatorio: Obtener Marco desde tabla de páginas
+				// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+				m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d", pid, nroPag, frame))
 
-			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				pid, nroPag, response.Frame))
+				frame = response.Frame
+			} else {
+				frame = tlbData.Frame
+			}
 
 			if err := m.Memoria.GuardarPagsEnMemoria(dataToSave); err != nil {
 				m.Log.Error("Error al guardar páginas en memoria",
 					log.ErrAttr(err),
 				)
 			}
+
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+				pid, nroPag, frame))
+
+			// Traducir dirección lógica a física (es la página completa)
+			direccionFisica := strconv.Itoa(frame * m.PageSize)
+
+			//Log obligatorio: Lectura/Escritura Memoria
+			//"PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>".
+			m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+				pid, direccionFisica, entry.Data))
 		}
 		// Eliminar entrada de caché
 		m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
@@ -413,6 +458,17 @@ func (m *MMU) LimpiarMemoriaProceso(pid int) {
 			log.StringAttr("page_id", entry.PageID))
 	}
 	m.CacheMutex.Unlock()
+
+	// Limpiar TLB - eliminar todas las entradas del proceso
+	m.TLBMutex.Lock()
+	for key, entryTLB := range m.TLB.Entries {
+		// Limpiamos toda la TLB
+		delete(m.TLB.Entries, key)
+		m.Log.Debug("Entrada TLB eliminada",
+			log.StringAttr("key", key),
+			log.IntAttr("frame", entryTLB.Frame))
+	}
+	m.TLBMutex.Unlock()
 
 	m.Log.Debug("Limpieza de memoria completada",
 		log.IntAttr("pid", pid))
@@ -539,32 +595,48 @@ func (m *MMU) evictCacheClock() {
 	// La primera iteración comienza desde el puntero del CLOCK y va buscando entradas con el bit de uso en 0.
 	for i, entry := range newArrayCache {
 		if !entry.Reference {
-			// Se agrega la data a almacenar
-			dataAAlmacenar = map[string]interface{}{
-				"pid":                strconv.Itoa(entry.PID),
-				"data":               entry.Data,
-				"entradas_por_nivel": entry.PageID,
+			if entry.Modified {
+				// Se agrega la data a almacenar
+				dataAAlmacenar = map[string]interface{}{
+					"pid":                strconv.Itoa(entry.PID),
+					"data":               entry.Data,
+					"entradas_por_nivel": entry.PageID,
+				}
+
+				// Obtenemos el frame asociado a la página
+				response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
+				nroPag, _ := m.calcularNumeroPagina(entry.PageID)
+
+				// Log obligatorio: Obtener Marco desde tabla de páginas
+				// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+				m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d",
+					entry.PID, nroPag, response.Frame))
+
+				// Enviar información a memoria y salir
+				if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
+					m.Log.Error("Error al guardar páginas en memoria",
+						log.ErrAttr(err),
+					)
+				}
+
+				// Log obligatorio: Limpieza de memoria
+				m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+					entry.PID, nroPag, response.Frame))
+
+				// Traducir dirección lógica a física (es la página completa)
+				direccionFisica := strconv.Itoa(response.Frame * m.PageSize)
+
+				//Log obligatorio: Lectura/Escritura Memoria
+				//"PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>".
+				m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+					entry.PID, direccionFisica, entry.Data))
 			}
 
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
-
-			// Obtenemos el frame asociado a la página
-			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
-			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
-
-			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				entry.PID, nroPag, response.Frame))
-
-			// Enviar información a memoria y salir
-			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
-				m.Log.Error("Error al guardar páginas en memoria",
-					log.ErrAttr(err),
-				)
-			}
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
@@ -577,32 +649,47 @@ func (m *MMU) evictCacheClock() {
 	// La segunda iteración comienza desde el principio y busca entradas con el bit de uso ya setteado en 0 anteriormente.
 	for i, entry := range newArrayCache {
 		if !entry.Reference {
-			// Se agrega la data a almacenar
-			dataAAlmacenar = map[string]interface{}{
-				"pid":                strconv.Itoa(entry.PID),
-				"data":               entry.Data,
-				"entradas_por_nivel": entry.PageID,
+			if entry.Modified {
+				// Se agrega la data a almacenar
+				dataAAlmacenar = map[string]interface{}{
+					"pid":                strconv.Itoa(entry.PID),
+					"data":               entry.Data,
+					"entradas_por_nivel": entry.PageID,
+				}
+
+				// Obtenemos el frame asociado a la página
+				response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
+				nroPag, _ := m.calcularNumeroPagina(entry.PageID)
+
+				// Log obligatorio: Obtener Marco desde tabla de páginas
+				// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+				m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d",
+					entry.PID, nroPag, response.Frame))
+
+				// Enviar información a memoria y salir
+				if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
+					m.Log.Error("Error al guardar páginas en memoria",
+						log.ErrAttr(err),
+					)
+				}
+				// Log obligatorio: Limpieza de memoria
+				m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+					entry.PID, nroPag, response.Frame))
+
+				// Traducir dirección lógica a física (es la página completa)
+				direccionFisica := strconv.Itoa(response.Frame * m.PageSize)
+
+				//Log obligatorio: Lectura/Escritura Memoria
+				//"PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>".
+				m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+					entry.PID, direccionFisica, entry.Data))
 			}
 
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
-
-			// Obtenemos el frame asociado a la página
-			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
-			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
-
-			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				entry.PID, nroPag, response.Frame))
-
-			// Enviar información a memoria y salir
-			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
-				m.Log.Error("Error al guardar páginas en memoria",
-					log.ErrAttr(err),
-				)
-			}
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
@@ -624,32 +711,11 @@ func (m *MMU) evictCacheClockM() {
 	// U = 0 y M = 0
 	for i, entry := range newArrayCache {
 		if !entry.Reference && !entry.Modified {
-			// Se agrega la data a almacenar
-			dataAAlmacenar = map[string]interface{}{
-				"pid":                strconv.Itoa(entry.PID),
-				"data":               entry.Data,
-				"entradas_por_nivel": entry.PageID,
-			}
-
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
-
-			// Obtenemos el frame asociado a la página
-			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
-			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
-
-			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				entry.PID, nroPag, response.Frame))
-
-			// Enviar información a memoria y salir
-			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
-				m.Log.Error("Error al guardar páginas en memoria",
-					log.ErrAttr(err),
-				)
-			}
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
@@ -668,8 +734,11 @@ func (m *MMU) evictCacheClockM() {
 				"entradas_por_nivel": entry.PageID,
 			}
 
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
+
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			//m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
@@ -677,8 +746,9 @@ func (m *MMU) evictCacheClockM() {
 			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
-			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+			// Log obligatorio: Obtener Marco desde tabla de páginas
+			// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+			m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d",
 				entry.PID, nroPag, response.Frame))
 
 			// Enviar información a memoria y salir
@@ -687,6 +757,17 @@ func (m *MMU) evictCacheClockM() {
 					log.ErrAttr(err),
 				)
 			}
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+				entry.PID, nroPag, response.Frame))
+
+			// Traducir dirección lógica a física (es la página completa)
+			direccionFisica := strconv.Itoa(response.Frame * m.PageSize)
+
+			//Log obligatorio: Lectura/Escritura Memoria
+			//"PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>".
+			m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+				entry.PID, direccionFisica, entry.Data))
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
@@ -699,32 +780,11 @@ func (m *MMU) evictCacheClockM() {
 	// U = 0 y M = 0
 	for i, entry := range newArrayCache {
 		if !entry.Reference && !entry.Modified {
-			// Se agrega la data a almacenar
-			dataAAlmacenar = map[string]interface{}{
-				"pid":                strconv.Itoa(entry.PID),
-				"data":               entry.Data,
-				"entradas_por_nivel": entry.PageID,
-			}
-
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
-
-			// Obtenemos el frame asociado a la página
-			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
-			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
-
-			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
-				entry.PID, nroPag, response.Frame))
-
-			// Enviar información a memoria y salir
-			if err := m.Memoria.GuardarPagsEnMemoria(dataAAlmacenar); err != nil {
-				m.Log.Error("Error al guardar páginas en memoria",
-					log.ErrAttr(err),
-				)
-			}
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
@@ -744,7 +804,8 @@ func (m *MMU) evictCacheClockM() {
 			}
 
 			// Eliminar la entrada de la caché
-			m.Cache.Entries = append(m.Cache.Entries[:i], m.Cache.Entries[i+1:]...)
+			newArrayCache = append(newArrayCache[:i], newArrayCache[i+1:]...)
+			m.Cache.Entries = newArrayCache
 			m.Log.Debug("Entrada caché evictada (CLOCK)",
 				log.StringAttr("page_id", entry.PageID))
 
@@ -752,8 +813,9 @@ func (m *MMU) evictCacheClockM() {
 			response, _ := m.Memoria.BuscarFrame(entry.PID, entry.PageID)
 			nroPag, _ := m.calcularNumeroPagina(entry.PageID)
 
-			// Log obligatorio: Limpieza de memoria
-			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+			// Log obligatorio: Obtener Marco desde tabla de páginas
+			// "PID: <PID> - OBTENER MARCO - Página: <NUMERO_PAGINA> - Marco: <NUMERO_MARCO>"
+			m.Log.Info(fmt.Sprintf("PID: %d - OBTENER MARCO - Página: %d - Marco: %d",
 				entry.PID, nroPag, response.Frame))
 
 			// Enviar información a memoria y salir
@@ -762,6 +824,17 @@ func (m *MMU) evictCacheClockM() {
 					log.ErrAttr(err),
 				)
 			}
+			// Log obligatorio: Limpieza de memoria
+			m.Log.Info(fmt.Sprintf("PID: %d - Memory Update - Página: %d - Frame: %d",
+				entry.PID, nroPag, response.Frame))
+
+			// Traducir dirección lógica a física (es la página completa)
+			direccionFisica := strconv.Itoa(response.Frame * m.PageSize)
+
+			//Log obligatorio: Lectura/Escritura Memoria
+			//"PID: <PID> - Acción: <LEER / ESCRIBIR> - Dirección Física: <DIRECCION_FISICA> - Valor: <VALOR LEIDO / ESCRITO>".
+			m.Log.Info(fmt.Sprintf("## PID: %d - Acción: ESCRIBIR - Dirección Física: %s - Valor: %s",
+				entry.PID, direccionFisica, entry.Data))
 
 			// Actualizar el puntero del CLOCK
 			m.Cache.Clock = i
