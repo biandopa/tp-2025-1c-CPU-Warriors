@@ -31,7 +31,12 @@ func (p *Service) PlanificadorCortoPlazoFIFO() {
 			// Hay nuevos procesos en Ready, procesarlos
 			p.Log.Debug("Notificación de nuevo proceso en Ready recibida")
 		default:
-			// No hay notificaciones pendientes, continuar
+			// No hay notificaciones pendientes, verificar si hay procesos para procesar
+			if len(p.Planificador.ReadyQueue) == 0 {
+				// No hay trabajo que hacer, pausar para evitar espera activa
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
 		}
 
 		// Procesar todos los procesos en ReadyQueue

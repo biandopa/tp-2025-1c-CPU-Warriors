@@ -66,8 +66,6 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	go h.Planificador.PlanificadorLargoPlazo()
 	go h.Planificador.PlanificadorCortoPlazo()
 	go h.Planificador.SuspenderProcesoBloqueado()
-	//h.Planificador.CanalNuevoProcesoNew <- proceso
-
 	h.Planificador.CanalNuevoProcesoNew <- proceso
 
 	//Log obligatorio: Creación de proceso
