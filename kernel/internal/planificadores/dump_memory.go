@@ -83,6 +83,8 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 	if proceso == nil {
 		return fmt.Errorf("proceso con PID %d no encontrado en EXEC", pid)
 	}
+	proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+		time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
 
 	// Actualizar ráfaga anterior antes de mover a BLOCKED (IMPORTANTE para SRT - incluye métricas de tiempo EXEC)
 	//p.actualizarRafagaAnterior(proceso)

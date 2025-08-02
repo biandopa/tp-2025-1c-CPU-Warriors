@@ -74,10 +74,9 @@ func (p *Service) BloquearPorIO(pid int) error {
 	if proceso != nil {
 		var removido bool
 		p.Planificador.ExecQueue, removido = p.removerDeCola(pid, p.Planificador.ExecQueue)
-		if !removido {
-			p.Log.Error("🚨 Proceso no encontrado en ExecQueue durante BloquearPorIO",
-				log.IntAttr("pid", pid),
-			)
+		if removido {
+			proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+				time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
 		}
 	}
 

@@ -365,10 +365,9 @@ func (p *Service) desalojarProceso(proceso *internal.Proceso) *cpu.Cpu {
 		// Remover de ExecQueue
 		var found bool
 		p.Planificador.ExecQueue, found = p.removerDeCola(proceso.PCB.PID, p.Planificador.ExecQueue)
-		if !found {
-			p.Log.Debug("🚨 Proceso no encontrado en ExecQueue durante desalojo",
-				log.IntAttr("pid", proceso.PCB.PID),
-			)
+		if found {
+			proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+				time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
 		}
 
 		// Log obligatorio: Desalojo de SJF/SRT

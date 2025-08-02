@@ -24,40 +24,41 @@ func (p *Service) SuspenderProcesoBloqueado() {
 			//Si el proceso sigue bloqueado, lo suspendemos
 			//p.mutexBlockQueue.Lock()
 			//sigueBloqueado := estaEnCola(proceso, p.Planificador.BlockQueue)
-			sigueBloqueado := p.BuscarProcesoEnCola(proceso.PCB.PID, "blocked")
+			if proceso != nil && proceso.PCB != nil {
+				sigueBloqueado := p.BuscarProcesoEnCola(proceso.PCB.PID, "blocked")
 
-			if sigueBloqueado != nil {
-				//Mover de blocked a suspended blocked
-				p.mutexBlockQueue.Lock()
-				p.removerDeCola(proceso.PCB.PID, p.Planificador.BlockQueue)
-				p.mutexBlockQueue.Unlock()
+				if sigueBloqueado != nil {
+					//Mover de blocked a suspended blocked
+					p.mutexBlockQueue.Lock()
+					p.removerDeCola(proceso.PCB.PID, p.Planificador.BlockQueue)
+					p.mutexBlockQueue.Unlock()
 
-				p.mutexSuspBlockQueue.Lock()
-				p.Planificador.SuspBlockQueue = append(p.Planificador.SuspBlockQueue, proceso)
-				p.mutexSuspBlockQueue.Unlock()
+					p.mutexSuspBlockQueue.Lock()
+					p.Planificador.SuspBlockQueue = append(p.Planificador.SuspBlockQueue, proceso)
+					p.mutexSuspBlockQueue.Unlock()
 
-				//Actualizar métricas
-				tiempo := proceso.PCB.MetricasTiempo[internal.EstadoBloqueado]
-				tiempo.TiempoAcumulado += time.Since(tiempo.TiempoInicio)
+					//Actualizar métricas
+					tiempo := proceso.PCB.MetricasTiempo[internal.EstadoBloqueado]
+					tiempo.TiempoAcumulado += time.Since(tiempo.TiempoInicio)
 
-				if proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado] == nil {
-					proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado] = &internal.EstadoTiempo{}
+					if proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado] == nil {
+						proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado] = &internal.EstadoTiempo{}
+					}
+					proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado].TiempoInicio = time.Now()
+					proceso.PCB.MetricasEstado[internal.EstadoSuspBloqueado]++
+
+					//Log obligatorio: Cambio de estado
+					// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+					p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado SUSP.BLOCKED", proceso.PCB.PID))
+
+					//Notificar a memoria que debe swappear
+					go p.avisarAMemoriaSwap(proceso)
+
+					//Intentar traer procesos desde SUSP READY o NEW a memoria
+					p.CheckearEspacioEnMemoria()
+
 				}
-				proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado].TiempoInicio = time.Now()
-				proceso.PCB.MetricasEstado[internal.EstadoSuspBloqueado]++
-
-				//Log obligatorio: Cambio de estado
-				// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
-				p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado SUSP.BLOCKED", proceso.PCB.PID))
-
-				//Notificar a memoria que debe swappear
-				go p.avisarAMemoriaSwap(proceso)
-
-				//Intentar traer procesos desde SUSP READY o NEW a memoria
-				p.CheckearEspacioEnMemoria()
-
-			}
-			//p.mutexBlockQueue.Unlock()
+			} //p.mutexBlockQueue.Unlock()
 		}()
 	}
 }

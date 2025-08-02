@@ -229,6 +229,8 @@ func (p *Service) FinalizarProceso(pid int) {
 			p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:i], p.Planificador.ExecQueue[i+1:]...)
 			break
 		}
+		proc.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+			time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
 	}
 	p.mutexExecQueue.Unlock()
 
