@@ -171,7 +171,7 @@ func (p *Service) removerDeCola(pid int, cola []*internal.Proceso) ([]*internal.
 	procesoRemovido := false
 
 	for _, proc := range cola {
-		if proc.PCB.PID != pid {
+		if proc != nil && proc.PCB != nil && proc.PCB.PID != pid {
 			nuevaQueue = append(nuevaQueue, proc)
 		} else {
 			procesoRemovido = true

@@ -444,7 +444,7 @@ func (p *Service) asignarProcesoACPU(proceso *internal.Proceso, cpuAsignada *cpu
 	// Verificar que el proceso no esté ya en ExecQueue
 	p.mutexExecQueue.RLock()
 	for _, proc := range p.Planificador.ExecQueue {
-		if proc.PCB.PID == proceso.PCB.PID {
+		if proc != nil && proc.PCB.PID == proceso.PCB.PID {
 			p.Log.Error("Proceso ya está en ExecQueue, no se puede asignar nuevamente",
 				log.IntAttr("pid", proceso.PCB.PID),
 			)

@@ -64,7 +64,7 @@ func (p *Service) BloquearPorIO(pid int) error {
 
 	p.mutexExecQueue.Lock()
 	for _, proc := range p.Planificador.ExecQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB != nil && proc.PCB.PID == pid {
 			proceso = proc
 			break
 		}
@@ -81,8 +81,10 @@ func (p *Service) BloquearPorIO(pid int) error {
 		}
 	}
 
+	p.mutexExecQueue.Unlock()
+
 	if proceso == nil {
-		p.mutexExecQueue.Unlock()
+		//p.mutexExecQueue.Unlock()
 		return fmt.Errorf("proceso con PID %d no encontrado en EXEC", pid)
 	}
 
@@ -104,7 +106,6 @@ func (p *Service) BloquearPorIO(pid int) error {
 	proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoBloqueado]++
 	p.mutexBlockQueue.Unlock()
-	p.mutexExecQueue.Unlock()
 
 	// Notificar al planificador de mediano plazo
 	p.CanalNuevoProcBlocked <- proceso
