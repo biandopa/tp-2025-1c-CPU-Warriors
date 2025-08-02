@@ -22,14 +22,16 @@ type rtaCPU struct {
 func (h *Handler) crearProceso(nombreArchivo, tamanioProceso string) *internal.Proceso {
 	proceso := &internal.Proceso{
 		PCB: &internal.PCB{
-			PID:                h.UniqueID.GetUniqueID(),
-			PC:                 0,
-			MetricasTiempo:     map[internal.Estado]*internal.EstadoTiempo{},
-			MetricasEstado:     map[internal.Estado]int{},
-			Tamanio:            tamanioProceso,
-			NombreArchivo:      nombreArchivo,
-			EstimacionAnterior: float64(h.Config.InitialEstimate * 1000), // Convertir a milisegundos
+			PID:            h.UniqueID.GetUniqueID(),
+			PC:             0,
+			MetricasTiempo: map[internal.Estado]*internal.EstadoTiempo{},
+			MetricasEstado: map[internal.Estado]int{},
+			Tamanio:        tamanioProceso,
+			NombreArchivo:  nombreArchivo,
 		},
+		EstimacionRafaga:     float64(h.Config.InitialEstimate),
+		UltimaRafagaEstimada: float64(h.Config.InitialEstimate),
+		UltimaRafagaReal:     float64(h.Config.InitialEstimate),
 	}
 
 	// Inicializar métricas de tiempo para estado NEW
@@ -127,7 +129,7 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 
 		if !existeIO {
 			//No existe la IO, se manda a EXIT
-			go h.Planificador.FinalizarProceso(syscall.PID)
+			go h.Planificador.FinalizarProcesoEnCualquierCola(syscall.PID)
 			return
 
 		} else {
@@ -235,7 +237,7 @@ func (h *Handler) RespuestaProcesoCPU(w http.ResponseWriter, r *http.Request) {
 		//"## (<PID>) - Solicitó syscall: <NOMBRE_SYSCALL>"
 		h.Log.Info(fmt.Sprintf("## (%d) - Solicitó syscall: %s", syscall.PID, syscall.Instruccion))
 
-		go h.Planificador.FinalizarProceso(syscall.PID)
+		go h.Planificador.FinalizarProcesoEnCualquierCola(syscall.PID)
 
 	default:
 		w.WriteHeader(http.StatusBadRequest)

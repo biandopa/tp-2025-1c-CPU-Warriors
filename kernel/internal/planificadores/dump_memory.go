@@ -12,15 +12,13 @@ import (
 // Bloquea el proceso, solicita el dump a memoria, y luego lo desbloquea o envía a EXIT
 func (p *Service) RealizarDumpMemory(pid int) {
 	// Mover el proceso de EXEC a BLOCKED
-	go func() {
-		if err := p.moverProcesoExecABlocked(pid); err != nil {
-			p.Log.Error("Error al mover proceso de EXEC a BLOCKED",
-				log.IntAttr("pid", pid),
-				log.ErrAttr(err),
-			)
-			return
-		}
-	}()
+	if err := p.moverProcesoExecABlocked(pid); err != nil {
+		p.Log.Error("Error al mover proceso de EXEC a BLOCKED",
+			log.IntAttr("pid", pid),
+			log.ErrAttr(err),
+		)
+		return
+	}
 
 	// Realizar el dump de memoria de forma asíncrona
 	go func() {
@@ -32,14 +30,14 @@ func (p *Service) RealizarDumpMemory(pid int) {
 				log.ErrAttr(err),
 			)
 
-			if err = p.moverProcesoBlockedAExit(pid); err != nil {
+			/*if err = p.moverProcesoBlockedAExit(pid); err != nil {
 				p.Log.Error("Error al mover proceso de BLOCKED a EXIT",
 					log.IntAttr("pid", pid),
 					log.ErrAttr(err),
 				)
-			} else {
-				go p.FinalizarProceso(pid)
-			}
+			} else {*/
+			go p.FinalizarProcesoEnCualquierCola(pid)
+			//}
 
 		} else {
 			// Si es exitoso, mover el proceso de BLOCKED a READY
@@ -77,20 +75,21 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 				log.IntAttr("pid", pid),
 			)
 		}
+
+		if proceso.PCB.MetricasTiempo[internal.EstadoExec] != nil {
+			proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+				time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
+		}
 	}
-	p.mutexExecQueue.Unlock()
 
 	if proceso == nil {
+		p.mutexExecQueue.Unlock()
 		return fmt.Errorf("proceso con PID %d no encontrado en EXEC", pid)
 	}
-
-	// Actualizar ráfaga anterior antes de mover a BLOCKED (IMPORTANTE para SRT - incluye métricas de tiempo EXEC)
-	p.actualizarRafagaAnterior(proceso)
 
 	// Agregar a BLOCKED
 	p.mutexBlockQueue.Lock()
 	p.Planificador.BlockQueue = append(p.Planificador.BlockQueue, proceso)
-	p.mutexBlockQueue.Unlock()
 
 	// Inicializar métricas de tiempo para BLOCKED
 	if proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] == nil {
@@ -100,6 +99,8 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 	proceso.PCB.MetricasEstado[internal.EstadoBloqueado]++
 
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado BLOCKED", proceso.PCB.PID))
+	p.mutexBlockQueue.Unlock()
+	p.mutexExecQueue.Unlock()
 
 	// Notificar al planificador de mediano plazo
 	p.CanalNuevoProcBlocked <- proceso
@@ -129,9 +130,9 @@ func (p *Service) moverProcesoBlockedAReady(pid int) error {
 			)
 		}
 	}
-	p.mutexBlockQueue.Unlock()
 
 	if proceso == nil {
+		p.mutexBlockQueue.Unlock()
 		return fmt.Errorf("proceso con PID %d no encontrado en BLOCKED", pid)
 	}
 
@@ -150,9 +151,10 @@ func (p *Service) moverProcesoBlockedAReady(pid int) error {
 	}
 	proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoReady]++
-	p.mutexReadyQueue.Unlock()
 
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado READY", proceso.PCB.PID))
+	p.mutexReadyQueue.Unlock()
+	p.mutexBlockQueue.Unlock()
 
 	p.canalNuevoProcesoReady <- struct{}{} // Notificar al planificador de corto plazo
 
@@ -182,9 +184,9 @@ func (p *Service) moverProcesoBlockedAExit(pid int) error {
 			)
 		}
 	}
-	p.mutexBlockQueue.Unlock()
 
 	if proceso == nil {
+		p.mutexBlockQueue.Unlock()
 		return fmt.Errorf("proceso con PID %d no encontrado en BLOCKED", pid)
 	}
 
@@ -208,6 +210,7 @@ func (p *Service) moverProcesoBlockedAExit(pid int) error {
 	proceso.PCB.MetricasEstado[internal.EstadoExit]++
 
 	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado BLOCKED al estado EXIT", proceso.PCB.PID))
+	p.mutexBlockQueue.Unlock()
 
 	return nil
 }

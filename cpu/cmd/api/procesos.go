@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/sisoputnfrba/tp-golang/utils/log"
 )
@@ -21,6 +22,9 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 		log.IntAttr("pid", proceso.PID),
 		log.IntAttr("pc", proceso.PC))
 
+	// Settear el tiempo de inicio del proceso
+	h.TiempoInicio = time.Now()
+
 	// Ejecutar el proceso en este CPU
 	msg := h.Ciclo(&proceso)
 
@@ -29,6 +33,7 @@ func (h *Handler) RecibirProcesos(w http.ResponseWriter, r *http.Request) {
 		"pid":    proceso.PID,
 		"pc":     proceso.PC,
 		"motivo": msg,
+		"rafaga": time.Since(h.TiempoInicio).Milliseconds(),
 	}
 
 	w.WriteHeader(http.StatusOK)

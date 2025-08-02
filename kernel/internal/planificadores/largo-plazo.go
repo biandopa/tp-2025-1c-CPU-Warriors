@@ -92,286 +92,182 @@ func (p *Service) PlanificadorLargoPlazoPMCP(proceso *internal.Proceso) {
 
 func (p *Service) CheckearEspacioEnMemoria() {
 	// Priorizamos los procesos suspendidos ready
+	// Usar scope limitado de mutex para evitar deadlocks
+	var (
+		procesosAMover []*internal.Proceso
+	)
+
 	p.mutexSuspReadyQueue.Lock()
-	i := 0
-	for i < len(p.Planificador.SuspReadyQueue) {
-		proceso := p.Planificador.SuspReadyQueue[i]
+	for _, proceso := range p.Planificador.SuspReadyQueue {
 		if p.Memoria.ConsultarEspacio(proceso.PCB.Tamanio, proceso.PCB.PID) {
-			// Si el proceso se carga en memoria, lo muevo a la cola de ready
-			// y lo elimino de la cola de suspendidos ready
-
-			// Remover el proceso de la cola
-			p.Planificador.SuspReadyQueue, _ = p.removerDeCola(proceso.PCB.PID, p.Planificador.SuspReadyQueue)
-
-			if proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] == nil {
-				proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] = &internal.EstadoTiempo{}
-			}
-			timeSusp := proceso.PCB.MetricasTiempo[internal.EstadoSuspReady]
-			timeSusp.TiempoAcumulado = timeSusp.TiempoAcumulado + time.Since(timeSusp.TiempoInicio)
-
-			// Agrego el proceso a la cola de ready
-			p.mutexReadyQueue.Lock()
-			p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-			if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
-				proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
-			}
-			proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
-
-			proceso.PCB.MetricasEstado[internal.EstadoReady]++
-			p.mutexReadyQueue.Unlock()
-
-			// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
-			p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
-
-			// Enviar señal al canal de corto plazo para procesos suspendidos
-			p.Log.Debug("Enviando señal al canal de corto plazo (SUSP.READY -> READY)",
-				log.IntAttr("pid", proceso.PCB.PID))
-
-			p.canalNuevoProcesoReady <- struct{}{}
-
-			// No incrementar i porque removimos un elemento
+			procesosAMover = append(procesosAMover, proceso)
 		} else {
 			// Si no hay espacio, salir del loop
 			break
 		}
 	}
-	p.mutexSuspReadyQueue.Unlock()
 
+	// Quitar los procesos que se van a mover de la cola
+	for _, proceso := range procesosAMover {
+		// Remover de SuspReadyQueue
+		var removido bool
+		p.Planificador.SuspReadyQueue, removido = p.removerDeCola(proceso.PCB.PID, p.Planificador.SuspReadyQueue)
+
+		if !removido {
+			p.Log.Error("🚨 Proceso no encontrado en SuspReadyQueue durante carga a memoria",
+				log.IntAttr("pid", proceso.PCB.PID),
+			)
+			continue
+		}
+
+		// Actualizar métricas de tiempo
+		if proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] == nil {
+			proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] = &internal.EstadoTiempo{}
+		}
+		timeSusp := proceso.PCB.MetricasTiempo[internal.EstadoSuspReady]
+		timeSusp.TiempoAcumulado = timeSusp.TiempoAcumulado + time.Since(timeSusp.TiempoInicio)
+
+		// Agregar a ReadyQueue
+		p.mutexReadyQueue.Lock()
+		p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
+		if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
+			proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
+		}
+		proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
+		proceso.PCB.MetricasEstado[internal.EstadoReady]++
+
+		//Log obligatorio: Cambio de estado
+		p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado SUSP.READY al estado READY", proceso.PCB.PID))
+
+		// Enviar señal al canal de corto plazo para procesos suspendidos
+		p.Log.Debug("Enviando señal al canal de corto plazo (SUSP.READY -> READY)",
+			log.IntAttr("pid", proceso.PCB.PID))
+
+		p.mutexReadyQueue.Unlock()
+
+		// Notificar al planificador de corto plazo
+		p.canalNuevoProcesoReady <- struct{}{}
+	}
+
+	// Si no hay procesos suspendidos, revisar NewQueue
 	if len(p.Planificador.SuspReadyQueue) == 0 {
+		var procesosACargar []*internal.Proceso
+
 		p.mutexNewQueue.Lock()
-		i := 0
-		for i < len(p.Planificador.NewQueue) {
-			proceso := p.Planificador.NewQueue[i]
+		for _, proceso := range p.Planificador.NewQueue {
 			if p.Memoria.ConsultarEspacio(proceso.PCB.Tamanio, proceso.PCB.PID) {
-				// Si el proceso se carga en memoria, lo muevo a la cola de ready
-				// y lo elimino de la cola de new
-
-				// Remover el proceso de la cola usando índice
-				p.Planificador.NewQueue, _ = p.removerDeCola(proceso.PCB.PID, p.Planificador.NewQueue)
-
-				if proceso.PCB.MetricasTiempo[internal.EstadoNew] == nil {
-					proceso.PCB.MetricasTiempo[internal.EstadoNew] = &internal.EstadoTiempo{}
-				}
-				timeNew := proceso.PCB.MetricasTiempo[internal.EstadoNew]
-				timeNew.TiempoAcumulado = timeNew.TiempoAcumulado + time.Since(timeNew.TiempoInicio)
-
-				if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
-					proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
-				}
-
-				p.Memoria.CargarProcesoEnMemoriaDeSistema(proceso.PCB.NombreArchivo, proceso.PCB.PID)
-
-				// Primero agrego el proceso a la cola de ready
-				p.mutexReadyQueue.Lock()
-				p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
-				proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
-				proceso.PCB.MetricasEstado[internal.EstadoReady]++
-				p.mutexReadyQueue.Unlock()
-
-				// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
-				p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado NEW al estado READY", proceso.PCB.PID))
-
-				// Luego, envío la señal para que el planificador de corto plazo pueda ejecutar el proceso
-				p.Log.Debug("Enviando señal al canal de corto plazo",
-					log.IntAttr("pid", proceso.PCB.PID))
-
-				p.canalNuevoProcesoReady <- struct{}{}
-
-				// No incrementar i porque removimos un elemento
+				procesosACargar = append(procesosACargar, proceso)
 			} else {
 				p.Log.Debug("No hay espacio en memoria para el proceso",
 					log.IntAttr("pid", proceso.PCB.PID))
-				break
+				break // Si no hay espacio para este proceso, no habrá para los siguientes
 			}
+		}
+
+		for _, proceso := range procesosACargar {
+			// Remover de NewQueue
+			var removido bool
+			p.Planificador.NewQueue, removido = p.removerDeCola(proceso.PCB.PID, p.Planificador.NewQueue)
+
+			if !removido {
+				p.Log.Error("🚨 Proceso no encontrado en NewQueue durante carga a memoria",
+					log.IntAttr("pid", proceso.PCB.PID),
+				)
+				continue
+			}
+
+			// Actualizar métricas
+			if proceso.PCB.MetricasTiempo[internal.EstadoNew] == nil {
+				proceso.PCB.MetricasTiempo[internal.EstadoNew] = &internal.EstadoTiempo{}
+			}
+			timeNew := proceso.PCB.MetricasTiempo[internal.EstadoNew]
+			timeNew.TiempoAcumulado = timeNew.TiempoAcumulado + time.Since(timeNew.TiempoInicio)
+
+			//p.mutexNewQueue.Unlock()
+
+			// Cargar en memoria
+			p.Memoria.CargarProcesoEnMemoriaDeSistema(proceso.PCB.NombreArchivo, proceso.PCB.PID)
+
+			// Agregar a ReadyQueue
+			p.mutexReadyQueue.Lock()
+			p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue, proceso)
+
+			if proceso.PCB.MetricasTiempo[internal.EstadoReady] == nil {
+				proceso.PCB.MetricasTiempo[internal.EstadoReady] = &internal.EstadoTiempo{}
+			}
+
+			proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio = time.Now()
+			proceso.PCB.MetricasEstado[internal.EstadoReady]++
+
+			//Log obligatorio: Cambio de estado
+			p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado NEW al estado READY", proceso.PCB.PID))
+
+			p.Log.Debug("Enviando señal al canal de corto plazo",
+				log.IntAttr("pid", proceso.PCB.PID))
+
+			p.mutexReadyQueue.Unlock()
+
+			// Notificar al planificador de corto plazo
+			p.canalNuevoProcesoReady <- struct{}{}
 		}
 		p.mutexNewQueue.Unlock()
 	}
+	p.mutexSuspReadyQueue.Unlock()
 }
 
-func (p *Service) FinalizarProceso(pid int) {
-	// 1. Buscar el proceso en la cola de exec (verificación inicial sin lock)
-	var proceso *internal.Proceso
-
-	// Verificación inicial para ver si el proceso existe
-	procesoEncontrado := false
-	for _, proc := range p.Planificador.ExecQueue {
-		if proc.PCB.PID == pid {
-			proceso = proc
-			procesoEncontrado = true
-			break
-		}
-	}
-
-	if !procesoEncontrado {
-		p.Log.Debug("No se encontró el proceso en la cola de exec",
-			log.IntAttr("PID", pid),
-		)
-		return
-	}
-
-	// 2. Notificar a Memoria
-	status, err := p.Memoria.FinalizarProceso(proceso.PCB.PID)
-	if err != nil || status != http.StatusOK {
-		p.Log.Error("Error al finalizar proceso en memoria",
-			log.ErrAttr(err),
-			log.IntAttr("PID", proceso.PCB.PID),
-		)
-		return
-	}
-
-	// 3. PRIMERO: Remover de ExecQueue antes de actualizar ráfaga (evita deadlock)
-	p.mutexExecQueue.Lock()
-	for i, proc := range p.Planificador.ExecQueue {
-		if proc.PCB.PID == pid {
-			// Sacar de la cola de exec
-			p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:i], p.Planificador.ExecQueue[i+1:]...)
-			break
-		}
-	}
-	p.mutexExecQueue.Unlock()
-
-	// 4. DESPUÉS: Actualizar ráfaga anterior (IMPORTANTE para SRT)
-	p.actualizarRafagaAnterior(proceso)
-
-	// 5. Cambiar el estado de la CPU y notificar al planificador
-	cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
-	if cpuFound != nil {
-		p.LiberarCPU(cpuFound) // Usar función centralizada que incluye notificación al planificador
-	}
-
-	if proceso.PCB.MetricasTiempo[internal.EstadoExit] == nil {
-		proceso.PCB.MetricasTiempo[internal.EstadoExit] = &internal.EstadoTiempo{}
-	}
-	proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoInicio = time.Now()
-
-	// 6. Cambiar el estado del proceso a EXIT (las métricas de EXEC ya están actualizadas por actualizarRafagaAnterior)
-	proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoAcumulado = time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoInicio)
-	proceso.PCB.MetricasEstado[internal.EstadoExec]++
-	proceso.PCB.MetricasEstado[internal.EstadoExit]++
-
-	// 7. Loguear métricas
-	//Log obligatorio: Cambio de estado
-	// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
-	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado EXIT", proceso.PCB.PID))
-
-	//Log obligatorio: Finalización de proceso
-	//"## (<PID>) - Finaliza el proceso"
-	p.Log.Info(fmt.Sprintf("## (%d) Finaliza el proceso", proceso.PCB.PID))
-
-	// Log obligatorio: Métricas de Estado
-	//"## (<PID>) - Métricas de estado: NEW (NEW_COUNT) (NEW_TIME), READY (READY_COUNT) (READY_TIME), …"
-	p.Log.Info(fmt.Sprintf("## (%d) - Métricas de estado: NEW %d %d, READY %d %d, "+
-		"EXEC %d %d, BLOCKED %d %d, SUSP. BLOCKED %d %d, SUSP. READY %d %d, EXIT %d %d",
-		proceso.PCB.PID,
-		proceso.PCB.MetricasEstado[internal.EstadoNew],
-		proceso.PCB.MetricasTiempo[internal.EstadoNew].TiempoAcumulado.Milliseconds(),
-		proceso.PCB.MetricasEstado[internal.EstadoReady],
-		proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoAcumulado.Milliseconds(),
-		proceso.PCB.MetricasEstado[internal.EstadoExec],
-		proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado.Milliseconds(),
-		proceso.PCB.MetricasEstado[internal.EstadoBloqueado],
-		proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoAcumulado.Milliseconds(),
-		proceso.PCB.MetricasEstado[internal.EstadoSuspBloqueado],
-		proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado].TiempoAcumulado.Milliseconds(),
-		proceso.PCB.MetricasEstado[internal.EstadoSuspReady],
-		proceso.PCB.MetricasTiempo[internal.EstadoSuspReady].TiempoAcumulado.Milliseconds(),
-		proceso.PCB.MetricasEstado[internal.EstadoExit],
-		proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoAcumulado.Milliseconds(),
-	),
-	)
-
-	// 8. Checkear si hay procesos suspendidos que puedan volver a memoria
-	p.CheckearEspacioEnMemoria()
-}
-
-// FinalizarProcesoEnCualquierCola busca un proceso en todas las colas y lo finaliza
-// Esta función es útil cuando el proceso puede estar en BLOCKED, SUSP.BLOCKED, etc.
+// FinalizarProcesoEnCualquierCola busca un proceso en todas las colas y lo finaliza.
 func (p *Service) FinalizarProcesoEnCualquierCola(pid int) {
-	var (
-		proceso        *internal.Proceso
-		estadoAnterior string
-	)
+	proceso, cola := p.BuscarProcesoEnCualquierCola(pid)
 
-	// 1. Buscar el proceso en todas las colas posibles
-	// Primero en EXEC (comportamiento normal)
-	for i, proc := range p.Planificador.ExecQueue {
-		if proc.PCB.PID == pid {
-			proceso = proc
-			estadoAnterior = "EXEC"
+	// Vovler a revisar si estaba en otra cola más
+	if proceso2, cola2 := p.BuscarProcesoEnCualquierCola(pid); proceso2 != nil && proceso2.PCB.PID == pid {
+		proceso = proceso2
+		cola = cola2
+	}
 
-			// Sacarlo de EXEC PRIMERO (evitar deadlock)
-			p.Planificador.ExecQueue = append(p.Planificador.ExecQueue[:i], p.Planificador.ExecQueue[i+1:]...)
+	// Si encontré proceso en EXEC, actualizar y liberar CPU
+	if proceso != nil {
+		// Actualizar métricas de tiempo
+		if proceso.PCB.MetricasTiempo[cola] != nil {
+			proceso.PCB.MetricasTiempo[cola].TiempoAcumulado +=
+				time.Since(proceso.PCB.MetricasTiempo[cola].TiempoInicio)
+		}
 
-			// DESPUÉS actualizar ráfaga anterior (IMPORTANTE para SRT - pero sin deadlock)
-			p.actualizarRafagaAnterior(proceso)
-
+		switch cola {
+		case internal.EstadoExec:
 			// Liberar CPU
 			cpuFound := p.buscarCPUPorPID(proceso.PCB.PID)
 			if cpuFound != nil {
-				p.LiberarCPU(cpuFound) // Usar función centralizada que incluye notificación al planificador
+				p.LiberarCPU(cpuFound)
 			}
-			break
-		}
-	}
 
-	// Si no está en EXEC, buscar en BLOCKED
-	if proceso == nil {
-		p.mutexBlockQueue.Lock()
-		for i, proc := range p.Planificador.BlockQueue {
-			if proc.PCB.PID == pid {
-				proceso = proc
-				estadoAnterior = "BLOCKED"
-				// Sacarlo de BLOCKED
-				p.Planificador.BlockQueue = append(p.Planificador.BlockQueue[:i], p.Planificador.BlockQueue[i+1:]...)
-				break
-			}
+			p.mutexExecQueue.Lock()
+			p.Planificador.ExecQueue, _ = p.removerDeCola(pid, p.Planificador.ExecQueue)
+			p.mutexExecQueue.Unlock()
+		case internal.EstadoReady:
+			p.mutexReadyQueue.Lock()
+			p.Planificador.ReadyQueue, _ = p.removerDeCola(pid, p.Planificador.ReadyQueue)
+			p.mutexReadyQueue.Unlock()
+		case internal.EstadoBloqueado:
+			p.mutexBlockQueue.Lock()
+			p.Planificador.BlockQueue, _ = p.removerDeCola(pid, p.Planificador.BlockQueue)
+			p.mutexBlockQueue.Unlock()
+		case internal.EstadoSuspBloqueado:
+			p.mutexSuspBlockQueue.Lock()
+			p.Planificador.SuspBlockQueue, _ = p.removerDeCola(pid, p.Planificador.SuspBlockQueue)
+			p.mutexSuspBlockQueue.Unlock()
+		case internal.EstadoSuspReady:
+			p.mutexSuspReadyQueue.Lock()
+			p.Planificador.SuspReadyQueue, _ = p.removerDeCola(pid, p.Planificador.SuspReadyQueue)
+			p.mutexSuspReadyQueue.Unlock()
+		case internal.EstadoNew:
+			p.Planificador.NewQueue, _ = p.removerDeCola(pid, p.Planificador.NewQueue)
+		default:
+			p.Log.Error("🚨 Estado no reconocido al finalizar proceso",
+				log.IntAttr("pid", pid),
+				log.StringAttr("estado", string(cola)),
+			)
 		}
-		p.mutexBlockQueue.Unlock()
-	}
-
-	// Si no está en BLOCKED, buscar en SUSP.BLOCKED
-	if proceso == nil {
-		p.mutexSuspBlockQueue.Lock()
-		for i, proc := range p.Planificador.SuspBlockQueue {
-			if proc.PCB.PID == pid {
-				proceso = proc
-				estadoAnterior = "SUSP.BLOCKED"
-				// Sacarlo de SUSP.BLOCKED
-				p.Planificador.SuspBlockQueue = append(p.Planificador.SuspBlockQueue[:i], p.Planificador.SuspBlockQueue[i+1:]...)
-				break
-			}
-		}
-		p.mutexSuspBlockQueue.Unlock()
-	}
-
-	// Si no está en ninguna de las anteriores, buscar en READY
-	if proceso == nil {
-		p.mutexReadyQueue.Lock()
-		for i, proc := range p.Planificador.ReadyQueue {
-			if proc.PCB.PID == pid {
-				proceso = proc
-				estadoAnterior = "READY"
-				// Sacarlo de READY
-				p.Planificador.ReadyQueue = append(p.Planificador.ReadyQueue[:i], p.Planificador.ReadyQueue[i+1:]...)
-				break
-			}
-		}
-		p.mutexReadyQueue.Unlock()
-	}
-
-	// Si no está en READY, buscar en SUSP.READY
-	if proceso == nil {
-		p.mutexSuspReadyQueue.Lock()
-		for i, proc := range p.Planificador.SuspReadyQueue {
-			if proc.PCB.PID == pid {
-				proceso = proc
-				estadoAnterior = "SUSP.READY"
-				// Sacarlo de SUSP.READY
-				p.Planificador.SuspReadyQueue = append(p.Planificador.SuspReadyQueue[:i], p.Planificador.SuspReadyQueue[i+1:]...)
-				break
-			}
-		}
-		p.mutexSuspReadyQueue.Unlock()
 	}
 
 	if proceso == nil {
@@ -391,40 +287,21 @@ func (p *Service) FinalizarProcesoEnCualquierCola(pid int) {
 		return
 	}
 
-	// 3. Actualizar métricas según el estado anterior
+	// 3. Actualizar métricas de Exit
 	proceso.PCB.MetricasEstado[internal.EstadoExit]++
 	if proceso.PCB.MetricasTiempo[internal.EstadoExit] == nil {
 		proceso.PCB.MetricasTiempo[internal.EstadoExit] = &internal.EstadoTiempo{}
 	}
 	proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoInicio = time.Now()
 
-	// Actualizar tiempo acumulado del estado anterior
-	switch estadoAnterior {
-	case "EXEC":
-		// Ya se actualizó en actualizarRafagaAnterior() - no hacer nada adicional
-	case "BLOCKED":
-		if proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] != nil {
-			proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoAcumulado += time.Since(proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoInicio)
-		}
-	case "SUSP.BLOCKED":
-		if proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado] != nil {
-			proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado].TiempoAcumulado += time.Since(proceso.PCB.MetricasTiempo[internal.EstadoSuspBloqueado].TiempoInicio)
-		}
-	case "READY":
-		if proceso.PCB.MetricasTiempo[internal.EstadoReady] != nil {
-			proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoAcumulado += time.Since(proceso.PCB.MetricasTiempo[internal.EstadoReady].TiempoInicio)
-		}
-	case "SUSP.READY":
-		if proceso.PCB.MetricasTiempo[internal.EstadoSuspReady] != nil {
-			proceso.PCB.MetricasTiempo[internal.EstadoSuspReady].TiempoAcumulado += time.Since(proceso.PCB.MetricasTiempo[internal.EstadoSuspReady].TiempoInicio)
-		}
-	}
-
 	//Log obligatorio: Cambio de estado
-	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado %s al estado EXIT", proceso.PCB.PID, estadoAnterior))
+	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado %s al estado EXIT", proceso.PCB.PID, cola))
 
 	//Log obligatorio: Finalización de proceso
 	p.Log.Info(fmt.Sprintf("## (%d) Finaliza el proceso", proceso.PCB.PID))
+
+	proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoAcumulado +=
+		time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoInicio)
 
 	// Log obligatorio: Métricas de Estado
 	p.Log.Info(fmt.Sprintf("## (%d) - Métricas de estado: NEW %d %d, READY %d %d, "+
@@ -446,6 +323,9 @@ func (p *Service) FinalizarProcesoEnCualquierCola(pid int) {
 		proceso.PCB.MetricasTiempo[internal.EstadoExit].TiempoAcumulado.Milliseconds(),
 	),
 	)
+
+	proceso.PCB = nil // Liberar referencia al proceso
+	proceso = nil     // Liberar referencia al proceso
 
 	// 4. Checkear si hay procesos suspendidos que puedan volver a memoria
 	p.CheckearEspacioEnMemoria()

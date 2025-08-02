@@ -97,68 +97,67 @@ func NewPlanificador(log *slog.Logger, ipMemoria, largoPlazoAlgoritmo, cortoPlaz
 		MedianoPlazoConfig: &MedianoPlazoConfig{
 			SuspensionTime: suspTime,
 		},
-		CPUSemaphore: make(chan struct{}, 100), // Inicializamos el semáforo vacío, se llenará cuando se conecten CPUp.
-		// Buffer máximo de 100 CPUs
-		HttpClient: httpClient,
+		CPUSemaphore: make(chan struct{}, 10), // Inicializamos el semáforo vacío, se llenará cuando se conecten CPUs. Buffer máximo de 10 CPUs
+		HttpClient:   httpClient,
 	}
 }
 
-func (p *Service) BuscarProcesoEnCualquierCola(pid int) *internal.Proceso {
-	p.mutexNewQueue.RLock()
-	for _, proc := range p.Planificador.NewQueue {
-		if proc.PCB.PID == pid {
-			p.mutexNewQueue.RUnlock()
-			return proc
-		}
-	}
-	p.mutexNewQueue.RUnlock()
-
-	p.mutexReadyQueue.RLock()
-	for _, proc := range p.Planificador.ReadyQueue {
-		if proc.PCB.PID == pid {
-			p.mutexReadyQueue.RUnlock()
-			return proc
-		}
-	}
-	p.mutexReadyQueue.RUnlock()
-
-	p.mutexBlockQueue.RLock()
-	for _, proc := range p.Planificador.BlockQueue {
-		if proc.PCB.PID == pid {
-			p.mutexBlockQueue.RUnlock()
-			return proc
-		}
-	}
-	p.mutexBlockQueue.RUnlock()
-
+func (p *Service) BuscarProcesoEnCualquierCola(pid int) (*internal.Proceso, internal.Estado) {
 	p.mutexExecQueue.RLock()
 	for _, proc := range p.Planificador.ExecQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB.PID == pid {
 			p.mutexExecQueue.RUnlock()
-			return proc
+			return proc, internal.EstadoExec
 		}
 	}
 	p.mutexExecQueue.RUnlock()
 
+	p.mutexReadyQueue.RLock()
+	for _, proc := range p.Planificador.ReadyQueue {
+		if proc != nil && proc.PCB.PID == pid {
+			p.mutexReadyQueue.RUnlock()
+			return proc, internal.EstadoReady
+		}
+	}
+	p.mutexReadyQueue.RUnlock()
+
+	p.mutexNewQueue.RLock()
+	for _, proc := range p.Planificador.NewQueue {
+		if proc != nil && proc.PCB.PID == pid {
+			p.mutexNewQueue.RUnlock()
+			return proc, internal.EstadoNew
+		}
+	}
+	p.mutexNewQueue.RUnlock()
+
+	p.mutexBlockQueue.RLock()
+	for _, proc := range p.Planificador.BlockQueue {
+		if proc != nil && proc.PCB.PID == pid {
+			p.mutexBlockQueue.RUnlock()
+			return proc, internal.EstadoBloqueado
+		}
+	}
+	p.mutexBlockQueue.RUnlock()
+
 	p.mutexSuspBlockQueue.RLock()
 	for _, proc := range p.Planificador.SuspBlockQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB.PID == pid {
 			p.mutexSuspBlockQueue.RUnlock()
-			return proc
+			return proc, internal.EstadoSuspBloqueado
 		}
 	}
 	p.mutexSuspBlockQueue.RUnlock()
 
 	p.mutexSuspReadyQueue.RLock()
 	for _, proc := range p.Planificador.SuspReadyQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB.PID == pid {
 			p.mutexSuspReadyQueue.RUnlock()
-			return proc
+			return proc, internal.EstadoSuspReady
 		}
 	}
 	p.mutexSuspReadyQueue.RUnlock()
 
-	return nil // No se encontró el proceso en ninguna cola
+	return nil, "" // No se encontró el proceso en ninguna cola
 }
 
 // removerDeCola remueve un proceso de cualquier cola de forma segura y devuelve la nueva cola
@@ -169,7 +168,7 @@ func (p *Service) removerDeCola(pid int, cola []*internal.Proceso) ([]*internal.
 	procesoRemovido := false
 
 	for _, proc := range cola {
-		if proc.PCB.PID != pid {
+		if proc != nil && proc.PCB.PID != pid {
 			nuevaQueue = append(nuevaQueue, proc)
 		} else {
 			procesoRemovido = true

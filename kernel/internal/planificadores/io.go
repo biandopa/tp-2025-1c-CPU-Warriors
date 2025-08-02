@@ -79,15 +79,17 @@ func (p *Service) BloquearPorIO(pid int) error {
 				log.IntAttr("pid", pid),
 			)
 		}
+
+		if proceso.PCB.MetricasTiempo[internal.EstadoExec] != nil {
+			proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+				time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
+		}
 	}
 	p.mutexExecQueue.Unlock()
 
 	if proceso == nil {
 		return fmt.Errorf("proceso con PID %d no encontrado en EXEC", pid)
 	}
-
-	// Actualizar ráfaga anterior antes de bloquear (IMPORTANTE para SRT - incluye métricas de tiempo EXEC)
-	p.actualizarRafagaAnterior(proceso)
 
 	// Agregar a BLOCKED
 	p.mutexBlockQueue.Lock()
