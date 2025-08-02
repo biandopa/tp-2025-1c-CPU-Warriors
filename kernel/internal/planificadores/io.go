@@ -64,7 +64,7 @@ func (p *Service) BloquearPorIO(pid int) error {
 
 	p.mutexExecQueue.Lock()
 	for _, proc := range p.Planificador.ExecQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB != nil && proc.PCB.PID == pid {
 			proceso = proc
 			break
 		}
@@ -74,25 +74,29 @@ func (p *Service) BloquearPorIO(pid int) error {
 	if proceso != nil {
 		var removido bool
 		p.Planificador.ExecQueue, removido = p.removerDeCola(pid, p.Planificador.ExecQueue)
-		if !removido {
-			p.Log.Error("🚨 Proceso no encontrado en ExecQueue durante BloquearPorIO",
-				log.IntAttr("pid", pid),
-			)
+		if removido {
+			proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+				time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
 		}
 	}
+
 	p.mutexExecQueue.Unlock()
 
 	if proceso == nil {
+		//p.mutexExecQueue.Unlock()
 		return fmt.Errorf("proceso con PID %d no encontrado en EXEC", pid)
 	}
 
 	// Actualizar ráfaga anterior antes de bloquear (IMPORTANTE para SRT - incluye métricas de tiempo EXEC)
-	p.actualizarRafagaAnterior(proceso)
+	//p.actualizarRafagaAnterior(proceso)
 
 	// Agregar a BLOCKED
 	p.mutexBlockQueue.Lock()
 	p.Planificador.BlockQueue = append(p.Planificador.BlockQueue, proceso)
-	p.mutexBlockQueue.Unlock()
+
+	//Log obligatorio: Cambio de estado
+	// "## (<PID>) Pasa del estado <ESTADO_ANTERIOR> al estado <ESTADO_ACTUAL>"
+	p.Log.Info(fmt.Sprintf("## (%d) Pasa del estado EXEC al estado BLOCKED", pid))
 
 	// Inicializar métricas de tiempo para BLOCKED
 	if proceso.PCB.MetricasTiempo[internal.EstadoBloqueado] == nil {
@@ -100,6 +104,7 @@ func (p *Service) BloquearPorIO(pid int) error {
 	}
 	proceso.PCB.MetricasTiempo[internal.EstadoBloqueado].TiempoInicio = time.Now()
 	proceso.PCB.MetricasEstado[internal.EstadoBloqueado]++
+	p.mutexBlockQueue.Unlock()
 
 	// Notificar al planificador de mediano plazo
 	p.CanalNuevoProcBlocked <- proceso

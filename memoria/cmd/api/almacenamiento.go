@@ -217,7 +217,7 @@ func (h *Handler) escribirMarcoEnSwap(archivo *os.File, marco int) error {
 // BuscarProcesoPorPID Busca la tablaProceso dentro de la lista de TablasProcesos por pid
 func (h *Handler) BuscarProcesoPorPID(pid string) (*TablasProceso, error) {
 	for _, proceso := range h.TablasProcesos {
-		if proceso.PID == pid {
+		if proceso != nil && proceso.PID == pid {
 			return proceso, nil
 		}
 	}
