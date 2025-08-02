@@ -63,12 +63,12 @@ func (h *Handler) EjecutarPlanificadores(archivoNombre, tamanioProceso string) {
 	// Creo un proceso con métricas inicializadas correctamente
 	proceso := h.crearProceso(archivoNombre, tamanioProceso)
 
-	go func() {
-		h.Planificador.PlanificadorLargoPlazo()
-		h.Planificador.PlanificadorCortoPlazo()
-		h.Planificador.SuspenderProcesoBloqueado()
-		h.Planificador.CanalNuevoProcesoNew <- proceso
-	}()
+	go h.Planificador.PlanificadorLargoPlazo()
+	go h.Planificador.PlanificadorCortoPlazo()
+	go h.Planificador.SuspenderProcesoBloqueado()
+	h.Planificador.CanalNuevoProcesoNew <- proceso
+
+	h.Planificador.CanalNuevoProcesoNew <- proceso
 
 	//Log obligatorio: Creación de proceso
 	//"## (<PID>) Se crea el proceso - Estado: NEW"
