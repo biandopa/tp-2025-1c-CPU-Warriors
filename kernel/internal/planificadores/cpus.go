@@ -29,7 +29,6 @@ func (p *Service) BuscarCPUDisponible() *cpu.Cpu {
 	// Buscar y reservar una CPU libre
 	p.mutexCPUsConectadas.Lock()
 	defer p.mutexCPUsConectadas.Unlock()
-
 	for i := range p.CPUsConectadas {
 		if p.CPUsConectadas[i].Estado && p.CPUsConectadas[i].Proceso.PID == -1 {
 			p.CPUsConectadas[i].Estado = false // Marcar como ocupada
@@ -45,15 +44,13 @@ func (p *Service) BuscarCPUDisponible() *cpu.Cpu {
 // LiberarCPU libera una CPU de vuelta al pool de CPUs disponibles
 func (p *Service) LiberarCPU(cpuToRelease *cpu.Cpu) {
 	p.mutexCPUsConectadas.Lock()
-	defer p.mutexCPUsConectadas.Unlock()
+
 	cpuToRelease.Estado = true    // Marcar como libre
 	cpuToRelease.Proceso.PID = -1 // Limpiar el PID del proceso asociado
 
 	// Liberar el semáforo (release)
 	p.CPUSemaphore <- struct{}{}
-
-	p.Log.Debug("CPU liberada",
-		log.StringAttr("cpu_id", cpuToRelease.ID))
+	p.mutexCPUsConectadas.Unlock()
 
 	/*// Notificar al planificador de corto plazo que puede haber más trabajo
 	select {
@@ -83,7 +80,7 @@ func (p *Service) IntentarBuscarCPUDisponible() *cpu.Cpu {
 		}
 
 		// Esto no debería suceder, devolver el token al semáforo
-		p.CPUSemaphore <- struct{}{}
+		//p.CPUSemaphore <- struct{}{}
 		return nil
 	default:
 		// No hay CPUs disponibles

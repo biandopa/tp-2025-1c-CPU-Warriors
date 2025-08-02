@@ -19,7 +19,7 @@ func (s *Service) HayInterrupciones() bool {
 }
 
 // ObtenerInterrupcion obtiene y elimina la primera interrupción de la cola
-func (s *Service) ObtenerInterrupcion() (Interrupcion, bool) {
+func (s *Service) ObtenerInterrupcion(pid int) (Interrupcion, bool) {
 	s.InterruptMutex.Lock()
 	defer s.InterruptMutex.Unlock()
 
@@ -27,15 +27,34 @@ func (s *Service) ObtenerInterrupcion() (Interrupcion, bool) {
 		return Interrupcion{}, false
 	}
 
-	interrupcion := s.Interrupciones[0]
-	s.Interrupciones = s.Interrupciones[1:]
+	// Si hay interrupciones para el PID específico, devolver la primera y eliminarla
+	var (
+		interrupcion Interrupcion
+		index        int
+		found        bool
+	)
+
+	for i, interr := range s.Interrupciones {
+		if interr.PID == pid {
+			s.Log.Debug("Interrupción encontrada para PID",
+				log.IntAttr("pid", pid),
+				log.StringAttr("tipo", string(interrupcion.Tipo)))
+
+			index = i
+			interrupcion = interr
+			found = true
+			break
+		}
+	}
+
+	s.Interrupciones = append(s.Interrupciones[:index], s.Interrupciones[index+1:]...)
 
 	s.Log.Debug("Interrupción procesada",
 		log.StringAttr("tipo", string(interrupcion.Tipo)),
 		log.IntAttr("pid", interrupcion.PID),
 	)
 
-	return interrupcion, true
+	return interrupcion, found
 }
 
 // LimpiarInterrupciones limpia todas las interrupciones pendientes

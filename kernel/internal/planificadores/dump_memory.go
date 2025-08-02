@@ -38,7 +38,7 @@ func (p *Service) RealizarDumpMemory(pid int) {
 					log.ErrAttr(err),
 				)
 			} else {
-				go p.FinalizarProceso(pid)
+				go p.FinalizarProcesoEnCualquierCola(pid)
 			}
 
 		} else {
@@ -78,14 +78,18 @@ func (p *Service) moverProcesoExecABlocked(pid int) error {
 			)
 		}
 	}
-	p.mutexExecQueue.Unlock()
 
 	if proceso == nil {
+		p.mutexExecQueue.Unlock()
 		return fmt.Errorf("proceso con PID %d no encontrado en EXEC", pid)
 	}
 
+	proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado +=
+		time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
+	p.mutexExecQueue.Unlock()
+
 	// Actualizar ráfaga anterior antes de mover a BLOCKED (IMPORTANTE para SRT - incluye métricas de tiempo EXEC)
-	p.actualizarRafagaAnterior(proceso)
+	//p.actualizarRafagaAnterior(proceso)
 
 	// Agregar a BLOCKED
 	p.mutexBlockQueue.Lock()

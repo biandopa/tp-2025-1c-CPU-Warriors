@@ -23,9 +23,9 @@ func (p *Service) SuspenderProcesoBloqueado() {
 
 			//Si el proceso sigue bloqueado, lo suspendemos
 			p.mutexBlockQueue.Lock()
-			sigueBloqueado := estaEnCola(proceso, p.Planificador.BlockQueue)
+			//sigueBloqueado := estaEnCola(proceso, p.Planificador.BlockQueue)
 
-			if sigueBloqueado {
+			if process := p.BuscarProcesoEnCola(proceso.PCB.PID, "blocked"); process != nil {
 				//Mover de blocked a suspended blocked
 				p.removerDeCola(proceso.PCB.PID, p.Planificador.BlockQueue)
 
@@ -68,8 +68,8 @@ func (p *Service) ManejarFinIO(proceso *internal.Proceso) {
 	}
 
 	p.mutexSuspBlockQueue.Lock()
-	estabaSuspendido := estaEnCola(proceso, p.Planificador.SuspBlockQueue)
-	if estabaSuspendido {
+	//estabaSuspendido := estaEnCola(proceso, p.Planificador.SuspBlockQueue)
+	if process := p.BuscarProcesoEnCola(proceso.PCB.PID, "suspended_blocked"); process != nil {
 		var removido bool
 		p.Planificador.SuspBlockQueue, removido = p.removerDeCola(proceso.PCB.PID, p.Planificador.SuspBlockQueue)
 		if !removido {
@@ -173,7 +173,7 @@ func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
 	case "exec":
 		p.mutexExecQueue.RLock()
 		for _, proc := range p.Planificador.ExecQueue {
-			if proc.PCB.PID == pid {
+			if proc != nil && proc.PCB != nil && proc.PCB.PID == pid {
 				p.mutexExecQueue.RUnlock()
 				return proc
 			}
@@ -182,7 +182,7 @@ func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
 	case "suspended_blocked":
 		p.mutexSuspBlockQueue.RLock()
 		for _, proc := range p.Planificador.SuspBlockQueue {
-			if proc.PCB.PID == pid {
+			if proc != nil && proc.PCB != nil && proc.PCB.PID == pid {
 				p.mutexSuspBlockQueue.RUnlock()
 				return proc
 			}
@@ -191,7 +191,7 @@ func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
 	case "blocked":
 		p.mutexBlockQueue.RLock()
 		for _, proc := range p.Planificador.BlockQueue {
-			if proc.PCB.PID == pid {
+			if proc != nil && proc.PCB != nil && proc.PCB.PID == pid {
 				p.mutexBlockQueue.RUnlock()
 				return proc
 			}
@@ -200,7 +200,7 @@ func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
 	case "ready":
 		p.mutexReadyQueue.RLock()
 		for _, proc := range p.Planificador.ReadyQueue {
-			if proc.PCB.PID == pid {
+			if proc != nil && proc.PCB != nil && proc.PCB.PID == pid {
 				p.mutexReadyQueue.RUnlock()
 				return proc
 			}
@@ -209,7 +209,7 @@ func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
 	case "suspended_ready":
 		p.mutexSuspReadyQueue.RLock()
 		for _, proc := range p.Planificador.SuspReadyQueue {
-			if proc.PCB.PID == pid {
+			if proc != nil && proc.PCB != nil && proc.PCB.PID == pid {
 				p.mutexSuspReadyQueue.RUnlock()
 				return proc
 			}
@@ -220,7 +220,7 @@ func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
 		// Primero en BLOCKED (más probable para procesos de IO)
 		p.mutexBlockQueue.RLock()
 		for _, proc := range p.Planificador.BlockQueue {
-			if proc.PCB.PID == pid {
+			if proc != nil && proc.PCB != nil && proc.PCB.PID == pid {
 				p.mutexBlockQueue.RUnlock()
 				return proc
 			}
@@ -230,7 +230,7 @@ func (p *Service) BuscarProcesoEnCola(pid int, cola string) *internal.Proceso {
 		// Luego en SUSP.BLOCKED
 		p.mutexSuspBlockQueue.RLock()
 		for _, proc := range p.Planificador.SuspBlockQueue {
-			if proc.PCB.PID == pid {
+			if proc != nil && proc.PCB != nil && proc.PCB.PID == pid {
 				p.mutexSuspBlockQueue.RUnlock()
 				return proc
 			}
