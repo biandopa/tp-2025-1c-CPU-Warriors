@@ -26,7 +26,11 @@ func (p *Service) SuspenderProcesoBloqueado() {
 			//sigueBloqueado := estaEnCola(proceso, p.Planificador.BlockQueue)
 			if proceso != nil && proceso.PCB != nil {
 				sigueBloqueado := p.BuscarProcesoEnCola(proceso.PCB.PID, "blocked")
-
+				sigueBloqueadoEnSusp := p.BuscarProcesoEnCola(proceso.PCB.PID, "suspended_blocked")
+				//TO DO: SI ROMPE COMENTARLA
+				if sigueBloqueadoEnSusp != nil {
+					return
+				}
 				if sigueBloqueado != nil {
 					//Mover de blocked a suspended blocked
 					p.mutexBlockQueue.Lock()
