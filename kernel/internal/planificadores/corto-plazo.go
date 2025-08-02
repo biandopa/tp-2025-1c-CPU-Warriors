@@ -315,31 +315,36 @@ func (p *Service) evaluarDesalojo(procesoNuevo *internal.Proceso) bool {
 // actualizarRafagaAnterior actualiza la ráfaga anterior y estimación anterior del proceso
 // Debe llamarse cada vez que un proceso deja de ejecutarse (por desalojo, IO, finalización, etc.)
 func (p *Service) actualizarRafagaAnterior(proceso *internal.Proceso) {
-	tiempoEjecutado := time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
+	var tiempoEjecutado time.Duration
+	if proceso != nil && proceso.PCB != nil {
+		tiempoEjecutado = time.Since(proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoInicio)
 
-	// Actualizar tiempo acumulado de ejecución
-	if proceso.PCB.MetricasTiempo[internal.EstadoExec] != nil {
-		proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado += tiempoEjecutado
+		// Actualizar tiempo acumulado de ejecución
+		if proceso.PCB.MetricasTiempo[internal.EstadoExec] != nil {
+			proceso.PCB.MetricasTiempo[internal.EstadoExec].TiempoAcumulado += tiempoEjecutado
+		}
+
+		// Calcular NUEVA estimación usando la ráfaga anterior actual
+		nuevaEstimacion := p.calcularSiguienteEstimacion(proceso) // 1000
+
+		// Después actualizar la ráfaga anterior con el tiempo recién ejecutado
+		if proceso.PCB.RafagaAnterior == nil {
+			proceso.PCB.RafagaAnterior = &tiempoEjecutado
+		} else {
+			*proceso.PCB.RafagaAnterior = tiempoEjecutado
+		}
+
+		// Guardar la nueva estimación calculada correctamente
+		proceso.PCB.EstimacionAnterior = nuevaEstimacion
+
+		p.Log.Debug("Ráfaga anterior actualizada",
+			log.IntAttr("pid", proceso.PCB.PID),
+			log.AnyAttr("rafaga_ejecutada_ms", float64(tiempoEjecutado.Milliseconds())),
+			log.AnyAttr("nueva_estimacion", proceso.PCB.EstimacionAnterior),
+		)
+
 	}
 
-	// Calcular NUEVA estimación usando la ráfaga anterior actual
-	nuevaEstimacion := p.calcularSiguienteEstimacion(proceso) // 1000
-
-	// Después actualizar la ráfaga anterior con el tiempo recién ejecutado
-	if proceso.PCB.RafagaAnterior == nil {
-		proceso.PCB.RafagaAnterior = &tiempoEjecutado
-	} else {
-		*proceso.PCB.RafagaAnterior = tiempoEjecutado
-	}
-
-	// Guardar la nueva estimación calculada correctamente
-	proceso.PCB.EstimacionAnterior = nuevaEstimacion
-
-	p.Log.Debug("Ráfaga anterior actualizada",
-		log.IntAttr("pid", proceso.PCB.PID),
-		log.AnyAttr("rafaga_ejecutada_ms", float64(tiempoEjecutado.Milliseconds())),
-		log.AnyAttr("nueva_estimacion", proceso.PCB.EstimacionAnterior),
-	)
 }
 
 // desalojarProceso desaloja un proceso de la CPU y lo devuelve a ReadyQueue

@@ -116,7 +116,7 @@ func (p *Service) moverProcesoBlockedAReady(pid int) error {
 	// Remover de BLOCKED usando función segura
 	p.mutexBlockQueue.Lock()
 	for _, proc := range p.Planificador.BlockQueue {
-		if proc.PCB.PID == pid {
+		if proc != nil && proc.PCB != nil && proc.PCB.PID == pid {
 			proceso = proc
 			break
 		}
