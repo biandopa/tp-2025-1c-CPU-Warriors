@@ -81,12 +81,9 @@ func (h *Handler) TerminoPeticionIO(w http.ResponseWriter, r *http.Request) {
 
 	// Buscar el proceso en cualquier cola (primero en blocked, luego en suspended_blocked)
 	proceso := h.Planificador.BuscarProcesoEnCola(ioIdentificacionPeticion.ProcesoID, "blocked")
-	h.Log.Info("todo bien")
 	if proceso == nil {
-		h.Log.Info("todo normal- no bloqueado")
 		// Si no está en blocked, buscar en suspended_blocked
 		proceso = h.Planificador.BuscarProcesoEnCola(ioIdentificacionPeticion.ProcesoID, "suspended_blocked")
-		h.Log.Info("todo normal- no suspendido")
 	}
 
 	if proceso != nil {
